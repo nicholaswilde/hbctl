@@ -1,0 +1,4 @@
+[
+  { "id": "et-item", "name": "Item", "description": "Standard inventory item", "isLocation": false },
+  { "id": "et-loc", "name": "Storage Bin", "description": "Physical container", "isLocation": true }
+]

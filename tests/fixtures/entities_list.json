@@ -1,0 +1,33 @@
+{
+  "items": [
+    {
+      "id": "ent-1",
+      "name": "ESP32 DevKitC",
+      "description": "Wi-Fi + BLE microcontroller",
+      "quantity": 3,
+      "entityTypeId": "et-item",
+      "tags": [
+        { "id": "tag-elec", "name": "electronics", "description": null }
+      ],
+      "tagIds": null,
+      "fields": null,
+      "attachments": null
+    },
+    {
+      "id": "ent-2",
+      "name": "Fluke 87V",
+      "description": "True-RMS multimeter",
+      "quantity": 1,
+      "entityTypeId": "et-item",
+      "tags": [
+        { "id": "tag-tools", "name": "tools", "description": "" }
+      ],
+      "tagIds": ["tag-tools"],
+      "fields": null,
+      "attachments": null
+    }
+  ],
+  "page": 1,
+  "pageSize": 50,
+  "total": 2
+}

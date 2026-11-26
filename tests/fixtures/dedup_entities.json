@@ -1,0 +1,31 @@
+{
+  "items": [
+    {
+      "id": "dup-1",
+      "name": "BME280 Sensor Module v1.0",
+      "description": "Temp/Humidity",
+      "quantity": 2,
+      "tags": [],
+      "fields": []
+    },
+    {
+      "id": "dup-2",
+      "name": "BME280 Breakout Board",
+      "description": "Temp/Humidity",
+      "quantity": 3,
+      "tags": [],
+      "fields": []
+    },
+    {
+      "id": "dup-3",
+      "name": "Unique Oscilloscope",
+      "description": "Rigol",
+      "quantity": 1,
+      "tags": [],
+      "fields": []
+    }
+  ],
+  "page": 1,
+  "pageSize": 50,
+  "total": 3
+}

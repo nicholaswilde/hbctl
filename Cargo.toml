@@ -1,0 +1,99 @@
+[package]
+name = "hbx"
+version = "0.1.0"
+edition = "2021"
+authors = ["Nicholas Wilde"]
+description = "A fast, agent-friendly Rust CLI for remote Homebox v0.26+ instances"
+
+[lib]
+name = "hbx"
+path = "src/lib.rs"
+
+[[bin]]
+name = "hbx"
+path = "src/main.rs"
+
+[dependencies]
+anyhow = "1.0"
+clap = { version = "4.5", features = ["derive", "env"] }
+clap_complete = "4.5"
+clap_mangen = "0.3"
+comfy-table = "7.1"
+csv = "1.3"
+directories = "6.0"
+dotenvy = "0.15"
+mime_guess = "2.0"
+owo-colors = "4.1"
+regex = "1.11"
+reqwest = { version = "0.12", default-features = false, features = [
+  "blocking",
+  "json",
+  "multipart",
+  "rustls-tls",
+] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+thiserror = "2.0"
+toml = "0.8"
+url = "2.5"
+
+[dev-dependencies]
+assert_cmd = "2.0"
+mockito = "1.7"
+predicates = "3.1"
+tempfile = "3.16"
+testcontainers = { version = "0.28", features = ["blocking"] }
+
+# Profile for final production releases (smaller, faster)
+[profile.release]
+opt-level = "z"   # Optimize for size
+lto = true        # Link Time Optimization (smaller binary)
+codegen-units = 1 # Reduce parallel code generation for better optimization
+panic = "abort"   # Remove stack unwinding (smaller binary)
+strip = true      # Strip symbols (smaller binary)
+
+# Profile for CI/CD builds (inherits from dev)
+[profile.ci]
+inherits = "dev"
+incremental = false # Disable incremental compilation for CI (often slower/buggy in CI cache)
+debug = 0           # No debug info needed for basic CI checks (speeds up build)
+
+[package.metadata.deb]
+maintainer = "Nicholas Wilde <ncwilde43@gmail.com>"
+copyright = "2026 Nicholas Wilde"
+license-file = ["LICENSE", "4"]
+extended-description = "A fast, agent-friendly Rust CLI for interacting with remote Homebox v0.26+ instances."
+section = "utils"
+priority = "optional"
+assets = [
+  [
+    "target/release/hbx",
+    "usr/bin/",
+    "755",
+  ],
+  [
+    "assets/hbx.1",
+    "usr/share/man/man1/",
+    "644",
+  ],
+  [
+    "completions/hbx.bash",
+    "usr/share/bash-completion/completions/hbx",
+    "644",
+  ],
+  [
+    "completions/_hbx",
+    "usr/share/zsh/vendor-completions/_hbx",
+    "644",
+  ],
+  [
+    "completions/hbx.fish",
+    "usr/share/fish/vendor_completions.d/hbx.fish",
+    "644",
+  ],
+  [
+    "docs/README.md",
+    "usr/share/doc/hbx/README.md",
+    "644",
+  ],
+]

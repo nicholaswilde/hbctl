@@ -1,0 +1,16 @@
+[
+  {
+    "name": "Existing Widget",
+    "description": "Updated desc",
+    "quantity": 4,
+    "manufacturer": "Acme",
+    "tags": ["electronics"]
+  },
+  {
+    "name": "Brand New Sensor",
+    "description": "Fresh part",
+    "quantity": 2,
+    "model_number": "SHT40",
+    "tags": ["electronics"]
+  }
+]

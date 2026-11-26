@@ -1,0 +1,17 @@
+# hbx
+
+> Fast, agent-friendly Rust CLI client for remote Homebox v0.26+ REST APIs.
+
+## Docs
+
+- [README](docs/README.md): Overview, installation, usage, configuration
+- [Config Example](assets/config.example.toml): Annotated TOML configuration options
+- [AGENTS](AGENTS.md): Architecture, module map, and quality gates
+
+## Source
+
+- [src/cli.rs](src/cli.rs): CLI flags and subcommands
+- [src/config.rs](src/config.rs): Layered configuration precedence
+- [src/client/mod.rs](src/client/mod.rs): Homebox v0.26+ REST client
+- [src/dedup.rs](src/dedup.rs): Two-pass deduplication engine
+- [src/output.rs](src/output.rs): Table, compact JSON, plain, CSV, Markdown renderers

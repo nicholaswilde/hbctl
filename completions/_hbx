@@ -1,0 +1,1546 @@
+#compdef hbx
+
+autoload -U is-at-least
+
+_hbx() {
+    typeset -A opt_args
+    typeset -a _arguments_options
+    local ret=1
+
+    if is-at-least 5.2; then
+        _arguments_options=(-s -S -C)
+    else
+        _arguments_options=(-s -C)
+    fi
+
+    local context curcontext="$curcontext" state line
+    _arguments "${_arguments_options[@]}" : \
+'--url=[Homebox base URL (env\: HBX_URL > HOMEBOX_URL > http\://<HOMEBOX_IP>\:7745)]:URL:_default' \
+'--api-key=[Homebox API key or Bearer token (env\: HBX_API_KEY > HOMEBOX_API_KEY)]:API_KEY:_default' \
+'--output=[Output format (table, json, plain) \[env\: HBX_OUTPUT\]]:OUTPUT:(table json plain)' \
+'*--select=[Comma-separated field projection for JSON/table output (e.g. id,name,fields)]:SELECT:_default' \
+'-C+[Path to explicit TOML configuration file]:CONFIG:_files' \
+'--config=[Path to explicit TOML configuration file]:CONFIG:_files' \
+'--json[Shorthand for --output json (emits compact JSON)]' \
+'--dry-run[Preview mutating requests without hitting the server (redacts Authorization)]' \
+'-q[Output only created/affected IDs for shell piping]' \
+'--quiet[Output only created/affected IDs for shell piping]' \
+'-h[Print help]' \
+'--help[Print help]' \
+'-V[Print version]' \
+'--version[Print version]' \
+":: :_hbx_commands" \
+"*::: :->hbx" \
+&& ret=0
+    case $state in
+    (hbx)
+        words=($line[1] "${words[@]}")
+        (( CURRENT += 1 ))
+        curcontext="${curcontext%:*:*}:hbx-command-$line[1]:"
+        case $line[1] in
+            (item)
+_arguments "${_arguments_options[@]}" : \
+'--url=[Homebox base URL (env\: HBX_URL > HOMEBOX_URL > http\://<HOMEBOX_IP>\:7745)]:URL:_default' \
+'--api-key=[Homebox API key or Bearer token (env\: HBX_API_KEY > HOMEBOX_API_KEY)]:API_KEY:_default' \
+'--output=[Output format (table, json, plain) \[env\: HBX_OUTPUT\]]:OUTPUT:(table json plain)' \
+'*--select=[Comma-separated field projection for JSON/table output (e.g. id,name,fields)]:SELECT:_default' \
+'-C+[Path to explicit TOML configuration file]:CONFIG:_files' \
+'--config=[Path to explicit TOML configuration file]:CONFIG:_files' \
+'--json[Shorthand for --output json (emits compact JSON)]' \
+'--dry-run[Preview mutating requests without hitting the server (redacts Authorization)]' \
+'-q[Output only created/affected IDs for shell piping]' \
+'--quiet[Output only created/affected IDs for shell piping]' \
+'-h[Print help]' \
+'--help[Print help]' \
+":: :_hbx__subcmd__item_commands" \
+"*::: :->item" \
+&& ret=0
+
+    case $state in
+    (item)
+        words=($line[1] "${words[@]}")
+        (( CURRENT += 1 ))
+        curcontext="${curcontext%:*:*}:hbx-item-command-$line[1]:"
+        case $line[1] in
+            (list)
+_arguments "${_arguments_options[@]}" : \
+'--tag=[Filter by tag name or UUID]:TAG:_default' \
+'--type=[Filter by entity type name or UUID]:ENTITY_TYPE:_default' \
+'--has-field=[Only include items having the named custom field (hydrates details if missing)]:HAS_FIELD:_default' \
+'--page-size=[Page size for listing]:PAGE_SIZE:_default' \
+'--url=[Homebox base URL (env\: HBX_URL > HOMEBOX_URL > http\://<HOMEBOX_IP>\:7745)]:URL:_default' \
+'--api-key=[Homebox API key or Bearer token (env\: HBX_API_KEY > HOMEBOX_API_KEY)]:API_KEY:_default' \
+'--output=[Output format (table, json, plain) \[env\: HBX_OUTPUT\]]:OUTPUT:(table json plain)' \
+'*--select=[Comma-separated field projection for JSON/table output (e.g. id,name,fields)]:SELECT:_default' \
+'-C+[Path to explicit TOML configuration file]:CONFIG:_files' \
+'--config=[Path to explicit TOML configuration file]:CONFIG:_files' \
+'--all[Fetch all pages]' \
+'--json[Shorthand for --output json (emits compact JSON)]' \
+'--dry-run[Preview mutating requests without hitting the server (redacts Authorization)]' \
+'-q[Output only created/affected IDs for shell piping]' \
+'--quiet[Output only created/affected IDs for shell piping]' \
+'-h[Print help]' \
+'--help[Print help]' \
+&& ret=0
+;;
+(get)
+_arguments "${_arguments_options[@]}" : \
+'--url=[Homebox base URL (env\: HBX_URL > HOMEBOX_URL > http\://<HOMEBOX_IP>\:7745)]:URL:_default' \
+'--api-key=[Homebox API key or Bearer token (env\: HBX_API_KEY > HOMEBOX_API_KEY)]:API_KEY:_default' \
+'--output=[Output format (table, json, plain) \[env\: HBX_OUTPUT\]]:OUTPUT:(table json plain)' \
+'*--select=[Comma-separated field projection for JSON/table output (e.g. id,name,fields)]:SELECT:_default' \
+'-C+[Path to explicit TOML configuration file]:CONFIG:_files' \
+'--config=[Path to explicit TOML configuration file]:CONFIG:_files' \
+'--json[Shorthand for --output json (emits compact JSON)]' \
+'--dry-run[Preview mutating requests without hitting the server (redacts Authorization)]' \
+'-q[Output only created/affected IDs for shell piping]' \
+'--quiet[Output only created/affected IDs for shell piping]' \
+'-h[Print help]' \
+'--help[Print help]' \
+':id -- Entity ID:_default' \
+&& ret=0
+;;
+(create)
+_arguments "${_arguments_options[@]}" : \
+'--name=[Item name (required unless supplied via --from-json)]:NAME:_default' \
+'--description=[Item description]:DESCRIPTION:_default' \
+'--type=[Entity type name or UUID]:ENTITY_TYPE:_default' \
+'*--tag=[Tag name or UUID (repeatable; missing tags auto-created)]:TAGS:_default' \
+'--manufacturer=[Manufacturer (normalized into custom field '\''Manufacturer'\'')]:MANUFACTURER:_default' \
+'--model=[Model number (normalized into custom field '\''Model Number'\'')]:MODEL:_default' \
+'--notes=[Notes (normalized into custom field '\''Notes'\'')]:NOTES:_default' \
+'--quantity=[Item quantity]:QUANTITY:_default' \
+'--purchase-price=[Purchase price]:PURCHASE_PRICE:_default' \
+'--purchase-date=[Purchase date (YYYY-MM-DD)]:PURCHASE_DATE:_default' \
+'--purchase-from=[Purchase vendor/source]:PURCHASE_FROM:_default' \
+'*--field=[Custom field KEY=VAL (repeatable)]:FIELDS:_default' \
+'--field-type=[Value type for --field entries]:FIELD_TYPE:(text number boolean)' \
+'--from-json=[Load initial item JSON from file path or '\''-'\'' for stdin]:FROM_JSON:_default' \
+'--url=[Homebox base URL (env\: HBX_URL > HOMEBOX_URL > http\://<HOMEBOX_IP>\:7745)]:URL:_default' \
+'--api-key=[Homebox API key or Bearer token (env\: HBX_API_KEY > HOMEBOX_API_KEY)]:API_KEY:_default' \
+'--output=[Output format (table, json, plain) \[env\: HBX_OUTPUT\]]:OUTPUT:(table json plain)' \
+'*--select=[Comma-separated field projection for JSON/table output (e.g. id,name,fields)]:SELECT:_default' \
+'-C+[Path to explicit TOML configuration file]:CONFIG:_files' \
+'--config=[Path to explicit TOML configuration file]:CONFIG:_files' \
+'--json[Shorthand for --output json (emits compact JSON)]' \
+'--dry-run[Preview mutating requests without hitting the server (redacts Authorization)]' \
+'-q[Output only created/affected IDs for shell piping]' \
+'--quiet[Output only created/affected IDs for shell piping]' \
+'-h[Print help]' \
+'--help[Print help]' \
+&& ret=0
+;;
+(update)
+_arguments "${_arguments_options[@]}" : \
+'--name=[Updated item name]:NAME:_default' \
+'--description=[Updated item description]:DESCRIPTION:_default' \
+'--type=[Entity type name or UUID]:ENTITY_TYPE:_default' \
+'*--tag=[Tag name or UUID to merge (repeatable)]:TAGS:_default' \
+'--manufacturer=[Manufacturer (merged into custom field '\''Manufacturer'\'')]:MANUFACTURER:_default' \
+'--model=[Model number (merged into custom field '\''Model Number'\'')]:MODEL:_default' \
+'--quantity=[Updated quantity]:QUANTITY:_default' \
+'--purchase-price=[Updated purchase price]:PURCHASE_PRICE:_default' \
+'--purchase-date=[Updated purchase date (YYYY-MM-DD)]:PURCHASE_DATE:_default' \
+'--purchase-from=[Updated purchase source]:PURCHASE_FROM:_default' \
+'--notes=[Notes (merged into custom field '\''Notes'\'')]:NOTES:_default' \
+'*--field=[Custom field KEY=VAL to upsert (repeatable)]:FIELDS:_default' \
+'--field-type=[Value type for --field entries]:FIELD_TYPE:(text number boolean)' \
+'--from-json=[Load patch JSON from file path or '\''-'\'' for stdin]:FROM_JSON:_default' \
+'--url=[Homebox base URL (env\: HBX_URL > HOMEBOX_URL > http\://<HOMEBOX_IP>\:7745)]:URL:_default' \
+'--api-key=[Homebox API key or Bearer token (env\: HBX_API_KEY > HOMEBOX_API_KEY)]:API_KEY:_default' \
+'--output=[Output format (table, json, plain) \[env\: HBX_OUTPUT\]]:OUTPUT:(table json plain)' \
+'*--select=[Comma-separated field projection for JSON/table output (e.g. id,name,fields)]:SELECT:_default' \
+'-C+[Path to explicit TOML configuration file]:CONFIG:_files' \
+'--config=[Path to explicit TOML configuration file]:CONFIG:_files' \
+'--json[Shorthand for --output json (emits compact JSON)]' \
+'--dry-run[Preview mutating requests without hitting the server (redacts Authorization)]' \
+'-q[Output only created/affected IDs for shell piping]' \
+'--quiet[Output only created/affected IDs for shell piping]' \
+'-h[Print help]' \
+'--help[Print help]' \
+':id -- Entity ID to update:_default' \
+&& ret=0
+;;
+(upsert)
+_arguments "${_arguments_options[@]}" : \
+'--name=[Item name to match or create]:NAME:_default' \
+'--description=[Item description]:DESCRIPTION:_default' \
+'--type=[Entity type name or UUID]:ENTITY_TYPE:_default' \
+'*--tag=[Tag name or UUID (repeatable; missing tags auto-created)]:TAGS:_default' \
+'--manufacturer=[Manufacturer]:MANUFACTURER:_default' \
+'--model=[Model number]:MODEL:_default' \
+'--notes=[Notes]:NOTES:_default' \
+'--quantity=[Quantity]:QUANTITY:_default' \
+'--purchase-price=[Purchase price]:PURCHASE_PRICE:_default' \
+'--purchase-date=[Purchase date (YYYY-MM-DD)]:PURCHASE_DATE:_default' \
+'--purchase-from=[Purchase source]:PURCHASE_FROM:_default' \
+'*--field=[Custom field KEY=VAL (repeatable)]:FIELDS:_default' \
+'--field-type=[Value type for --field entries]:FIELD_TYPE:(text number boolean)' \
+'--url=[Homebox base URL (env\: HBX_URL > HOMEBOX_URL > http\://<HOMEBOX_IP>\:7745)]:URL:_default' \
+'--api-key=[Homebox API key or Bearer token (env\: HBX_API_KEY > HOMEBOX_API_KEY)]:API_KEY:_default' \
+'--output=[Output format (table, json, plain) \[env\: HBX_OUTPUT\]]:OUTPUT:(table json plain)' \
+'*--select=[Comma-separated field projection for JSON/table output (e.g. id,name,fields)]:SELECT:_default' \
+'-C+[Path to explicit TOML configuration file]:CONFIG:_files' \
+'--config=[Path to explicit TOML configuration file]:CONFIG:_files' \
+'--json[Shorthand for --output json (emits compact JSON)]' \
+'--dry-run[Preview mutating requests without hitting the server (redacts Authorization)]' \
+'-q[Output only created/affected IDs for shell piping]' \
+'--quiet[Output only created/affected IDs for shell piping]' \
+'-h[Print help]' \
+'--help[Print help]' \
+&& ret=0
+;;
+(delete)
+_arguments "${_arguments_options[@]}" : \
+'--url=[Homebox base URL (env\: HBX_URL > HOMEBOX_URL > http\://<HOMEBOX_IP>\:7745)]:URL:_default' \
+'--api-key=[Homebox API key or Bearer token (env\: HBX_API_KEY > HOMEBOX_API_KEY)]:API_KEY:_default' \
+'--output=[Output format (table, json, plain) \[env\: HBX_OUTPUT\]]:OUTPUT:(table json plain)' \
+'*--select=[Comma-separated field projection for JSON/table output (e.g. id,name,fields)]:SELECT:_default' \
+'-C+[Path to explicit TOML configuration file]:CONFIG:_files' \
+'--config=[Path to explicit TOML configuration file]:CONFIG:_files' \
+'--force[Skip interactive confirmation prompt]' \
+'--json[Shorthand for --output json (emits compact JSON)]' \
+'--dry-run[Preview mutating requests without hitting the server (redacts Authorization)]' \
+'-q[Output only created/affected IDs for shell piping]' \
+'--quiet[Output only created/affected IDs for shell piping]' \
+'-h[Print help]' \
+'--help[Print help]' \
+':id -- Entity ID to delete:_default' \
+&& ret=0
+;;
+(import)
+_arguments "${_arguments_options[@]}" : \
+'--format=[Input format (inferred from extension if omitted; defaults to json for stdin)]:FORMAT:(json csv)' \
+'--url=[Homebox base URL (env\: HBX_URL > HOMEBOX_URL > http\://<HOMEBOX_IP>\:7745)]:URL:_default' \
+'--api-key=[Homebox API key or Bearer token (env\: HBX_API_KEY > HOMEBOX_API_KEY)]:API_KEY:_default' \
+'--output=[Output format (table, json, plain) \[env\: HBX_OUTPUT\]]:OUTPUT:(table json plain)' \
+'*--select=[Comma-separated field projection for JSON/table output (e.g. id,name,fields)]:SELECT:_default' \
+'-C+[Path to explicit TOML configuration file]:CONFIG:_files' \
+'--config=[Path to explicit TOML configuration file]:CONFIG:_files' \
+'(--update-existing)--skip-existing[Skip items whose name already exists in Homebox]' \
+'(--skip-existing)--update-existing[Update items whose name already exists in Homebox]' \
+'--json[Shorthand for --output json (emits compact JSON)]' \
+'--dry-run[Preview mutating requests without hitting the server (redacts Authorization)]' \
+'-q[Output only created/affected IDs for shell piping]' \
+'--quiet[Output only created/affected IDs for shell piping]' \
+'-h[Print help]' \
+'--help[Print help]' \
+':file -- Input file path or '\''-'\'' for stdin:_default' \
+&& ret=0
+;;
+(dedup)
+_arguments "${_arguments_options[@]}" : \
+'--threshold=[Jaccard similarity threshold for near-duplicate detection (0.0..=1.0)]:THRESHOLD:_default' \
+'--url=[Homebox base URL (env\: HBX_URL > HOMEBOX_URL > http\://<HOMEBOX_IP>\:7745)]:URL:_default' \
+'--api-key=[Homebox API key or Bearer token (env\: HBX_API_KEY > HOMEBOX_API_KEY)]:API_KEY:_default' \
+'--output=[Output format (table, json, plain) \[env\: HBX_OUTPUT\]]:OUTPUT:(table json plain)' \
+'*--select=[Comma-separated field projection for JSON/table output (e.g. id,name,fields)]:SELECT:_default' \
+'-C+[Path to explicit TOML configuration file]:CONFIG:_files' \
+'--config=[Path to explicit TOML configuration file]:CONFIG:_files' \
+'--delete[Delete detected duplicate items, retaining only the keeper]' \
+'--merge[Sum duplicate quantities onto the keeper before deleting duplicates (implies --delete)]' \
+'--json[Shorthand for --output json (emits compact JSON)]' \
+'--dry-run[Preview mutating requests without hitting the server (redacts Authorization)]' \
+'-q[Output only created/affected IDs for shell piping]' \
+'--quiet[Output only created/affected IDs for shell piping]' \
+'-h[Print help]' \
+'--help[Print help]' \
+&& ret=0
+;;
+(help)
+_arguments "${_arguments_options[@]}" : \
+":: :_hbx__subcmd__item__subcmd__help_commands" \
+"*::: :->help" \
+&& ret=0
+
+    case $state in
+    (help)
+        words=($line[1] "${words[@]}")
+        (( CURRENT += 1 ))
+        curcontext="${curcontext%:*:*}:hbx-item-help-command-$line[1]:"
+        case $line[1] in
+            (list)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+(get)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+(create)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+(update)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+(upsert)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+(delete)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+(import)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+(dedup)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+(help)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+        esac
+    ;;
+esac
+;;
+        esac
+    ;;
+esac
+;;
+(attachment)
+_arguments "${_arguments_options[@]}" : \
+'--url=[Homebox base URL (env\: HBX_URL > HOMEBOX_URL > http\://<HOMEBOX_IP>\:7745)]:URL:_default' \
+'--api-key=[Homebox API key or Bearer token (env\: HBX_API_KEY > HOMEBOX_API_KEY)]:API_KEY:_default' \
+'--output=[Output format (table, json, plain) \[env\: HBX_OUTPUT\]]:OUTPUT:(table json plain)' \
+'*--select=[Comma-separated field projection for JSON/table output (e.g. id,name,fields)]:SELECT:_default' \
+'-C+[Path to explicit TOML configuration file]:CONFIG:_files' \
+'--config=[Path to explicit TOML configuration file]:CONFIG:_files' \
+'--json[Shorthand for --output json (emits compact JSON)]' \
+'--dry-run[Preview mutating requests without hitting the server (redacts Authorization)]' \
+'-q[Output only created/affected IDs for shell piping]' \
+'--quiet[Output only created/affected IDs for shell piping]' \
+'-h[Print help]' \
+'--help[Print help]' \
+":: :_hbx__subcmd__attachment_commands" \
+"*::: :->attachment" \
+&& ret=0
+
+    case $state in
+    (attachment)
+        words=($line[1] "${words[@]}")
+        (( CURRENT += 1 ))
+        curcontext="${curcontext%:*:*}:hbx-attachment-command-$line[1]:"
+        case $line[1] in
+            (upload)
+_arguments "${_arguments_options[@]}" : \
+'--url=[Homebox base URL (env\: HBX_URL > HOMEBOX_URL > http\://<HOMEBOX_IP>\:7745)]:URL:_default' \
+'--api-key=[Homebox API key or Bearer token (env\: HBX_API_KEY > HOMEBOX_API_KEY)]:API_KEY:_default' \
+'--output=[Output format (table, json, plain) \[env\: HBX_OUTPUT\]]:OUTPUT:(table json plain)' \
+'*--select=[Comma-separated field projection for JSON/table output (e.g. id,name,fields)]:SELECT:_default' \
+'-C+[Path to explicit TOML configuration file]:CONFIG:_files' \
+'--config=[Path to explicit TOML configuration file]:CONFIG:_files' \
+'(--overwrite)--skip-existing[Skip files that already exist on the item (default behavior)]' \
+'(--skip-existing)--overwrite[Delete and re-upload files that already exist on the item]' \
+'--force[Allow uploading images larger than 500KB]' \
+'--json[Shorthand for --output json (emits compact JSON)]' \
+'--dry-run[Preview mutating requests without hitting the server (redacts Authorization)]' \
+'-q[Output only created/affected IDs for shell piping]' \
+'--quiet[Output only created/affected IDs for shell piping]' \
+'-h[Print help]' \
+'--help[Print help]' \
+':item_id -- Target entity ID:_default' \
+'*::files -- Local file path(s) to upload:_files' \
+&& ret=0
+;;
+(list)
+_arguments "${_arguments_options[@]}" : \
+'--url=[Homebox base URL (env\: HBX_URL > HOMEBOX_URL > http\://<HOMEBOX_IP>\:7745)]:URL:_default' \
+'--api-key=[Homebox API key or Bearer token (env\: HBX_API_KEY > HOMEBOX_API_KEY)]:API_KEY:_default' \
+'--output=[Output format (table, json, plain) \[env\: HBX_OUTPUT\]]:OUTPUT:(table json plain)' \
+'*--select=[Comma-separated field projection for JSON/table output (e.g. id,name,fields)]:SELECT:_default' \
+'-C+[Path to explicit TOML configuration file]:CONFIG:_files' \
+'--config=[Path to explicit TOML configuration file]:CONFIG:_files' \
+'--json[Shorthand for --output json (emits compact JSON)]' \
+'--dry-run[Preview mutating requests without hitting the server (redacts Authorization)]' \
+'-q[Output only created/affected IDs for shell piping]' \
+'--quiet[Output only created/affected IDs for shell piping]' \
+'-h[Print help]' \
+'--help[Print help]' \
+':item_id -- Target entity ID:_default' \
+&& ret=0
+;;
+(download)
+_arguments "${_arguments_options[@]}" : \
+'--mime=[Filter attachments by MIME type (e.g. application/pdf)]:MIME:_default' \
+'--ext=[Filter attachments by file extension (e.g. pdf)]:EXT:_default' \
+'--out=[Output file path (single download) or directory (multi-download / --all)]:OUT:_files' \
+'--url=[Homebox base URL (env\: HBX_URL > HOMEBOX_URL > http\://<HOMEBOX_IP>\:7745)]:URL:_default' \
+'--api-key=[Homebox API key or Bearer token (env\: HBX_API_KEY > HOMEBOX_API_KEY)]:API_KEY:_default' \
+'--output=[Output format (table, json, plain) \[env\: HBX_OUTPUT\]]:OUTPUT:(table json plain)' \
+'*--select=[Comma-separated field projection for JSON/table output (e.g. id,name,fields)]:SELECT:_default' \
+'-C+[Path to explicit TOML configuration file]:CONFIG:_files' \
+'--config=[Path to explicit TOML configuration file]:CONFIG:_files' \
+'--all[Download all matching attachments on the item]' \
+'--overwrite[Overwrite existing local files instead of skipping]' \
+'--json[Shorthand for --output json (emits compact JSON)]' \
+'--dry-run[Preview mutating requests without hitting the server (redacts Authorization)]' \
+'-q[Output only created/affected IDs for shell piping]' \
+'--quiet[Output only created/affected IDs for shell piping]' \
+'-h[Print help]' \
+'--help[Print help]' \
+':item_id -- Target entity ID:_default' \
+'::attachment_id -- Specific attachment ID to download (omit when using --all):_default' \
+&& ret=0
+;;
+(delete)
+_arguments "${_arguments_options[@]}" : \
+'--url=[Homebox base URL (env\: HBX_URL > HOMEBOX_URL > http\://<HOMEBOX_IP>\:7745)]:URL:_default' \
+'--api-key=[Homebox API key or Bearer token (env\: HBX_API_KEY > HOMEBOX_API_KEY)]:API_KEY:_default' \
+'--output=[Output format (table, json, plain) \[env\: HBX_OUTPUT\]]:OUTPUT:(table json plain)' \
+'*--select=[Comma-separated field projection for JSON/table output (e.g. id,name,fields)]:SELECT:_default' \
+'-C+[Path to explicit TOML configuration file]:CONFIG:_files' \
+'--config=[Path to explicit TOML configuration file]:CONFIG:_files' \
+'--json[Shorthand for --output json (emits compact JSON)]' \
+'--dry-run[Preview mutating requests without hitting the server (redacts Authorization)]' \
+'-q[Output only created/affected IDs for shell piping]' \
+'--quiet[Output only created/affected IDs for shell piping]' \
+'-h[Print help]' \
+'--help[Print help]' \
+':item_id -- Target entity ID:_default' \
+':attachment_id -- Attachment ID to delete:_default' \
+&& ret=0
+;;
+(help)
+_arguments "${_arguments_options[@]}" : \
+":: :_hbx__subcmd__attachment__subcmd__help_commands" \
+"*::: :->help" \
+&& ret=0
+
+    case $state in
+    (help)
+        words=($line[1] "${words[@]}")
+        (( CURRENT += 1 ))
+        curcontext="${curcontext%:*:*}:hbx-attachment-help-command-$line[1]:"
+        case $line[1] in
+            (upload)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+(list)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+(download)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+(delete)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+(help)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+        esac
+    ;;
+esac
+;;
+        esac
+    ;;
+esac
+;;
+(search)
+_arguments "${_arguments_options[@]}" : \
+'--tag=[Filter by tag name or UUID]:TAG:_default' \
+'--model=[Filter by model number (exact or substring, case-insensitive)]:MODEL:_default' \
+'--serial=[Filter by serial number (exact or substring, case-insensitive)]:SERIAL:_default' \
+'--manufacturer=[Filter by manufacturer (exact or substring, case-insensitive)]:MANUFACTURER:_default' \
+'--url=[Homebox base URL (env\: HBX_URL > HOMEBOX_URL > http\://<HOMEBOX_IP>\:7745)]:URL:_default' \
+'--api-key=[Homebox API key or Bearer token (env\: HBX_API_KEY > HOMEBOX_API_KEY)]:API_KEY:_default' \
+'--output=[Output format (table, json, plain) \[env\: HBX_OUTPUT\]]:OUTPUT:(table json plain)' \
+'*--select=[Comma-separated field projection for JSON/table output (e.g. id,name,fields)]:SELECT:_default' \
+'-C+[Path to explicit TOML configuration file]:CONFIG:_files' \
+'--config=[Path to explicit TOML configuration file]:CONFIG:_files' \
+'--json[Shorthand for --output json (emits compact JSON)]' \
+'--dry-run[Preview mutating requests without hitting the server (redacts Authorization)]' \
+'-q[Output only created/affected IDs for shell piping]' \
+'--quiet[Output only created/affected IDs for shell piping]' \
+'-h[Print help]' \
+'--help[Print help]' \
+'::query -- Optional free-text search query:_default' \
+&& ret=0
+;;
+(field)
+_arguments "${_arguments_options[@]}" : \
+'--url=[Homebox base URL (env\: HBX_URL > HOMEBOX_URL > http\://<HOMEBOX_IP>\:7745)]:URL:_default' \
+'--api-key=[Homebox API key or Bearer token (env\: HBX_API_KEY > HOMEBOX_API_KEY)]:API_KEY:_default' \
+'--output=[Output format (table, json, plain) \[env\: HBX_OUTPUT\]]:OUTPUT:(table json plain)' \
+'*--select=[Comma-separated field projection for JSON/table output (e.g. id,name,fields)]:SELECT:_default' \
+'-C+[Path to explicit TOML configuration file]:CONFIG:_files' \
+'--config=[Path to explicit TOML configuration file]:CONFIG:_files' \
+'--json[Shorthand for --output json (emits compact JSON)]' \
+'--dry-run[Preview mutating requests without hitting the server (redacts Authorization)]' \
+'-q[Output only created/affected IDs for shell piping]' \
+'--quiet[Output only created/affected IDs for shell piping]' \
+'-h[Print help]' \
+'--help[Print help]' \
+":: :_hbx__subcmd__field_commands" \
+"*::: :->field" \
+&& ret=0
+
+    case $state in
+    (field)
+        words=($line[1] "${words[@]}")
+        (( CURRENT += 1 ))
+        curcontext="${curcontext%:*:*}:hbx-field-command-$line[1]:"
+        case $line[1] in
+            (get)
+_arguments "${_arguments_options[@]}" : \
+'--url=[Homebox base URL (env\: HBX_URL > HOMEBOX_URL > http\://<HOMEBOX_IP>\:7745)]:URL:_default' \
+'--api-key=[Homebox API key or Bearer token (env\: HBX_API_KEY > HOMEBOX_API_KEY)]:API_KEY:_default' \
+'--output=[Output format (table, json, plain) \[env\: HBX_OUTPUT\]]:OUTPUT:(table json plain)' \
+'*--select=[Comma-separated field projection for JSON/table output (e.g. id,name,fields)]:SELECT:_default' \
+'-C+[Path to explicit TOML configuration file]:CONFIG:_files' \
+'--config=[Path to explicit TOML configuration file]:CONFIG:_files' \
+'--json[Shorthand for --output json (emits compact JSON)]' \
+'--dry-run[Preview mutating requests without hitting the server (redacts Authorization)]' \
+'-q[Output only created/affected IDs for shell piping]' \
+'--quiet[Output only created/affected IDs for shell piping]' \
+'-h[Print help]' \
+'--help[Print help]' \
+':item_id -- Entity ID:_default' \
+':key -- Custom field name:_default' \
+&& ret=0
+;;
+(set)
+_arguments "${_arguments_options[@]}" : \
+'--type=[Custom field value type]:FIELD_TYPE:(text number boolean)' \
+'--url=[Homebox base URL (env\: HBX_URL > HOMEBOX_URL > http\://<HOMEBOX_IP>\:7745)]:URL:_default' \
+'--api-key=[Homebox API key or Bearer token (env\: HBX_API_KEY > HOMEBOX_API_KEY)]:API_KEY:_default' \
+'--output=[Output format (table, json, plain) \[env\: HBX_OUTPUT\]]:OUTPUT:(table json plain)' \
+'*--select=[Comma-separated field projection for JSON/table output (e.g. id,name,fields)]:SELECT:_default' \
+'-C+[Path to explicit TOML configuration file]:CONFIG:_files' \
+'--config=[Path to explicit TOML configuration file]:CONFIG:_files' \
+'--json[Shorthand for --output json (emits compact JSON)]' \
+'--dry-run[Preview mutating requests without hitting the server (redacts Authorization)]' \
+'-q[Output only created/affected IDs for shell piping]' \
+'--quiet[Output only created/affected IDs for shell piping]' \
+'-h[Print help]' \
+'--help[Print help]' \
+':item_id -- Entity ID:_default' \
+':key -- Custom field name:_default' \
+':value -- Custom field value:_default' \
+&& ret=0
+;;
+(help)
+_arguments "${_arguments_options[@]}" : \
+":: :_hbx__subcmd__field__subcmd__help_commands" \
+"*::: :->help" \
+&& ret=0
+
+    case $state in
+    (help)
+        words=($line[1] "${words[@]}")
+        (( CURRENT += 1 ))
+        curcontext="${curcontext%:*:*}:hbx-field-help-command-$line[1]:"
+        case $line[1] in
+            (get)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+(set)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+(help)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+        esac
+    ;;
+esac
+;;
+        esac
+    ;;
+esac
+;;
+(tag)
+_arguments "${_arguments_options[@]}" : \
+'--url=[Homebox base URL (env\: HBX_URL > HOMEBOX_URL > http\://<HOMEBOX_IP>\:7745)]:URL:_default' \
+'--api-key=[Homebox API key or Bearer token (env\: HBX_API_KEY > HOMEBOX_API_KEY)]:API_KEY:_default' \
+'--output=[Output format (table, json, plain) \[env\: HBX_OUTPUT\]]:OUTPUT:(table json plain)' \
+'*--select=[Comma-separated field projection for JSON/table output (e.g. id,name,fields)]:SELECT:_default' \
+'-C+[Path to explicit TOML configuration file]:CONFIG:_files' \
+'--config=[Path to explicit TOML configuration file]:CONFIG:_files' \
+'--json[Shorthand for --output json (emits compact JSON)]' \
+'--dry-run[Preview mutating requests without hitting the server (redacts Authorization)]' \
+'-q[Output only created/affected IDs for shell piping]' \
+'--quiet[Output only created/affected IDs for shell piping]' \
+'-h[Print help]' \
+'--help[Print help]' \
+":: :_hbx__subcmd__tag_commands" \
+"*::: :->tag" \
+&& ret=0
+
+    case $state in
+    (tag)
+        words=($line[1] "${words[@]}")
+        (( CURRENT += 1 ))
+        curcontext="${curcontext%:*:*}:hbx-tag-command-$line[1]:"
+        case $line[1] in
+            (list)
+_arguments "${_arguments_options[@]}" : \
+'--url=[Homebox base URL (env\: HBX_URL > HOMEBOX_URL > http\://<HOMEBOX_IP>\:7745)]:URL:_default' \
+'--api-key=[Homebox API key or Bearer token (env\: HBX_API_KEY > HOMEBOX_API_KEY)]:API_KEY:_default' \
+'--output=[Output format (table, json, plain) \[env\: HBX_OUTPUT\]]:OUTPUT:(table json plain)' \
+'*--select=[Comma-separated field projection for JSON/table output (e.g. id,name,fields)]:SELECT:_default' \
+'-C+[Path to explicit TOML configuration file]:CONFIG:_files' \
+'--config=[Path to explicit TOML configuration file]:CONFIG:_files' \
+'--json[Shorthand for --output json (emits compact JSON)]' \
+'--dry-run[Preview mutating requests without hitting the server (redacts Authorization)]' \
+'-q[Output only created/affected IDs for shell piping]' \
+'--quiet[Output only created/affected IDs for shell piping]' \
+'-h[Print help]' \
+'--help[Print help]' \
+&& ret=0
+;;
+(create)
+_arguments "${_arguments_options[@]}" : \
+'--url=[Homebox base URL (env\: HBX_URL > HOMEBOX_URL > http\://<HOMEBOX_IP>\:7745)]:URL:_default' \
+'--api-key=[Homebox API key or Bearer token (env\: HBX_API_KEY > HOMEBOX_API_KEY)]:API_KEY:_default' \
+'--output=[Output format (table, json, plain) \[env\: HBX_OUTPUT\]]:OUTPUT:(table json plain)' \
+'*--select=[Comma-separated field projection for JSON/table output (e.g. id,name,fields)]:SELECT:_default' \
+'-C+[Path to explicit TOML configuration file]:CONFIG:_files' \
+'--config=[Path to explicit TOML configuration file]:CONFIG:_files' \
+'--json[Shorthand for --output json (emits compact JSON)]' \
+'--dry-run[Preview mutating requests without hitting the server (redacts Authorization)]' \
+'-q[Output only created/affected IDs for shell piping]' \
+'--quiet[Output only created/affected IDs for shell piping]' \
+'-h[Print help]' \
+'--help[Print help]' \
+':name -- Tag name:_default' \
+&& ret=0
+;;
+(help)
+_arguments "${_arguments_options[@]}" : \
+":: :_hbx__subcmd__tag__subcmd__help_commands" \
+"*::: :->help" \
+&& ret=0
+
+    case $state in
+    (help)
+        words=($line[1] "${words[@]}")
+        (( CURRENT += 1 ))
+        curcontext="${curcontext%:*:*}:hbx-tag-help-command-$line[1]:"
+        case $line[1] in
+            (list)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+(create)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+(help)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+        esac
+    ;;
+esac
+;;
+        esac
+    ;;
+esac
+;;
+(entity-types)
+_arguments "${_arguments_options[@]}" : \
+'--url=[Homebox base URL (env\: HBX_URL > HOMEBOX_URL > http\://<HOMEBOX_IP>\:7745)]:URL:_default' \
+'--api-key=[Homebox API key or Bearer token (env\: HBX_API_KEY > HOMEBOX_API_KEY)]:API_KEY:_default' \
+'--output=[Output format (table, json, plain) \[env\: HBX_OUTPUT\]]:OUTPUT:(table json plain)' \
+'*--select=[Comma-separated field projection for JSON/table output (e.g. id,name,fields)]:SELECT:_default' \
+'-C+[Path to explicit TOML configuration file]:CONFIG:_files' \
+'--config=[Path to explicit TOML configuration file]:CONFIG:_files' \
+'--json[Shorthand for --output json (emits compact JSON)]' \
+'--dry-run[Preview mutating requests without hitting the server (redacts Authorization)]' \
+'-q[Output only created/affected IDs for shell piping]' \
+'--quiet[Output only created/affected IDs for shell piping]' \
+'-h[Print help]' \
+'--help[Print help]' \
+":: :_hbx__subcmd__entity-types_commands" \
+"*::: :->entity-types" \
+&& ret=0
+
+    case $state in
+    (entity-types)
+        words=($line[1] "${words[@]}")
+        (( CURRENT += 1 ))
+        curcontext="${curcontext%:*:*}:hbx-entity-types-command-$line[1]:"
+        case $line[1] in
+            (list)
+_arguments "${_arguments_options[@]}" : \
+'--url=[Homebox base URL (env\: HBX_URL > HOMEBOX_URL > http\://<HOMEBOX_IP>\:7745)]:URL:_default' \
+'--api-key=[Homebox API key or Bearer token (env\: HBX_API_KEY > HOMEBOX_API_KEY)]:API_KEY:_default' \
+'--output=[Output format (table, json, plain) \[env\: HBX_OUTPUT\]]:OUTPUT:(table json plain)' \
+'*--select=[Comma-separated field projection for JSON/table output (e.g. id,name,fields)]:SELECT:_default' \
+'-C+[Path to explicit TOML configuration file]:CONFIG:_files' \
+'--config=[Path to explicit TOML configuration file]:CONFIG:_files' \
+'--json[Shorthand for --output json (emits compact JSON)]' \
+'--dry-run[Preview mutating requests without hitting the server (redacts Authorization)]' \
+'-q[Output only created/affected IDs for shell piping]' \
+'--quiet[Output only created/affected IDs for shell piping]' \
+'-h[Print help]' \
+'--help[Print help]' \
+&& ret=0
+;;
+(help)
+_arguments "${_arguments_options[@]}" : \
+":: :_hbx__subcmd__entity-types__subcmd__help_commands" \
+"*::: :->help" \
+&& ret=0
+
+    case $state in
+    (help)
+        words=($line[1] "${words[@]}")
+        (( CURRENT += 1 ))
+        curcontext="${curcontext%:*:*}:hbx-entity-types-help-command-$line[1]:"
+        case $line[1] in
+            (list)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+(help)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+        esac
+    ;;
+esac
+;;
+        esac
+    ;;
+esac
+;;
+(entity-type)
+_arguments "${_arguments_options[@]}" : \
+'--url=[Homebox base URL (env\: HBX_URL > HOMEBOX_URL > http\://<HOMEBOX_IP>\:7745)]:URL:_default' \
+'--api-key=[Homebox API key or Bearer token (env\: HBX_API_KEY > HOMEBOX_API_KEY)]:API_KEY:_default' \
+'--output=[Output format (table, json, plain) \[env\: HBX_OUTPUT\]]:OUTPUT:(table json plain)' \
+'*--select=[Comma-separated field projection for JSON/table output (e.g. id,name,fields)]:SELECT:_default' \
+'-C+[Path to explicit TOML configuration file]:CONFIG:_files' \
+'--config=[Path to explicit TOML configuration file]:CONFIG:_files' \
+'--json[Shorthand for --output json (emits compact JSON)]' \
+'--dry-run[Preview mutating requests without hitting the server (redacts Authorization)]' \
+'-q[Output only created/affected IDs for shell piping]' \
+'--quiet[Output only created/affected IDs for shell piping]' \
+'-h[Print help]' \
+'--help[Print help]' \
+":: :_hbx__subcmd__entity-types_commands" \
+"*::: :->entity-types" \
+&& ret=0
+
+    case $state in
+    (entity-types)
+        words=($line[1] "${words[@]}")
+        (( CURRENT += 1 ))
+        curcontext="${curcontext%:*:*}:hbx-entity-types-command-$line[1]:"
+        case $line[1] in
+            (list)
+_arguments "${_arguments_options[@]}" : \
+'--url=[Homebox base URL (env\: HBX_URL > HOMEBOX_URL > http\://<HOMEBOX_IP>\:7745)]:URL:_default' \
+'--api-key=[Homebox API key or Bearer token (env\: HBX_API_KEY > HOMEBOX_API_KEY)]:API_KEY:_default' \
+'--output=[Output format (table, json, plain) \[env\: HBX_OUTPUT\]]:OUTPUT:(table json plain)' \
+'*--select=[Comma-separated field projection for JSON/table output (e.g. id,name,fields)]:SELECT:_default' \
+'-C+[Path to explicit TOML configuration file]:CONFIG:_files' \
+'--config=[Path to explicit TOML configuration file]:CONFIG:_files' \
+'--json[Shorthand for --output json (emits compact JSON)]' \
+'--dry-run[Preview mutating requests without hitting the server (redacts Authorization)]' \
+'-q[Output only created/affected IDs for shell piping]' \
+'--quiet[Output only created/affected IDs for shell piping]' \
+'-h[Print help]' \
+'--help[Print help]' \
+&& ret=0
+;;
+(help)
+_arguments "${_arguments_options[@]}" : \
+":: :_hbx__subcmd__entity-types__subcmd__help_commands" \
+"*::: :->help" \
+&& ret=0
+
+    case $state in
+    (help)
+        words=($line[1] "${words[@]}")
+        (( CURRENT += 1 ))
+        curcontext="${curcontext%:*:*}:hbx-entity-types-help-command-$line[1]:"
+        case $line[1] in
+            (list)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+(help)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+        esac
+    ;;
+esac
+;;
+        esac
+    ;;
+esac
+;;
+(export)
+_arguments "${_arguments_options[@]}" : \
+'--tag=[Filter by tag name or UUID]:TAG:_default' \
+'--has-field=[Require items to have the named custom field]:HAS_FIELD:_default' \
+'*--field=[Custom field column(s) to include in export (repeatable)]:FIELDS:_default' \
+'--sort=[Sort exported items by name or id]:SORT:(name id)' \
+'--format=[Export format (json, csv, markdown)]:FORMAT:(json csv markdown)' \
+'--url=[Homebox base URL (env\: HBX_URL > HOMEBOX_URL > http\://<HOMEBOX_IP>\:7745)]:URL:_default' \
+'--api-key=[Homebox API key or Bearer token (env\: HBX_API_KEY > HOMEBOX_API_KEY)]:API_KEY:_default' \
+'--output=[Output format (table, json, plain) \[env\: HBX_OUTPUT\]]:OUTPUT:(table json plain)' \
+'*--select=[Comma-separated field projection for JSON/table output (e.g. id,name,fields)]:SELECT:_default' \
+'-C+[Path to explicit TOML configuration file]:CONFIG:_files' \
+'--config=[Path to explicit TOML configuration file]:CONFIG:_files' \
+'--json[Shorthand for --output json (emits compact JSON)]' \
+'--dry-run[Preview mutating requests without hitting the server (redacts Authorization)]' \
+'-q[Output only created/affected IDs for shell piping]' \
+'--quiet[Output only created/affected IDs for shell piping]' \
+'-h[Print help]' \
+'--help[Print help]' \
+&& ret=0
+;;
+(completions)
+_arguments "${_arguments_options[@]}" : \
+'--url=[Homebox base URL (env\: HBX_URL > HOMEBOX_URL > http\://<HOMEBOX_IP>\:7745)]:URL:_default' \
+'--api-key=[Homebox API key or Bearer token (env\: HBX_API_KEY > HOMEBOX_API_KEY)]:API_KEY:_default' \
+'--output=[Output format (table, json, plain) \[env\: HBX_OUTPUT\]]:OUTPUT:(table json plain)' \
+'*--select=[Comma-separated field projection for JSON/table output (e.g. id,name,fields)]:SELECT:_default' \
+'-C+[Path to explicit TOML configuration file]:CONFIG:_files' \
+'--config=[Path to explicit TOML configuration file]:CONFIG:_files' \
+'--json[Shorthand for --output json (emits compact JSON)]' \
+'--dry-run[Preview mutating requests without hitting the server (redacts Authorization)]' \
+'-q[Output only created/affected IDs for shell piping]' \
+'--quiet[Output only created/affected IDs for shell piping]' \
+'-h[Print help]' \
+'--help[Print help]' \
+':shell -- Shell to generate completions for:(bash elvish fish powershell zsh)' \
+&& ret=0
+;;
+(man)
+_arguments "${_arguments_options[@]}" : \
+'--url=[Homebox base URL (env\: HBX_URL > HOMEBOX_URL > http\://<HOMEBOX_IP>\:7745)]:URL:_default' \
+'--api-key=[Homebox API key or Bearer token (env\: HBX_API_KEY > HOMEBOX_API_KEY)]:API_KEY:_default' \
+'--output=[Output format (table, json, plain) \[env\: HBX_OUTPUT\]]:OUTPUT:(table json plain)' \
+'*--select=[Comma-separated field projection for JSON/table output (e.g. id,name,fields)]:SELECT:_default' \
+'-C+[Path to explicit TOML configuration file]:CONFIG:_files' \
+'--config=[Path to explicit TOML configuration file]:CONFIG:_files' \
+'--json[Shorthand for --output json (emits compact JSON)]' \
+'--dry-run[Preview mutating requests without hitting the server (redacts Authorization)]' \
+'-q[Output only created/affected IDs for shell piping]' \
+'--quiet[Output only created/affected IDs for shell piping]' \
+'-h[Print help]' \
+'--help[Print help]' \
+&& ret=0
+;;
+(help)
+_arguments "${_arguments_options[@]}" : \
+":: :_hbx__subcmd__help_commands" \
+"*::: :->help" \
+&& ret=0
+
+    case $state in
+    (help)
+        words=($line[1] "${words[@]}")
+        (( CURRENT += 1 ))
+        curcontext="${curcontext%:*:*}:hbx-help-command-$line[1]:"
+        case $line[1] in
+            (item)
+_arguments "${_arguments_options[@]}" : \
+":: :_hbx__subcmd__help__subcmd__item_commands" \
+"*::: :->item" \
+&& ret=0
+
+    case $state in
+    (item)
+        words=($line[1] "${words[@]}")
+        (( CURRENT += 1 ))
+        curcontext="${curcontext%:*:*}:hbx-help-item-command-$line[1]:"
+        case $line[1] in
+            (list)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+(get)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+(create)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+(update)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+(upsert)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+(delete)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+(import)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+(dedup)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+        esac
+    ;;
+esac
+;;
+(attachment)
+_arguments "${_arguments_options[@]}" : \
+":: :_hbx__subcmd__help__subcmd__attachment_commands" \
+"*::: :->attachment" \
+&& ret=0
+
+    case $state in
+    (attachment)
+        words=($line[1] "${words[@]}")
+        (( CURRENT += 1 ))
+        curcontext="${curcontext%:*:*}:hbx-help-attachment-command-$line[1]:"
+        case $line[1] in
+            (upload)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+(list)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+(download)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+(delete)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+        esac
+    ;;
+esac
+;;
+(search)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+(field)
+_arguments "${_arguments_options[@]}" : \
+":: :_hbx__subcmd__help__subcmd__field_commands" \
+"*::: :->field" \
+&& ret=0
+
+    case $state in
+    (field)
+        words=($line[1] "${words[@]}")
+        (( CURRENT += 1 ))
+        curcontext="${curcontext%:*:*}:hbx-help-field-command-$line[1]:"
+        case $line[1] in
+            (get)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+(set)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+        esac
+    ;;
+esac
+;;
+(tag)
+_arguments "${_arguments_options[@]}" : \
+":: :_hbx__subcmd__help__subcmd__tag_commands" \
+"*::: :->tag" \
+&& ret=0
+
+    case $state in
+    (tag)
+        words=($line[1] "${words[@]}")
+        (( CURRENT += 1 ))
+        curcontext="${curcontext%:*:*}:hbx-help-tag-command-$line[1]:"
+        case $line[1] in
+            (list)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+(create)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+        esac
+    ;;
+esac
+;;
+(entity-types)
+_arguments "${_arguments_options[@]}" : \
+":: :_hbx__subcmd__help__subcmd__entity-types_commands" \
+"*::: :->entity-types" \
+&& ret=0
+
+    case $state in
+    (entity-types)
+        words=($line[1] "${words[@]}")
+        (( CURRENT += 1 ))
+        curcontext="${curcontext%:*:*}:hbx-help-entity-types-command-$line[1]:"
+        case $line[1] in
+            (list)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+        esac
+    ;;
+esac
+;;
+(export)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+(completions)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+(man)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+(help)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+        esac
+    ;;
+esac
+;;
+        esac
+    ;;
+esac
+}
+
+(( $+functions[_hbx_commands] )) ||
+_hbx_commands() {
+    local commands; commands=(
+'item:Manage inventory items (/api/v1/entities)' \
+'attachment:Manage item attachments (/api/v1/entities/{id}/attachments)' \
+'search:Full-text and structured item search' \
+'field:Get or set typed custom fields on an item' \
+'tag:Manage tags (/api/v1/tags)' \
+'entity-types:List Homebox entity types (/api/v1/entity-types)' \
+'entity-type:List Homebox entity types (/api/v1/entity-types)' \
+'export:Export filtered items to JSON, CSV, or Markdown' \
+'completions:Generate shell completion scripts' \
+'man:Generate UNIX roff man page' \
+'help:Print this message or the help of the given subcommand(s)' \
+    )
+    _describe -t commands 'hbx commands' commands "$@"
+}
+(( $+functions[_hbx__subcmd__attachment_commands] )) ||
+_hbx__subcmd__attachment_commands() {
+    local commands; commands=(
+'upload:Upload one or more files as item attachments' \
+'list:List attachments on an item' \
+'download:Stream-download one or all attachments from an item' \
+'delete:Delete an attachment from an item' \
+'help:Print this message or the help of the given subcommand(s)' \
+    )
+    _describe -t commands 'hbx attachment commands' commands "$@"
+}
+(( $+functions[_hbx__subcmd__attachment__subcmd__delete_commands] )) ||
+_hbx__subcmd__attachment__subcmd__delete_commands() {
+    local commands; commands=()
+    _describe -t commands 'hbx attachment delete commands' commands "$@"
+}
+(( $+functions[_hbx__subcmd__attachment__subcmd__download_commands] )) ||
+_hbx__subcmd__attachment__subcmd__download_commands() {
+    local commands; commands=()
+    _describe -t commands 'hbx attachment download commands' commands "$@"
+}
+(( $+functions[_hbx__subcmd__attachment__subcmd__help_commands] )) ||
+_hbx__subcmd__attachment__subcmd__help_commands() {
+    local commands; commands=(
+'upload:Upload one or more files as item attachments' \
+'list:List attachments on an item' \
+'download:Stream-download one or all attachments from an item' \
+'delete:Delete an attachment from an item' \
+'help:Print this message or the help of the given subcommand(s)' \
+    )
+    _describe -t commands 'hbx attachment help commands' commands "$@"
+}
+(( $+functions[_hbx__subcmd__attachment__subcmd__help__subcmd__delete_commands] )) ||
+_hbx__subcmd__attachment__subcmd__help__subcmd__delete_commands() {
+    local commands; commands=()
+    _describe -t commands 'hbx attachment help delete commands' commands "$@"
+}
+(( $+functions[_hbx__subcmd__attachment__subcmd__help__subcmd__download_commands] )) ||
+_hbx__subcmd__attachment__subcmd__help__subcmd__download_commands() {
+    local commands; commands=()
+    _describe -t commands 'hbx attachment help download commands' commands "$@"
+}
+(( $+functions[_hbx__subcmd__attachment__subcmd__help__subcmd__help_commands] )) ||
+_hbx__subcmd__attachment__subcmd__help__subcmd__help_commands() {
+    local commands; commands=()
+    _describe -t commands 'hbx attachment help help commands' commands "$@"
+}
+(( $+functions[_hbx__subcmd__attachment__subcmd__help__subcmd__list_commands] )) ||
+_hbx__subcmd__attachment__subcmd__help__subcmd__list_commands() {
+    local commands; commands=()
+    _describe -t commands 'hbx attachment help list commands' commands "$@"
+}
+(( $+functions[_hbx__subcmd__attachment__subcmd__help__subcmd__upload_commands] )) ||
+_hbx__subcmd__attachment__subcmd__help__subcmd__upload_commands() {
+    local commands; commands=()
+    _describe -t commands 'hbx attachment help upload commands' commands "$@"
+}
+(( $+functions[_hbx__subcmd__attachment__subcmd__list_commands] )) ||
+_hbx__subcmd__attachment__subcmd__list_commands() {
+    local commands; commands=()
+    _describe -t commands 'hbx attachment list commands' commands "$@"
+}
+(( $+functions[_hbx__subcmd__attachment__subcmd__upload_commands] )) ||
+_hbx__subcmd__attachment__subcmd__upload_commands() {
+    local commands; commands=()
+    _describe -t commands 'hbx attachment upload commands' commands "$@"
+}
+(( $+functions[_hbx__subcmd__completions_commands] )) ||
+_hbx__subcmd__completions_commands() {
+    local commands; commands=()
+    _describe -t commands 'hbx completions commands' commands "$@"
+}
+(( $+functions[_hbx__subcmd__entity-types_commands] )) ||
+_hbx__subcmd__entity-types_commands() {
+    local commands; commands=(
+'list:List all entity types' \
+'help:Print this message or the help of the given subcommand(s)' \
+    )
+    _describe -t commands 'hbx entity-types commands' commands "$@"
+}
+(( $+functions[_hbx__subcmd__entity-types__subcmd__help_commands] )) ||
+_hbx__subcmd__entity-types__subcmd__help_commands() {
+    local commands; commands=(
+'list:List all entity types' \
+'help:Print this message or the help of the given subcommand(s)' \
+    )
+    _describe -t commands 'hbx entity-types help commands' commands "$@"
+}
+(( $+functions[_hbx__subcmd__entity-types__subcmd__help__subcmd__help_commands] )) ||
+_hbx__subcmd__entity-types__subcmd__help__subcmd__help_commands() {
+    local commands; commands=()
+    _describe -t commands 'hbx entity-types help help commands' commands "$@"
+}
+(( $+functions[_hbx__subcmd__entity-types__subcmd__help__subcmd__list_commands] )) ||
+_hbx__subcmd__entity-types__subcmd__help__subcmd__list_commands() {
+    local commands; commands=()
+    _describe -t commands 'hbx entity-types help list commands' commands "$@"
+}
+(( $+functions[_hbx__subcmd__entity-types__subcmd__list_commands] )) ||
+_hbx__subcmd__entity-types__subcmd__list_commands() {
+    local commands; commands=()
+    _describe -t commands 'hbx entity-types list commands' commands "$@"
+}
+(( $+functions[_hbx__subcmd__export_commands] )) ||
+_hbx__subcmd__export_commands() {
+    local commands; commands=()
+    _describe -t commands 'hbx export commands' commands "$@"
+}
+(( $+functions[_hbx__subcmd__field_commands] )) ||
+_hbx__subcmd__field_commands() {
+    local commands; commands=(
+'get:Get a custom field value from an item' \
+'set:Set a typed custom field on an item via GET -> Merge -> PUT' \
+'help:Print this message or the help of the given subcommand(s)' \
+    )
+    _describe -t commands 'hbx field commands' commands "$@"
+}
+(( $+functions[_hbx__subcmd__field__subcmd__get_commands] )) ||
+_hbx__subcmd__field__subcmd__get_commands() {
+    local commands; commands=()
+    _describe -t commands 'hbx field get commands' commands "$@"
+}
+(( $+functions[_hbx__subcmd__field__subcmd__help_commands] )) ||
+_hbx__subcmd__field__subcmd__help_commands() {
+    local commands; commands=(
+'get:Get a custom field value from an item' \
+'set:Set a typed custom field on an item via GET -> Merge -> PUT' \
+'help:Print this message or the help of the given subcommand(s)' \
+    )
+    _describe -t commands 'hbx field help commands' commands "$@"
+}
+(( $+functions[_hbx__subcmd__field__subcmd__help__subcmd__get_commands] )) ||
+_hbx__subcmd__field__subcmd__help__subcmd__get_commands() {
+    local commands; commands=()
+    _describe -t commands 'hbx field help get commands' commands "$@"
+}
+(( $+functions[_hbx__subcmd__field__subcmd__help__subcmd__help_commands] )) ||
+_hbx__subcmd__field__subcmd__help__subcmd__help_commands() {
+    local commands; commands=()
+    _describe -t commands 'hbx field help help commands' commands "$@"
+}
+(( $+functions[_hbx__subcmd__field__subcmd__help__subcmd__set_commands] )) ||
+_hbx__subcmd__field__subcmd__help__subcmd__set_commands() {
+    local commands; commands=()
+    _describe -t commands 'hbx field help set commands' commands "$@"
+}
+(( $+functions[_hbx__subcmd__field__subcmd__set_commands] )) ||
+_hbx__subcmd__field__subcmd__set_commands() {
+    local commands; commands=()
+    _describe -t commands 'hbx field set commands' commands "$@"
+}
+(( $+functions[_hbx__subcmd__help_commands] )) ||
+_hbx__subcmd__help_commands() {
+    local commands; commands=(
+'item:Manage inventory items (/api/v1/entities)' \
+'attachment:Manage item attachments (/api/v1/entities/{id}/attachments)' \
+'search:Full-text and structured item search' \
+'field:Get or set typed custom fields on an item' \
+'tag:Manage tags (/api/v1/tags)' \
+'entity-types:List Homebox entity types (/api/v1/entity-types)' \
+'export:Export filtered items to JSON, CSV, or Markdown' \
+'completions:Generate shell completion scripts' \
+'man:Generate UNIX roff man page' \
+'help:Print this message or the help of the given subcommand(s)' \
+    )
+    _describe -t commands 'hbx help commands' commands "$@"
+}
+(( $+functions[_hbx__subcmd__help__subcmd__attachment_commands] )) ||
+_hbx__subcmd__help__subcmd__attachment_commands() {
+    local commands; commands=(
+'upload:Upload one or more files as item attachments' \
+'list:List attachments on an item' \
+'download:Stream-download one or all attachments from an item' \
+'delete:Delete an attachment from an item' \
+    )
+    _describe -t commands 'hbx help attachment commands' commands "$@"
+}
+(( $+functions[_hbx__subcmd__help__subcmd__attachment__subcmd__delete_commands] )) ||
+_hbx__subcmd__help__subcmd__attachment__subcmd__delete_commands() {
+    local commands; commands=()
+    _describe -t commands 'hbx help attachment delete commands' commands "$@"
+}
+(( $+functions[_hbx__subcmd__help__subcmd__attachment__subcmd__download_commands] )) ||
+_hbx__subcmd__help__subcmd__attachment__subcmd__download_commands() {
+    local commands; commands=()
+    _describe -t commands 'hbx help attachment download commands' commands "$@"
+}
+(( $+functions[_hbx__subcmd__help__subcmd__attachment__subcmd__list_commands] )) ||
+_hbx__subcmd__help__subcmd__attachment__subcmd__list_commands() {
+    local commands; commands=()
+    _describe -t commands 'hbx help attachment list commands' commands "$@"
+}
+(( $+functions[_hbx__subcmd__help__subcmd__attachment__subcmd__upload_commands] )) ||
+_hbx__subcmd__help__subcmd__attachment__subcmd__upload_commands() {
+    local commands; commands=()
+    _describe -t commands 'hbx help attachment upload commands' commands "$@"
+}
+(( $+functions[_hbx__subcmd__help__subcmd__completions_commands] )) ||
+_hbx__subcmd__help__subcmd__completions_commands() {
+    local commands; commands=()
+    _describe -t commands 'hbx help completions commands' commands "$@"
+}
+(( $+functions[_hbx__subcmd__help__subcmd__entity-types_commands] )) ||
+_hbx__subcmd__help__subcmd__entity-types_commands() {
+    local commands; commands=(
+'list:List all entity types' \
+    )
+    _describe -t commands 'hbx help entity-types commands' commands "$@"
+}
+(( $+functions[_hbx__subcmd__help__subcmd__entity-types__subcmd__list_commands] )) ||
+_hbx__subcmd__help__subcmd__entity-types__subcmd__list_commands() {
+    local commands; commands=()
+    _describe -t commands 'hbx help entity-types list commands' commands "$@"
+}
+(( $+functions[_hbx__subcmd__help__subcmd__export_commands] )) ||
+_hbx__subcmd__help__subcmd__export_commands() {
+    local commands; commands=()
+    _describe -t commands 'hbx help export commands' commands "$@"
+}
+(( $+functions[_hbx__subcmd__help__subcmd__field_commands] )) ||
+_hbx__subcmd__help__subcmd__field_commands() {
+    local commands; commands=(
+'get:Get a custom field value from an item' \
+'set:Set a typed custom field on an item via GET -> Merge -> PUT' \
+    )
+    _describe -t commands 'hbx help field commands' commands "$@"
+}
+(( $+functions[_hbx__subcmd__help__subcmd__field__subcmd__get_commands] )) ||
+_hbx__subcmd__help__subcmd__field__subcmd__get_commands() {
+    local commands; commands=()
+    _describe -t commands 'hbx help field get commands' commands "$@"
+}
+(( $+functions[_hbx__subcmd__help__subcmd__field__subcmd__set_commands] )) ||
+_hbx__subcmd__help__subcmd__field__subcmd__set_commands() {
+    local commands; commands=()
+    _describe -t commands 'hbx help field set commands' commands "$@"
+}
+(( $+functions[_hbx__subcmd__help__subcmd__help_commands] )) ||
+_hbx__subcmd__help__subcmd__help_commands() {
+    local commands; commands=()
+    _describe -t commands 'hbx help help commands' commands "$@"
+}
+(( $+functions[_hbx__subcmd__help__subcmd__item_commands] )) ||
+_hbx__subcmd__help__subcmd__item_commands() {
+    local commands; commands=(
+'list:List inventory items' \
+'get:Fetch a single item by ID' \
+'create:Create a new item (auto-persists custom fields via follow-up PUT)' \
+'update:Update an existing item via GET -> Merge -> PUT' \
+'upsert:Create or update an item matched by name' \
+'delete:Delete an item by ID' \
+'import:Bulk import items from JSON or CSV (file or '\''-'\'' for stdin)' \
+'dedup:Detect (and optionally delete or merge) duplicate items' \
+    )
+    _describe -t commands 'hbx help item commands' commands "$@"
+}
+(( $+functions[_hbx__subcmd__help__subcmd__item__subcmd__create_commands] )) ||
+_hbx__subcmd__help__subcmd__item__subcmd__create_commands() {
+    local commands; commands=()
+    _describe -t commands 'hbx help item create commands' commands "$@"
+}
+(( $+functions[_hbx__subcmd__help__subcmd__item__subcmd__dedup_commands] )) ||
+_hbx__subcmd__help__subcmd__item__subcmd__dedup_commands() {
+    local commands; commands=()
+    _describe -t commands 'hbx help item dedup commands' commands "$@"
+}
+(( $+functions[_hbx__subcmd__help__subcmd__item__subcmd__delete_commands] )) ||
+_hbx__subcmd__help__subcmd__item__subcmd__delete_commands() {
+    local commands; commands=()
+    _describe -t commands 'hbx help item delete commands' commands "$@"
+}
+(( $+functions[_hbx__subcmd__help__subcmd__item__subcmd__get_commands] )) ||
+_hbx__subcmd__help__subcmd__item__subcmd__get_commands() {
+    local commands; commands=()
+    _describe -t commands 'hbx help item get commands' commands "$@"
+}
+(( $+functions[_hbx__subcmd__help__subcmd__item__subcmd__import_commands] )) ||
+_hbx__subcmd__help__subcmd__item__subcmd__import_commands() {
+    local commands; commands=()
+    _describe -t commands 'hbx help item import commands' commands "$@"
+}
+(( $+functions[_hbx__subcmd__help__subcmd__item__subcmd__list_commands] )) ||
+_hbx__subcmd__help__subcmd__item__subcmd__list_commands() {
+    local commands; commands=()
+    _describe -t commands 'hbx help item list commands' commands "$@"
+}
+(( $+functions[_hbx__subcmd__help__subcmd__item__subcmd__update_commands] )) ||
+_hbx__subcmd__help__subcmd__item__subcmd__update_commands() {
+    local commands; commands=()
+    _describe -t commands 'hbx help item update commands' commands "$@"
+}
+(( $+functions[_hbx__subcmd__help__subcmd__item__subcmd__upsert_commands] )) ||
+_hbx__subcmd__help__subcmd__item__subcmd__upsert_commands() {
+    local commands; commands=()
+    _describe -t commands 'hbx help item upsert commands' commands "$@"
+}
+(( $+functions[_hbx__subcmd__help__subcmd__man_commands] )) ||
+_hbx__subcmd__help__subcmd__man_commands() {
+    local commands; commands=()
+    _describe -t commands 'hbx help man commands' commands "$@"
+}
+(( $+functions[_hbx__subcmd__help__subcmd__search_commands] )) ||
+_hbx__subcmd__help__subcmd__search_commands() {
+    local commands; commands=()
+    _describe -t commands 'hbx help search commands' commands "$@"
+}
+(( $+functions[_hbx__subcmd__help__subcmd__tag_commands] )) ||
+_hbx__subcmd__help__subcmd__tag_commands() {
+    local commands; commands=(
+'list:List all tags' \
+'create:Create a new tag' \
+    )
+    _describe -t commands 'hbx help tag commands' commands "$@"
+}
+(( $+functions[_hbx__subcmd__help__subcmd__tag__subcmd__create_commands] )) ||
+_hbx__subcmd__help__subcmd__tag__subcmd__create_commands() {
+    local commands; commands=()
+    _describe -t commands 'hbx help tag create commands' commands "$@"
+}
+(( $+functions[_hbx__subcmd__help__subcmd__tag__subcmd__list_commands] )) ||
+_hbx__subcmd__help__subcmd__tag__subcmd__list_commands() {
+    local commands; commands=()
+    _describe -t commands 'hbx help tag list commands' commands "$@"
+}
+(( $+functions[_hbx__subcmd__item_commands] )) ||
+_hbx__subcmd__item_commands() {
+    local commands; commands=(
+'list:List inventory items' \
+'get:Fetch a single item by ID' \
+'create:Create a new item (auto-persists custom fields via follow-up PUT)' \
+'update:Update an existing item via GET -> Merge -> PUT' \
+'upsert:Create or update an item matched by name' \
+'delete:Delete an item by ID' \
+'import:Bulk import items from JSON or CSV (file or '\''-'\'' for stdin)' \
+'dedup:Detect (and optionally delete or merge) duplicate items' \
+'help:Print this message or the help of the given subcommand(s)' \
+    )
+    _describe -t commands 'hbx item commands' commands "$@"
+}
+(( $+functions[_hbx__subcmd__item__subcmd__create_commands] )) ||
+_hbx__subcmd__item__subcmd__create_commands() {
+    local commands; commands=()
+    _describe -t commands 'hbx item create commands' commands "$@"
+}
+(( $+functions[_hbx__subcmd__item__subcmd__dedup_commands] )) ||
+_hbx__subcmd__item__subcmd__dedup_commands() {
+    local commands; commands=()
+    _describe -t commands 'hbx item dedup commands' commands "$@"
+}
+(( $+functions[_hbx__subcmd__item__subcmd__delete_commands] )) ||
+_hbx__subcmd__item__subcmd__delete_commands() {
+    local commands; commands=()
+    _describe -t commands 'hbx item delete commands' commands "$@"
+}
+(( $+functions[_hbx__subcmd__item__subcmd__get_commands] )) ||
+_hbx__subcmd__item__subcmd__get_commands() {
+    local commands; commands=()
+    _describe -t commands 'hbx item get commands' commands "$@"
+}
+(( $+functions[_hbx__subcmd__item__subcmd__help_commands] )) ||
+_hbx__subcmd__item__subcmd__help_commands() {
+    local commands; commands=(
+'list:List inventory items' \
+'get:Fetch a single item by ID' \
+'create:Create a new item (auto-persists custom fields via follow-up PUT)' \
+'update:Update an existing item via GET -> Merge -> PUT' \
+'upsert:Create or update an item matched by name' \
+'delete:Delete an item by ID' \
+'import:Bulk import items from JSON or CSV (file or '\''-'\'' for stdin)' \
+'dedup:Detect (and optionally delete or merge) duplicate items' \
+'help:Print this message or the help of the given subcommand(s)' \
+    )
+    _describe -t commands 'hbx item help commands' commands "$@"
+}
+(( $+functions[_hbx__subcmd__item__subcmd__help__subcmd__create_commands] )) ||
+_hbx__subcmd__item__subcmd__help__subcmd__create_commands() {
+    local commands; commands=()
+    _describe -t commands 'hbx item help create commands' commands "$@"
+}
+(( $+functions[_hbx__subcmd__item__subcmd__help__subcmd__dedup_commands] )) ||
+_hbx__subcmd__item__subcmd__help__subcmd__dedup_commands() {
+    local commands; commands=()
+    _describe -t commands 'hbx item help dedup commands' commands "$@"
+}
+(( $+functions[_hbx__subcmd__item__subcmd__help__subcmd__delete_commands] )) ||
+_hbx__subcmd__item__subcmd__help__subcmd__delete_commands() {
+    local commands; commands=()
+    _describe -t commands 'hbx item help delete commands' commands "$@"
+}
+(( $+functions[_hbx__subcmd__item__subcmd__help__subcmd__get_commands] )) ||
+_hbx__subcmd__item__subcmd__help__subcmd__get_commands() {
+    local commands; commands=()
+    _describe -t commands 'hbx item help get commands' commands "$@"
+}
+(( $+functions[_hbx__subcmd__item__subcmd__help__subcmd__help_commands] )) ||
+_hbx__subcmd__item__subcmd__help__subcmd__help_commands() {
+    local commands; commands=()
+    _describe -t commands 'hbx item help help commands' commands "$@"
+}
+(( $+functions[_hbx__subcmd__item__subcmd__help__subcmd__import_commands] )) ||
+_hbx__subcmd__item__subcmd__help__subcmd__import_commands() {
+    local commands; commands=()
+    _describe -t commands 'hbx item help import commands' commands "$@"
+}
+(( $+functions[_hbx__subcmd__item__subcmd__help__subcmd__list_commands] )) ||
+_hbx__subcmd__item__subcmd__help__subcmd__list_commands() {
+    local commands; commands=()
+    _describe -t commands 'hbx item help list commands' commands "$@"
+}
+(( $+functions[_hbx__subcmd__item__subcmd__help__subcmd__update_commands] )) ||
+_hbx__subcmd__item__subcmd__help__subcmd__update_commands() {
+    local commands; commands=()
+    _describe -t commands 'hbx item help update commands' commands "$@"
+}
+(( $+functions[_hbx__subcmd__item__subcmd__help__subcmd__upsert_commands] )) ||
+_hbx__subcmd__item__subcmd__help__subcmd__upsert_commands() {
+    local commands; commands=()
+    _describe -t commands 'hbx item help upsert commands' commands "$@"
+}
+(( $+functions[_hbx__subcmd__item__subcmd__import_commands] )) ||
+_hbx__subcmd__item__subcmd__import_commands() {
+    local commands; commands=()
+    _describe -t commands 'hbx item import commands' commands "$@"
+}
+(( $+functions[_hbx__subcmd__item__subcmd__list_commands] )) ||
+_hbx__subcmd__item__subcmd__list_commands() {
+    local commands; commands=()
+    _describe -t commands 'hbx item list commands' commands "$@"
+}
+(( $+functions[_hbx__subcmd__item__subcmd__update_commands] )) ||
+_hbx__subcmd__item__subcmd__update_commands() {
+    local commands; commands=()
+    _describe -t commands 'hbx item update commands' commands "$@"
+}
+(( $+functions[_hbx__subcmd__item__subcmd__upsert_commands] )) ||
+_hbx__subcmd__item__subcmd__upsert_commands() {
+    local commands; commands=()
+    _describe -t commands 'hbx item upsert commands' commands "$@"
+}
+(( $+functions[_hbx__subcmd__man_commands] )) ||
+_hbx__subcmd__man_commands() {
+    local commands; commands=()
+    _describe -t commands 'hbx man commands' commands "$@"
+}
+(( $+functions[_hbx__subcmd__search_commands] )) ||
+_hbx__subcmd__search_commands() {
+    local commands; commands=()
+    _describe -t commands 'hbx search commands' commands "$@"
+}
+(( $+functions[_hbx__subcmd__tag_commands] )) ||
+_hbx__subcmd__tag_commands() {
+    local commands; commands=(
+'list:List all tags' \
+'create:Create a new tag' \
+'help:Print this message or the help of the given subcommand(s)' \
+    )
+    _describe -t commands 'hbx tag commands' commands "$@"
+}
+(( $+functions[_hbx__subcmd__tag__subcmd__create_commands] )) ||
+_hbx__subcmd__tag__subcmd__create_commands() {
+    local commands; commands=()
+    _describe -t commands 'hbx tag create commands' commands "$@"
+}
+(( $+functions[_hbx__subcmd__tag__subcmd__help_commands] )) ||
+_hbx__subcmd__tag__subcmd__help_commands() {
+    local commands; commands=(
+'list:List all tags' \
+'create:Create a new tag' \
+'help:Print this message or the help of the given subcommand(s)' \
+    )
+    _describe -t commands 'hbx tag help commands' commands "$@"
+}
+(( $+functions[_hbx__subcmd__tag__subcmd__help__subcmd__create_commands] )) ||
+_hbx__subcmd__tag__subcmd__help__subcmd__create_commands() {
+    local commands; commands=()
+    _describe -t commands 'hbx tag help create commands' commands "$@"
+}
+(( $+functions[_hbx__subcmd__tag__subcmd__help__subcmd__help_commands] )) ||
+_hbx__subcmd__tag__subcmd__help__subcmd__help_commands() {
+    local commands; commands=()
+    _describe -t commands 'hbx tag help help commands' commands "$@"
+}
+(( $+functions[_hbx__subcmd__tag__subcmd__help__subcmd__list_commands] )) ||
+_hbx__subcmd__tag__subcmd__help__subcmd__list_commands() {
+    local commands; commands=()
+    _describe -t commands 'hbx tag help list commands' commands "$@"
+}
+(( $+functions[_hbx__subcmd__tag__subcmd__list_commands] )) ||
+_hbx__subcmd__tag__subcmd__list_commands() {
+    local commands; commands=()
+    _describe -t commands 'hbx tag list commands' commands "$@"
+}
+
+if [ "$funcstack[1]" = "_hbx" ]; then
+    _hbx "$@"
+else
+    compdef _hbx hbx
+fi

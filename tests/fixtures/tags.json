@@ -1,0 +1,4 @@
+[
+  { "id": "tag-elec", "name": "electronics", "description": "Electronic parts" },
+  { "id": "tag-tools", "name": "tools", "description": "Bench tools" }
+]

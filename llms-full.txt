@@ -1,0 +1,14 @@
+# hbx
+
+> Fast, agent-friendly Rust CLI client for remote Homebox v0.26+ REST APIs.
+
+## Capabilities
+
+- Inventory CRUD (`item list|get|create|update|upsert|delete|import|dedup`)
+- Attachments (`attachment upload|list|download|delete`) with idempotent skip/overwrite, >500KB image guard, streaming downloads
+- Search (`search`) with full-text query and `--tag`, `--model`, `--serial`, `--manufacturer`
+- Typed custom fields (`field get|set`) supporting `text`, `number`, `boolean`
+- Tag & entity-type management (`tag list|create`, `entity-types`)
+- Filtered export (`export`) in `json`, `csv`, and `markdown`
+- Compact JSON (`--json`), `--select` field projection, `--dry-run` (redacted `Authorization`), `--quiet` ID output
+- Layered config: CLI > env/`.env` (`HBX_URL`, `HOMEBOX_URL`, `HOMEBOX_IP`, `HBX_API_KEY`, `HOMEBOX_API_KEY`) > `.hbx.toml` > `~/.config/hbx/config.toml` > defaults

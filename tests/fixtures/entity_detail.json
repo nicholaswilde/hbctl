@@ -1,0 +1,69 @@
+{
+  "id": "ent-1",
+  "name": "ESP32 DevKitC",
+  "description": "Wi-Fi + BLE microcontroller",
+  "quantity": 3,
+  "entityTypeId": "et-item",
+  "tags": [
+    { "id": "tag-elec", "name": "electronics", "description": "Electronic parts" }
+  ],
+  "tagIds": ["tag-elec"],
+  "purchasePrice": 9.95,
+  "purchaseDate": "2026-02-10",
+  "purchaseFrom": "DigiKey",
+  "fields": [
+    {
+      "id": "fld-1",
+      "name": "Manufacturer",
+      "type": "text",
+      "value": "Espressif",
+      "textValue": "Espressif"
+    },
+    {
+      "id": "fld-2",
+      "name": "Model Number",
+      "type": "text",
+      "value": "ESP32-WROOM-32E",
+      "textValue": "ESP32-WROOM-32E"
+    },
+    {
+      "id": "fld-3",
+      "name": "Serial Number",
+      "type": "text",
+      "value": "SN-ESP-001",
+      "textValue": "SN-ESP-001"
+    },
+    {
+      "id": "fld-4",
+      "name": "Voltage",
+      "type": "number",
+      "value": "stale",
+      "textValue": "stale",
+      "numberValue": 3.3
+    },
+    {
+      "id": "fld-5",
+      "name": "Tested",
+      "type": "boolean",
+      "value": "true",
+      "textValue": "true",
+      "booleanValue": true
+    }
+  ],
+  "attachments": [
+    {
+      "id": "att-pdf-1",
+      "title": "datasheet.pdf",
+      "name": "raw_datasheet.pdf",
+      "mimeType": "application/pdf",
+      "type": "manual"
+    },
+    {
+      "id": "att-img-1",
+      "title": "",
+      "name": "pinout.png",
+      "mimeType": "image/png",
+      "type": "photo"
+    }
+  ]
+}
