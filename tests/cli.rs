@@ -1869,3 +1869,34 @@ fn test_auth_login_status_refresh_logout_precedence_and_redaction() {
         .failure()
         .stderr(predicate::str::contains("API key is not configured"));
 }
+
+#[test]
+fn test_update_and_self_update_non_interactive_requires_yes() {
+    if !can_execute_binary() {
+        return;
+    }
+
+    // Works without Homebox URL/API key configured and rejects non-TTY without --yes
+    Command::new(env!("CARGO_BIN_EXE_hbx"))
+        .args(["update"])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("non-interactive mode"))
+        .stderr(predicate::str::contains("--yes"));
+
+    // Alias `self-update` behaves identically
+    Command::new(env!("CARGO_BIN_EXE_hbx"))
+        .args(["self-update"])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("--yes"));
+
+    // Help text advertises flags
+    Command::new(env!("CARGO_BIN_EXE_hbx"))
+        .args(["update", "--help"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("--check"))
+        .stdout(predicate::str::contains("--yes"))
+        .stdout(predicate::str::contains("--version"));
+}

@@ -100,6 +100,20 @@ pub enum Commands {
 
     /// Generate UNIX roff man page
     Man,
+
+    /// Check for and install the latest hbx release from GitHub
+    #[command(visible_alias = "self-update")]
+    Update {
+        /// Check for available updates without installing
+        #[arg(long)]
+        check: bool,
+        /// Skip confirmation prompt before installing
+        #[arg(short = 'y', long)]
+        yes: bool,
+        /// Target a specific release version or tag (e.g. 0.1.0 or v0.1.0)
+        #[arg(long, value_name = "VERSION")]
+        version: Option<String>,
+    },
 }
 
 // -----------------------------------------------------------------------------

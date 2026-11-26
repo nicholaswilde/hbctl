@@ -49,8 +49,14 @@ _hbx() {
             hbx,search)
                 cmd="hbx__subcmd__search"
                 ;;
+            hbx,self-update)
+                cmd="hbx__subcmd__update"
+                ;;
             hbx,tag)
                 cmd="hbx__subcmd__tag"
+                ;;
+            hbx,update)
+                cmd="hbx__subcmd__update"
                 ;;
             hbx__subcmd__attachment,delete)
                 cmd="hbx__subcmd__attachment__subcmd__delete"
@@ -174,6 +180,9 @@ _hbx() {
                 ;;
             hbx__subcmd__help,tag)
                 cmd="hbx__subcmd__help__subcmd__tag"
+                ;;
+            hbx__subcmd__help,update)
+                cmd="hbx__subcmd__help__subcmd__update"
                 ;;
             hbx__subcmd__help__subcmd__attachment,delete)
                 cmd="hbx__subcmd__help__subcmd__attachment__subcmd__delete"
@@ -317,7 +326,7 @@ _hbx() {
 
     case "${cmd}" in
         hbx)
-            opts="-q -C -h -V --url --api-key --output --json --select --dry-run --quiet --config --help --version auth item attachment search field tag entity-types entity-type export completions man help"
+            opts="-q -C -h -V --url --api-key --output --json --select --dry-run --quiet --config --help --version auth item attachment search field tag entity-types entity-type export completions man update self-update help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 1 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
@@ -1311,7 +1320,7 @@ _hbx() {
             return 0
             ;;
         hbx__subcmd__help)
-            opts="auth item attachment search field tag entity-types export completions man help"
+            opts="auth item attachment search field tag entity-types export completions man update help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 2 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
@@ -1761,6 +1770,20 @@ _hbx() {
         hbx__subcmd__help__subcmd__tag__subcmd__list)
             opts=""
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
+                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+                return 0
+            fi
+            case "${prev}" in
+                *)
+                    COMPREPLY=()
+                    ;;
+            esac
+            COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+            return 0
+            ;;
+        hbx__subcmd__help__subcmd__update)
+            opts=""
+            if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
             fi
@@ -2673,6 +2696,48 @@ _hbx() {
                 return 0
             fi
             case "${prev}" in
+                --url)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --api-key)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --output)
+                    COMPREPLY=($(compgen -W "table json plain" -- "${cur}"))
+                    return 0
+                    ;;
+                --select)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --config)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                -C)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                *)
+                    COMPREPLY=()
+                    ;;
+            esac
+            COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+            return 0
+            ;;
+        hbx__subcmd__update)
+            opts="-y -q -C -h --check --yes --version --url --api-key --output --json --select --dry-run --quiet --config --help"
+            if [[ ${cur} == -* || ${COMP_CWORD} -eq 2 ]] ; then
+                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+                return 0
+            fi
+            case "${prev}" in
+                --version)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
                 --url)
                     COMPREPLY=($(compgen -f "${cur}"))
                     return 0

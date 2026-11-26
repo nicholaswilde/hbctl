@@ -43,6 +43,8 @@ set edit:completion:arg-completer[hbx] = {|@words|
             cand export 'Export filtered items to JSON, CSV, or Markdown'
             cand completions 'Generate shell completion scripts'
             cand man 'Generate UNIX roff man page'
+            cand update 'Check for and install the latest hbx release from GitHub'
+            cand self-update 'Check for and install the latest hbx release from GitHub'
             cand help 'Print this message or the help of the given subcommand(s)'
         }
         &'hbx;auth'= {
@@ -715,6 +717,42 @@ set edit:completion:arg-completer[hbx] = {|@words|
             cand -h 'Print help'
             cand --help 'Print help'
         }
+        &'hbx;update'= {
+            cand --version 'Target a specific release version or tag (e.g. 0.1.0 or v0.1.0)'
+            cand --url 'Homebox base URL (env: HBX_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
+            cand --api-key 'Homebox API key or Bearer token (env: HBX_API_KEY > HOMEBOX_API_KEY)'
+            cand --output 'Output format (table, json, plain) [env: HBX_OUTPUT]'
+            cand --select 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)'
+            cand -C 'Path to explicit TOML configuration file'
+            cand --config 'Path to explicit TOML configuration file'
+            cand --check 'Check for available updates without installing'
+            cand -y 'Skip confirmation prompt before installing'
+            cand --yes 'Skip confirmation prompt before installing'
+            cand --json 'Shorthand for --output json (emits compact JSON)'
+            cand --dry-run 'Preview mutating requests without hitting the server (redacts Authorization)'
+            cand -q 'Output only created/affected IDs for shell piping'
+            cand --quiet 'Output only created/affected IDs for shell piping'
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'hbx;self-update'= {
+            cand --version 'Target a specific release version or tag (e.g. 0.1.0 or v0.1.0)'
+            cand --url 'Homebox base URL (env: HBX_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
+            cand --api-key 'Homebox API key or Bearer token (env: HBX_API_KEY > HOMEBOX_API_KEY)'
+            cand --output 'Output format (table, json, plain) [env: HBX_OUTPUT]'
+            cand --select 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)'
+            cand -C 'Path to explicit TOML configuration file'
+            cand --config 'Path to explicit TOML configuration file'
+            cand --check 'Check for available updates without installing'
+            cand -y 'Skip confirmation prompt before installing'
+            cand --yes 'Skip confirmation prompt before installing'
+            cand --json 'Shorthand for --output json (emits compact JSON)'
+            cand --dry-run 'Preview mutating requests without hitting the server (redacts Authorization)'
+            cand -q 'Output only created/affected IDs for shell piping'
+            cand --quiet 'Output only created/affected IDs for shell piping'
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
         &'hbx;help'= {
             cand auth 'Authenticate with a remote Homebox instance (login, status, logout, refresh)'
             cand item 'Manage inventory items (/api/v1/entities)'
@@ -726,6 +764,7 @@ set edit:completion:arg-completer[hbx] = {|@words|
             cand export 'Export filtered items to JSON, CSV, or Markdown'
             cand completions 'Generate shell completion scripts'
             cand man 'Generate UNIX roff man page'
+            cand update 'Check for and install the latest hbx release from GitHub'
             cand help 'Print this message or the help of the given subcommand(s)'
         }
         &'hbx;help;auth'= {
@@ -810,6 +849,8 @@ set edit:completion:arg-completer[hbx] = {|@words|
         &'hbx;help;completions'= {
         }
         &'hbx;help;man'= {
+        }
+        &'hbx;help;update'= {
         }
         &'hbx;help;help'= {
         }

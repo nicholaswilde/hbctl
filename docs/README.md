@@ -65,6 +65,9 @@ hbx attachment download <ITEM_ID> --all --ext pdf --out ./manuals
 
 # Export filtered Markdown table
 hbx export --tag electronics --field Manufacturer --field Voltage --format markdown
+
+# Check for or install the latest GitHub release
+hbx update --check
 ```
 
 ---

@@ -48,6 +48,7 @@ NEVER commit or stage `.env`, `.hbx.toml`, API keys (`hb_*`), Bearer tokens, or 
 - `src/commands/` — `mod.rs`, `auth.rs`, `item.rs`, `attachment.rs`, `search.rs`, `field.rs`, `tag.rs`, `entity_type.rs`, `export.rs`
 - `src/dedup.rs` — two-pass exact + Jaccard duplicate detector and keeper selector
 - `src/output.rs` — table, compact JSON (`--select`), plain, CSV, Markdown renderers (`stdout` data / `stderr` diagnostics)
+- `src/update.rs` — GitHub release self-updater (`hbx update` / `hbx self-update`)
 
 ---
 

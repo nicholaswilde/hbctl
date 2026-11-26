@@ -42,7 +42,7 @@ pub fn dispatch(
         Commands::Tag(args) => tag::handle(args, cli.dry_run, config, ctx, out, err),
         Commands::EntityTypes(args) => entity_type::handle(args, config, ctx, out, err),
         Commands::Export(args) => export::handle(args, config, ctx, out, err),
-        Commands::Completions { .. } | Commands::Man => Ok(()),
+        Commands::Completions { .. } | Commands::Man | Commands::Update { .. } => Ok(()),
     }
 }
 
