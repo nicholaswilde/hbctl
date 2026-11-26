@@ -394,7 +394,15 @@ impl HomeboxClient {
 
         let form = multipart::Form::new()
             .part("file", file_part)
-            .text("name", basename);
+            .text("name", basename)
+            .text(
+                "type",
+                if mime.type_() == "image" {
+                    "photo"
+                } else {
+                    "attachment"
+                },
+            );
 
         let resp = self
             .http

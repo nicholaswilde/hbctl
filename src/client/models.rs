@@ -42,6 +42,29 @@ fn default_field_type() -> String {
     "text".to_string()
 }
 
+/// Serialize `Option<f64>` as an integer when whole (Homebox v0.26+ Go `NumberValue` is `int`
+/// and rejects `5.0` floats during `PUT /api/v1/entities/{id}` JSON decoding).
+fn serialize_opt_clean_number<S>(
+    val: &Option<f64>,
+    serializer: S,
+) -> std::result::Result<S::Ok, S::Error>
+where
+    S: serde::Serializer,
+{
+    match val {
+        None => serializer.serialize_none(),
+        Some(n)
+            if n.is_finite()
+                && n.fract() == 0.0
+                && *n >= (i64::MIN as f64)
+                && *n <= (i64::MAX as f64) =>
+        {
+            serializer.serialize_i64(*n as i64)
+        }
+        Some(n) => serializer.serialize_f64(*n),
+    }
+}
+
 /// Supported custom field value types in Homebox v0.26+.
 #[derive(ValueEnum, Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -83,7 +106,8 @@ pub struct CustomField {
     #[serde(
         rename = "numberValue",
         default,
-        skip_serializing_if = "Option::is_none"
+        skip_serializing_if = "Option::is_none",
+        serialize_with = "serialize_opt_clean_number"
     )]
     pub number_value: Option<f64>,
 
@@ -160,7 +184,8 @@ impl CustomField {
     }
 
     /// Return the normalized string representation of this field's value.
-    /// For numeric fields, prefers non-null `numberValue` over `value` / `textValue`.
+    /// Respects `field_type` (Homebox v0.26+ returns zero-valued `numberValue: 0` and
+    /// `booleanValue: false` on every field regardless of type).
     pub fn display_value(&self) -> String {
         if self.field_type.eq_ignore_ascii_case("number") {
             if let Some(n) = self.number_value {
@@ -186,6 +211,9 @@ impl CustomField {
             if !text.is_empty() {
                 return text.clone();
             }
+        }
+        if self.field_type.eq_ignore_ascii_case("text") {
+            return String::new();
         }
         if let Some(n) = self.number_value {
             return n.to_string();
@@ -222,8 +250,10 @@ fn parse_bool_loose(s: &str) -> Option<bool> {
 }
 
 /// Homebox auth login / refresh response (`/api/v1/users/login`, `/api/v1/users/refresh`).
+/// Note: `/api/v1/users/login` returns `"token"`, whereas `/api/v1/users/refresh` returns `"raw"`.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct LoginResponse {
+    #[serde(alias = "raw")]
     pub token: String,
 
     #[serde(rename = "expiresAt", default, skip_serializing_if = "Option::is_none")]
@@ -495,20 +525,26 @@ impl Entity {
             .find(|f| f.name.trim().eq_ignore_ascii_case(needle))
     }
 
-    /// Look up a custom field display value (falling back to top-level alias properties).
+    /// Look up a custom field display value (falling back to non-empty top-level alias properties).
     pub fn field_value(&self, key: &str) -> Option<String> {
         if let Some(f) = self.find_field(key) {
             return Some(f.display_value());
         }
-        match key.trim().to_ascii_lowercase().as_str() {
-            "manufacturer" => self.manufacturer.clone(),
-            "model" | "modelnumber" | "model_number" | "model number" => self.model_number.clone(),
-            "serial" | "serialnumber" | "serial_number" | "serial number" => {
-                self.serial_number.clone()
+        let fallback = match key.trim().to_ascii_lowercase().as_str() {
+            "manufacturer" => self.manufacturer.as_deref(),
+            "model" | "modelnumber" | "model_number" | "model number" => {
+                self.model_number.as_deref()
             }
-            "notes" => self.notes.clone(),
+            "serial" | "serialnumber" | "serial_number" | "serial number" => {
+                self.serial_number.as_deref()
+            }
+            "notes" => self.notes.as_deref(),
             _ => None,
-        }
+        };
+        fallback
+            .map(str::trim)
+            .filter(|s| !s.is_empty())
+            .map(ToOwned::to_owned)
     }
 
     /// Effective tag IDs combining explicit `tagIds` and embedded `tags`.
@@ -552,7 +588,7 @@ pub enum ListResponse<T> {
 impl<T> ListResponse<T> {
     pub fn into_parts(self) -> (Vec<T>, Option<u64>) {
         match self {
-            Self::Paginated(p) => (p.items, p.total),
+            Self::Paginated(p) => (p.items, p.total.and_then(|t| u64::try_from(t).ok())),
             Self::Array(items) => {
                 let len = items.len() as u64;
                 (items, Some(len))
@@ -567,14 +603,15 @@ pub struct PaginatedResponse<T> {
     #[serde(default = "Vec::new", deserialize_with = "deserialize_null_vec")]
     pub items: Vec<T>,
 
+    /// Homebox returns `-1` when `page` query parameter is omitted.
     #[serde(default)]
-    pub page: Option<u32>,
+    pub page: Option<i64>,
 
     #[serde(rename = "pageSize", default)]
-    pub page_size: Option<u32>,
+    pub page_size: Option<i64>,
 
     #[serde(alias = "totalCount", alias = "totalItems", default)]
-    pub total: Option<u64>,
+    pub total: Option<i64>,
 }
 
 /// Payload for creating a new entity (`POST /api/v1/entities`).
@@ -866,6 +903,64 @@ mod tests {
         assert_eq!(flag.field_type, "boolean");
         assert_eq!(flag.boolean_value, Some(true));
         assert_eq!(flag.display_value(), "true");
+
+        // Whole numbers MUST serialize as JSON integers (Homebox Go NumberValue is int)
+        let whole = CustomField::new_typed("Pins", FieldValueType::Number, "38").unwrap();
+        let serialized = serde_json::to_string(&whole).unwrap();
+        assert!(serialized.contains("\"numberValue\":38"));
+        assert!(!serialized.contains("\"numberValue\":38.0"));
+
+        // Empty Homebox v0.27+ text field with zero-valued numberValue/booleanValue returns ""
+        let empty_text: CustomField = serde_json::from_value(json!({
+            "name": "Notes",
+            "type": "text",
+            "textValue": "",
+            "numberValue": 0,
+            "booleanValue": false
+        }))
+        .unwrap();
+        assert_eq!(empty_text.display_value(), "");
+
+        // Refresh response uses "raw" instead of "token"
+        let refreshed: LoginResponse = serde_json::from_value(json!({
+            "raw": "ROTATED_TOKEN",
+            "expiresAt": "2026-12-03T05:54:45Z"
+        }))
+        .unwrap();
+        assert_eq!(refreshed.token, "ROTATED_TOKEN");
+        assert_eq!(
+            refreshed.expires_at.as_deref(),
+            Some("2026-12-03T05:54:45Z")
+        );
+
+        // Empty top-level alias strings from Homebox v0.27+ must NOT look like populated fields
+        let empty_aliases: Entity = serde_json::from_value(json!({
+            "id": "ent-empty",
+            "name": "Bare Item",
+            "manufacturer": "",
+            "modelNumber": "",
+            "serialNumber": "",
+            "notes": "",
+            "fields": []
+        }))
+        .unwrap();
+        assert_eq!(empty_aliases.field_value("Manufacturer"), None);
+        assert_eq!(empty_aliases.field_value("Model Number"), None);
+        assert_eq!(empty_aliases.field_value("Serial Number"), None);
+        assert_eq!(empty_aliases.field_value("Notes"), None);
+
+        // Homebox v0.27+ returns `"page": -1` when `page` query parameter is omitted
+        let paged: ListResponse<Entity> = serde_json::from_value(json!({
+            "page": -1,
+            "pageSize": 5,
+            "total": 175,
+            "items": [{"id": "ent-1", "name": "Resistor", "quantity": 0}]
+        }))
+        .unwrap();
+        let (items, total) = paged.into_parts();
+        assert_eq!(items.len(), 1);
+        assert_eq!(items[0].quantity, 0);
+        assert_eq!(total, Some(175));
     }
 
     #[test]

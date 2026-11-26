@@ -292,7 +292,7 @@ fn test_item_upsert_existing_and_new() {
 
     let put_mock = server
         .mock("PUT", "/api/v1/entities/ent-1")
-        .match_body(Matcher::Regex("\"numberValue\":5\\.0".to_string()))
+        .match_body(Matcher::Regex("\"numberValue\":5[,}]".to_string()))
         .with_status(200)
         .with_body(fixture("entity_detail.json"))
         .create();
