@@ -5,10 +5,12 @@ use std::collections::BTreeMap;
 use std::fs::{self, File};
 use std::io;
 use std::path::Path;
-use std::time::Duration;
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use std::thread;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-use reqwest::blocking::{multipart, Client, Response};
-use reqwest::header::{AUTHORIZATION, CONTENT_TYPE};
+use reqwest::blocking::{multipart, Client, RequestBuilder, Response};
+use reqwest::header::{AUTHORIZATION, CONTENT_TYPE, RETRY_AFTER};
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 use serde_json::{json, Value};
@@ -22,6 +24,181 @@ use crate::config::{
     DEFAULT_DOWNLOAD_TIMEOUT_SECS, DEFAULT_TIMEOUT_SECS,
 };
 use crate::error::{HbctlError, Result};
+
+pub const DEFAULT_MAX_RETRIES: usize = 3;
+pub const DEFAULT_RETRY_BASE_DELAY_MS: u64 = 200;
+pub const DEFAULT_RETRY_MAX_DELAY_SECS: u64 = 10;
+pub const DEFAULT_HYDRATE_CONCURRENCY: usize = 8;
+
+/// Exponential backoff and `Retry-After` configuration for transient HTTP failures.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RetryPolicy {
+    pub max_retries: usize,
+    pub base_delay: Duration,
+    pub max_delay: Duration,
+}
+
+impl Default for RetryPolicy {
+    fn default() -> Self {
+        Self {
+            max_retries: DEFAULT_MAX_RETRIES,
+            base_delay: Duration::from_millis(DEFAULT_RETRY_BASE_DELAY_MS),
+            max_delay: Duration::from_secs(DEFAULT_RETRY_MAX_DELAY_SECS),
+        }
+    }
+}
+
+impl RetryPolicy {
+    /// Compute sleep duration before retry `attempt` (0-indexed), honoring `Retry-After` if given.
+    pub fn delay_for_attempt(&self, attempt: usize, retry_after: Option<Duration>) -> Duration {
+        if let Some(ra) = retry_after {
+            return ra.min(self.max_delay);
+        }
+        let factor = u32::try_from(attempt)
+            .ok()
+            .and_then(|shift| 1u32.checked_shl(shift))
+            .unwrap_or(u32::MAX);
+        self.base_delay.saturating_mul(factor).min(self.max_delay)
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum RetryMode {
+    /// GET / PUT / DELETE: retry 429, 502, 503, 504 and transient network errors.
+    Idempotent,
+    /// POST (create_entity, create_tag, upload_attachment, login, refresh POST):
+    /// retry only 429, 503, and TCP/TLS connect errors so writes are never duplicated.
+    SafeMutation,
+}
+
+fn is_retryable_status(status: u16, mode: RetryMode) -> bool {
+    match mode {
+        RetryMode::Idempotent => matches!(status, 429 | 502 | 503 | 504),
+        RetryMode::SafeMutation => matches!(status, 429 | 503),
+    }
+}
+
+fn is_retryable_network_error(err: &reqwest::Error, mode: RetryMode) -> bool {
+    match mode {
+        RetryMode::Idempotent => {
+            err.is_timeout()
+                || err.is_connect()
+                || (err.is_request() && !err.is_builder() && !err.is_redirect())
+        }
+        RetryMode::SafeMutation => err.is_connect(),
+    }
+}
+
+fn parse_retry_after(resp: &Response) -> Option<Duration> {
+    let raw = resp.headers().get(RETRY_AFTER)?.to_str().ok()?;
+    parse_retry_after_at(raw, SystemTime::now())
+}
+
+fn parse_retry_after_at(value: &str, now: SystemTime) -> Option<Duration> {
+    let trimmed = value.trim();
+    if let Ok(secs) = trimmed.parse::<u64>() {
+        return Some(Duration::from_secs(secs));
+    }
+
+    // RFC 9110 IMF-fixdate: "Wed, 21 Oct 2015 07:28:00 GMT"
+    let mut parts = trimmed.split_ascii_whitespace();
+    let dow = parts.next()?;
+    let day_s = parts.next()?;
+    let mon_s = parts.next()?;
+    let year_s = parts.next()?;
+    let hms_s = parts.next()?;
+    let tz = parts.next()?;
+    if parts.next().is_some() || !dow.ends_with(',') || !tz.eq_ignore_ascii_case("GMT") {
+        return None;
+    }
+
+    let day: u32 = day_s.parse().ok()?;
+    if !(1..=31).contains(&day) {
+        return None;
+    }
+    let month: u32 = match mon_s {
+        "Jan" => 1,
+        "Feb" => 2,
+        "Mar" => 3,
+        "Apr" => 4,
+        "May" => 5,
+        "Jun" => 6,
+        "Jul" => 7,
+        "Aug" => 8,
+        "Sep" => 9,
+        "Oct" => 10,
+        "Nov" => 11,
+        "Dec" => 12,
+        _ => return None,
+    };
+    let year: i64 = year_s.parse().ok()?;
+    if !(1970..=9999).contains(&year) {
+        return None;
+    }
+
+    let mut hms = hms_s.split(':');
+    let hour: u32 = hms.next()?.parse().ok()?;
+    let min: u32 = hms.next()?.parse().ok()?;
+    let sec: u32 = hms.next()?.parse().ok()?;
+    if hms.next().is_some() || hour > 23 || min > 59 || sec > 60 {
+        return None;
+    }
+
+    // Howard Hinnant's civil-from-days inverse (days since 1970-01-01).
+    let y = if month <= 2 { year - 1 } else { year };
+    let era = y.div_euclid(400);
+    let yoe = (y - era * 400) as u64;
+    let m = month as u64;
+    let doy = (153 * (if m > 2 { m - 3 } else { m + 9 }) + 2) / 5 + (day as u64) - 1;
+    let doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
+    let days = era * 146_097 + (doe as i64) - 719_468;
+
+    let target_secs = days * 86_400 + (hour as i64) * 3600 + (min as i64) * 60 + (sec as i64);
+    let now_secs = now.duration_since(UNIX_EPOCH).ok()?.as_secs() as i64;
+    if target_secs <= now_secs {
+        Some(Duration::ZERO)
+    } else {
+        Some(Duration::from_secs((target_secs - now_secs) as u64))
+    }
+}
+
+fn send_request_with_retry<F>(
+    policy: RetryPolicy,
+    mode: RetryMode,
+    mut build_req: F,
+) -> Result<Response>
+where
+    F: FnMut() -> Result<RequestBuilder>,
+{
+    for attempt in 0..=policy.max_retries {
+        let req = build_req()?;
+        match req.send() {
+            Ok(resp) => {
+                let status = resp.status().as_u16();
+                if attempt < policy.max_retries && is_retryable_status(status, mode) {
+                    let delay = policy.delay_for_attempt(attempt, parse_retry_after(&resp));
+                    drop(resp);
+                    if !delay.is_zero() {
+                        thread::sleep(delay);
+                    }
+                    continue;
+                }
+                return Ok(resp);
+            }
+            Err(err) => {
+                if attempt < policy.max_retries && is_retryable_network_error(&err, mode) {
+                    let delay = policy.delay_for_attempt(attempt, None);
+                    if !delay.is_zero() {
+                        thread::sleep(delay);
+                    }
+                    continue;
+                }
+                return Err(HbctlError::Network(err));
+            }
+        }
+    }
+    unreachable!("retry loop always returns on final attempt")
+}
 
 /// Redacted preview of a mutating request emitted during `--dry-run`.
 #[derive(Debug, Clone, Serialize)]
@@ -51,6 +228,8 @@ pub struct HomeboxClient {
     raw_secret: String,
     http: Client,
     download_http: Client,
+    retry_policy: RetryPolicy,
+    hydrate_concurrency: usize,
 }
 
 impl HomeboxClient {
@@ -86,6 +265,8 @@ impl HomeboxClient {
             raw_secret: api_key.to_string(),
             http,
             download_http,
+            retry_policy: RetryPolicy::default(),
+            hydrate_concurrency: DEFAULT_HYDRATE_CONCURRENCY,
         })
     }
 
@@ -96,6 +277,23 @@ impl HomeboxClient {
             DEFAULT_TIMEOUT_SECS,
             DEFAULT_DOWNLOAD_TIMEOUT_SECS,
         )
+    }
+
+    pub fn with_retry_policy(mut self, policy: RetryPolicy) -> Self {
+        self.retry_policy = policy;
+        self
+    }
+
+    pub fn with_hydrate_concurrency(mut self, concurrency: usize) -> Self {
+        self.hydrate_concurrency = concurrency.max(1);
+        self
+    }
+
+    fn send_with_retry<F>(&self, mode: RetryMode, build_req: F) -> Result<Response>
+    where
+        F: FnMut() -> Result<RequestBuilder>,
+    {
+        send_request_with_retry(self.retry_policy, mode, build_req)
     }
 
     pub fn base_url(&self) -> &str {
@@ -165,11 +363,6 @@ impl HomeboxClient {
         &self,
         query: &ListEntitiesQuery,
     ) -> Result<(Vec<Entity>, Option<u64>)> {
-        let mut req = self
-            .http
-            .get(self.endpoint("entities"))
-            .header(AUTHORIZATION, &self.auth_header);
-
         let mut params: Vec<(&str, String)> = Vec::new();
         if let Some(ref q) = query.query {
             if !q.trim().is_empty() {
@@ -188,11 +381,15 @@ impl HomeboxClient {
         if let Some(ps) = query.page_size {
             params.push(("pageSize", ps.to_string()));
         }
-        if !params.is_empty() {
-            req = req.query(&params);
-        }
 
-        let resp = req.send()?;
+        let url = self.endpoint("entities");
+        let resp = self.send_with_retry(RetryMode::Idempotent, || {
+            let mut req = self.http.get(&url).header(AUTHORIZATION, &self.auth_header);
+            if !params.is_empty() {
+                req = req.query(&params);
+            }
+            Ok(req)
+        })?;
         let parsed: ListResponse<Entity> = self.handle_response(resp)?;
         Ok(parsed.into_parts())
     }
@@ -232,25 +429,99 @@ impl HomeboxClient {
     }
 
     pub fn get_entity(&self, id: &str) -> Result<Entity> {
-        let resp = self
-            .http
-            .get(self.endpoint(&format!("entities/{id}")))
-            .header(AUTHORIZATION, &self.auth_header)
-            .send()?;
+        let url = self.endpoint(&format!("entities/{id}"));
+        let resp = self.send_with_retry(RetryMode::Idempotent, || {
+            Ok(self.http.get(&url).header(AUTHORIZATION, &self.auth_header))
+        })?;
         self.handle_response(resp)
     }
 
     /// Hydrate entities whose `fields` were omitted or `null` in list summaries.
-    pub fn hydrate_entity_fields(&self, entities: Vec<Entity>) -> Result<Vec<Entity>> {
-        let mut hydrated = Vec::with_capacity(entities.len());
-        for entity in entities {
-            if entity.needs_field_hydration() && !entity.id.is_empty() {
-                hydrated.push(self.get_entity(&entity.id)?);
-            } else {
-                hydrated.push(entity);
+    pub fn hydrate_entity_fields(&self, mut entities: Vec<Entity>) -> Result<Vec<Entity>> {
+        let work: Vec<(usize, String)> = entities
+            .iter()
+            .enumerate()
+            .filter(|(_, e)| e.needs_field_hydration() && !e.id.is_empty())
+            .map(|(idx, e)| (idx, e.id.clone()))
+            .collect();
+
+        if work.is_empty() {
+            return Ok(entities);
+        }
+
+        if work.len() == 1 || self.hydrate_concurrency <= 1 {
+            for (idx, id) in work {
+                entities[idx] = self.get_entity(&id)?;
+            }
+            return Ok(entities);
+        }
+
+        let worker_count = self.hydrate_concurrency.max(1).min(work.len());
+        let next = AtomicUsize::new(0);
+        let failed = AtomicBool::new(false);
+
+        let outcomes = thread::scope(|s| {
+            let mut handles = Vec::with_capacity(worker_count);
+            for _ in 0..worker_count {
+                handles.push(s.spawn(|| {
+                    let mut local = Vec::new();
+                    loop {
+                        if failed.load(Ordering::Acquire) {
+                            break;
+                        }
+                        let pos = next.fetch_add(1, Ordering::Relaxed);
+                        if pos >= work.len() {
+                            break;
+                        }
+                        let (orig_idx, ref id) = work[pos];
+                        match self.get_entity(id) {
+                            Ok(ent) => local.push((orig_idx, ent)),
+                            Err(err) => {
+                                failed.store(true, Ordering::Release);
+                                return Err((orig_idx, err));
+                            }
+                        }
+                    }
+                    Ok(local)
+                }));
+            }
+
+            let mut results = Vec::with_capacity(handles.len());
+            for handle in handles {
+                let res = handle
+                    .join()
+                    .map_err(|_| {
+                        (
+                            usize::MAX,
+                            HbctlError::InvalidInput("hydration worker panicked".to_string()),
+                        )
+                    })
+                    .and_then(|inner| inner);
+                results.push(res);
+            }
+            results
+        });
+
+        let mut first_err: Option<(usize, HbctlError)> = None;
+        let mut hydrated_items = Vec::with_capacity(work.len());
+        for outcome in outcomes {
+            match outcome {
+                Ok(local) => hydrated_items.extend(local),
+                Err((idx, err)) => match &first_err {
+                    Some((best_idx, _)) if idx >= *best_idx => {}
+                    _ => first_err = Some((idx, err)),
+                },
             }
         }
-        Ok(hydrated)
+
+        if let Some((_, err)) = first_err {
+            return Err(err);
+        }
+
+        for (orig_idx, ent) in hydrated_items {
+            entities[orig_idx] = ent;
+        }
+        Ok(entities)
     }
 
     /// Create an entity via `POST /api/v1/entities`.
@@ -258,13 +529,15 @@ impl HomeboxClient {
     /// `fields` on initial creation, automatically issues a follow-up `PUT /api/v1/entities/{id}`
     /// whenever `req.fields` is non-empty.
     pub fn create_entity(&self, req: &CreateEntityRequest) -> Result<Entity> {
-        let resp = self
-            .http
-            .post(self.endpoint("entities"))
-            .header(AUTHORIZATION, &self.auth_header)
-            .header(CONTENT_TYPE, "application/json")
-            .json(req)
-            .send()?;
+        let url = self.endpoint("entities");
+        let resp = self.send_with_retry(RetryMode::SafeMutation, || {
+            Ok(self
+                .http
+                .post(&url)
+                .header(AUTHORIZATION, &self.auth_header)
+                .header(CONTENT_TYPE, "application/json")
+                .json(req))
+        })?;
 
         let mut created: Entity = self.handle_response(resp)?;
 
@@ -306,13 +579,15 @@ impl HomeboxClient {
 
     /// Full entity replacement via `PUT /api/v1/entities/{id}`.
     pub fn put_entity(&self, id: &str, entity: &Entity) -> Result<Entity> {
-        let resp = self
-            .http
-            .put(self.endpoint(&format!("entities/{id}")))
-            .header(AUTHORIZATION, &self.auth_header)
-            .header(CONTENT_TYPE, "application/json")
-            .json(entity)
-            .send()?;
+        let url = self.endpoint(&format!("entities/{id}"));
+        let resp = self.send_with_retry(RetryMode::Idempotent, || {
+            Ok(self
+                .http
+                .put(&url)
+                .header(AUTHORIZATION, &self.auth_header)
+                .header(CONTENT_TYPE, "application/json")
+                .json(entity))
+        })?;
         self.handle_response(resp)
     }
 
@@ -324,11 +599,13 @@ impl HomeboxClient {
     }
 
     pub fn delete_entity(&self, id: &str) -> Result<()> {
-        let resp = self
-            .http
-            .delete(self.endpoint(&format!("entities/{id}")))
-            .header(AUTHORIZATION, &self.auth_header)
-            .send()?;
+        let url = self.endpoint(&format!("entities/{id}"));
+        let resp = self.send_with_retry(RetryMode::Idempotent, || {
+            Ok(self
+                .http
+                .delete(&url)
+                .header(AUTHORIZATION, &self.auth_header))
+        })?;
         self.handle_empty_response(resp)
     }
 
@@ -337,23 +614,25 @@ impl HomeboxClient {
     // -------------------------------------------------------------------------
 
     pub fn list_tags(&self) -> Result<Vec<Tag>> {
-        let resp = self
-            .http
-            .get(self.endpoint("tags"))
-            .header(AUTHORIZATION, &self.auth_header)
-            .send()?;
+        let url = self.endpoint("tags");
+        let resp = self.send_with_retry(RetryMode::Idempotent, || {
+            Ok(self.http.get(&url).header(AUTHORIZATION, &self.auth_header))
+        })?;
         let parsed: ListResponse<Tag> = self.handle_response(resp)?;
         Ok(parsed.into_parts().0)
     }
 
     pub fn create_tag(&self, name: &str) -> Result<Tag> {
-        let resp = self
-            .http
-            .post(self.endpoint("tags"))
-            .header(AUTHORIZATION, &self.auth_header)
-            .header(CONTENT_TYPE, "application/json")
-            .json(&json!({ "name": name }))
-            .send()?;
+        let url = self.endpoint("tags");
+        let body = json!({ "name": name });
+        let resp = self.send_with_retry(RetryMode::SafeMutation, || {
+            Ok(self
+                .http
+                .post(&url)
+                .header(AUTHORIZATION, &self.auth_header)
+                .header(CONTENT_TYPE, "application/json")
+                .json(&body))
+        })?;
         self.handle_response(resp)
     }
 
@@ -362,11 +641,10 @@ impl HomeboxClient {
     // -------------------------------------------------------------------------
 
     pub fn list_entity_types(&self) -> Result<Vec<EntityType>> {
-        let resp = self
-            .http
-            .get(self.endpoint("entity-types"))
-            .header(AUTHORIZATION, &self.auth_header)
-            .send()?;
+        let url = self.endpoint("entity-types");
+        let resp = self.send_with_retry(RetryMode::Idempotent, || {
+            Ok(self.http.get(&url).header(AUTHORIZATION, &self.auth_header))
+        })?;
         let parsed: ListResponse<EntityType> = self.handle_response(resp)?;
         Ok(parsed.into_parts().0)
     }
@@ -386,30 +664,30 @@ impl HomeboxClient {
 
         let mime = mime_guess::from_path(file_path).first_or_octet_stream();
         let bytes = fs::read(file_path)?;
+        let att_type = if mime.type_() == "image" {
+            "photo"
+        } else {
+            "attachment"
+        };
+        let url = self.endpoint(&format!("entities/{entity_id}/attachments"));
 
-        let file_part = multipart::Part::bytes(bytes)
-            .file_name(basename.clone())
-            .mime_str(mime.essence_str())
-            .map_err(|e| HbctlError::InvalidInput(format!("invalid MIME type: {e}")))?;
+        let resp = self.send_with_retry(RetryMode::SafeMutation, || {
+            let file_part = multipart::Part::bytes(bytes.clone())
+                .file_name(basename.clone())
+                .mime_str(mime.essence_str())
+                .map_err(|e| HbctlError::InvalidInput(format!("invalid MIME type: {e}")))?;
 
-        let form = multipart::Form::new()
-            .part("file", file_part)
-            .text("name", basename)
-            .text(
-                "type",
-                if mime.type_() == "image" {
-                    "photo"
-                } else {
-                    "attachment"
-                },
-            );
+            let form = multipart::Form::new()
+                .part("file", file_part)
+                .text("name", basename.clone())
+                .text("type", att_type);
 
-        let resp = self
-            .http
-            .post(self.endpoint(&format!("entities/{entity_id}/attachments")))
-            .header(AUTHORIZATION, &self.auth_header)
-            .multipart(form)
-            .send()?;
+            Ok(self
+                .http
+                .post(&url)
+                .header(AUTHORIZATION, &self.auth_header)
+                .multipart(form))
+        })?;
 
         // Homebox may return either the created Attachment directly or the updated Entity
         let status = resp.status();
@@ -442,17 +720,13 @@ impl HomeboxClient {
         attachment_id: &str,
         dest_path: &Path,
     ) -> Result<u64> {
-        if let Some(parent) = dest_path.parent() {
-            if !parent.as_os_str().is_empty() {
-                fs::create_dir_all(parent)?;
-            }
-        }
-
-        let mut resp = self
-            .download_http
-            .get(self.endpoint(&format!("entities/{entity_id}/attachments/{attachment_id}")))
-            .header(AUTHORIZATION, &self.auth_header)
-            .send()?;
+        let url = self.endpoint(&format!("entities/{entity_id}/attachments/{attachment_id}"));
+        let mut resp = self.send_with_retry(RetryMode::Idempotent, || {
+            Ok(self
+                .download_http
+                .get(&url)
+                .header(AUTHORIZATION, &self.auth_header))
+        })?;
 
         let status = resp.status();
         if !status.is_success() {
@@ -464,17 +738,25 @@ impl HomeboxClient {
             });
         }
 
+        if let Some(parent) = dest_path.parent() {
+            if !parent.as_os_str().is_empty() {
+                fs::create_dir_all(parent)?;
+            }
+        }
+
         let mut file = File::create(dest_path)?;
         let written = io::copy(&mut resp, &mut file)?;
         Ok(written)
     }
 
     pub fn delete_attachment(&self, entity_id: &str, attachment_id: &str) -> Result<()> {
-        let resp = self
-            .http
-            .delete(self.endpoint(&format!("entities/{entity_id}/attachments/{attachment_id}")))
-            .header(AUTHORIZATION, &self.auth_header)
-            .send()?;
+        let url = self.endpoint(&format!("entities/{entity_id}/attachments/{attachment_id}"));
+        let resp = self.send_with_retry(RetryMode::Idempotent, || {
+            Ok(self
+                .http
+                .delete(&url)
+                .header(AUTHORIZATION, &self.auth_header))
+        })?;
         self.handle_empty_response(resp)
     }
 
@@ -494,15 +776,19 @@ impl HomeboxClient {
             .timeout(Duration::from_secs(timeout_secs.max(1)))
             .build()?;
 
-        let resp = http
-            .post(format!("{normalized}/users/login"))
-            .header(CONTENT_TYPE, "application/json")
-            .json(&json!({
-                "username": username,
-                "password": password,
-                "stayLoggedIn": true,
-            }))
-            .send()?;
+        let url = format!("{normalized}/users/login");
+        let body = json!({
+            "username": username,
+            "password": password,
+            "stayLoggedIn": true,
+        });
+        let resp =
+            send_request_with_retry(RetryPolicy::default(), RetryMode::SafeMutation, || {
+                Ok(http
+                    .post(&url)
+                    .header(CONTENT_TYPE, "application/json")
+                    .json(&body))
+            })?;
 
         let status = resp.status();
         let text = resp.text()?;
@@ -518,32 +804,619 @@ impl HomeboxClient {
 
     /// Fetch the authenticated user's profile (`GET /api/v1/users/self`).
     pub fn get_current_user(&self) -> Result<UserProfile> {
-        let resp = self
-            .http
-            .get(self.endpoint("users/self"))
-            .header(AUTHORIZATION, &self.auth_header)
-            .send()?;
+        let url = self.endpoint("users/self");
+        let resp = self.send_with_retry(RetryMode::Idempotent, || {
+            Ok(self.http.get(&url).header(AUTHORIZATION, &self.auth_header))
+        })?;
         let parsed: UserSelfResponse = self.handle_response(resp)?;
         Ok(parsed.into_profile())
     }
 
     /// Refresh an active JWT session (`GET /api/v1/users/refresh`, falling back to `POST` on 405).
     pub fn refresh_token(&self) -> Result<LoginResponse> {
-        let resp = self
-            .http
-            .get(self.endpoint("users/refresh"))
-            .header(AUTHORIZATION, &self.auth_header)
-            .send()?;
+        let url = self.endpoint("users/refresh");
+        let resp = self.send_with_retry(RetryMode::Idempotent, || {
+            Ok(self.http.get(&url).header(AUTHORIZATION, &self.auth_header))
+        })?;
 
         if resp.status().as_u16() == 405 {
-            let post_resp = self
-                .http
-                .post(self.endpoint("users/refresh"))
-                .header(AUTHORIZATION, &self.auth_header)
-                .send()?;
+            drop(resp);
+            let post_resp = self.send_with_retry(RetryMode::SafeMutation, || {
+                Ok(self
+                    .http
+                    .post(&url)
+                    .header(AUTHORIZATION, &self.auth_header))
+            })?;
             return self.handle_response(post_resp);
         }
 
         self.handle_response(resp)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io::{Read, Write};
+    use std::net::TcpListener;
+    use std::sync::Arc;
+
+    use mockito::{Matcher, Server};
+    use tempfile::tempdir;
+
+    use crate::client::models::CustomField;
+
+    fn fast_policy() -> RetryPolicy {
+        RetryPolicy {
+            max_retries: 3,
+            base_delay: Duration::from_millis(1),
+            max_delay: Duration::from_millis(20),
+        }
+    }
+
+    fn test_client(base_url: &str) -> HomeboxClient {
+        HomeboxClient::new(base_url, "hb_super_secret_key", 5, 5)
+            .expect("client")
+            .with_retry_policy(fast_policy())
+    }
+
+    #[test]
+    fn test_parse_retry_after_seconds_and_http_date() {
+        let now = UNIX_EPOCH + Duration::from_secs(1_445_412_470); // 2015-10-21 07:27:50 GMT
+        assert_eq!(parse_retry_after_at("0", now), Some(Duration::ZERO));
+        assert_eq!(parse_retry_after_at("5", now), Some(Duration::from_secs(5)));
+        assert_eq!(
+            parse_retry_after_at(" 12 ", now),
+            Some(Duration::from_secs(12))
+        );
+        assert_eq!(
+            parse_retry_after_at("Wed, 21 Oct 2015 07:28:00 GMT", now),
+            Some(Duration::from_secs(10))
+        );
+        assert_eq!(
+            parse_retry_after_at("Wed, 21 Oct 2015 07:27:00 GMT", now),
+            Some(Duration::ZERO)
+        );
+        assert_eq!(parse_retry_after_at("not-a-date", now), None);
+        assert_eq!(
+            parse_retry_after_at("Wed, 21 Foo 2015 07:28:00 GMT", now),
+            None
+        );
+        assert_eq!(
+            parse_retry_after_at("Wed, 21 Oct 2015 25:00:00 GMT", now),
+            None
+        );
+    }
+
+    #[test]
+    fn test_retry_policy_backoff_and_retry_after_cap() {
+        let policy = RetryPolicy {
+            max_retries: 4,
+            base_delay: Duration::from_millis(100),
+            max_delay: Duration::from_millis(350),
+        };
+        assert_eq!(
+            policy.delay_for_attempt(0, None),
+            Duration::from_millis(100)
+        );
+        assert_eq!(
+            policy.delay_for_attempt(1, None),
+            Duration::from_millis(200)
+        );
+        assert_eq!(
+            policy.delay_for_attempt(2, None),
+            Duration::from_millis(350)
+        );
+        assert_eq!(
+            policy.delay_for_attempt(100, None),
+            Duration::from_millis(350)
+        );
+        assert_eq!(
+            policy.delay_for_attempt(0, Some(Duration::ZERO)),
+            Duration::ZERO
+        );
+        assert_eq!(
+            policy.delay_for_attempt(0, Some(Duration::from_secs(5))),
+            Duration::from_millis(350)
+        );
+    }
+
+    #[test]
+    fn test_retryable_status_modes() {
+        for s in [429, 502, 503, 504] {
+            assert!(is_retryable_status(s, RetryMode::Idempotent));
+        }
+        for s in [400, 401, 404, 405, 500] {
+            assert!(!is_retryable_status(s, RetryMode::Idempotent));
+        }
+
+        assert!(is_retryable_status(429, RetryMode::SafeMutation));
+        assert!(is_retryable_status(503, RetryMode::SafeMutation));
+        for s in [502, 504, 400, 401, 404, 500] {
+            assert!(!is_retryable_status(s, RetryMode::SafeMutation));
+        }
+    }
+
+    #[test]
+    fn test_get_retries_transient_statuses_and_respects_retry_after() {
+        let mut server = Server::new();
+
+        let m_429 = server
+            .mock("GET", "/api/v1/entities/ent-1")
+            .with_status(429)
+            .with_header("Retry-After", "0")
+            .with_body("rate limited")
+            .expect(1)
+            .create();
+        let m_503 = server
+            .mock("GET", "/api/v1/entities/ent-1")
+            .with_status(503)
+            .with_body("unavailable")
+            .expect(1)
+            .create();
+        let m_200 = server
+            .mock("GET", "/api/v1/entities/ent-1")
+            .with_status(200)
+            .with_body(r#"{"id":"ent-1","name":"Multimeter","quantity":1,"fields":[]}"#)
+            .expect(1)
+            .create();
+
+        let client = test_client(&server.url());
+        let ent = client.get_entity("ent-1").expect("retry should recover");
+        assert_eq!(ent.name, "Multimeter");
+        m_429.assert();
+        m_503.assert();
+        m_200.assert();
+
+        let m_502 = server
+            .mock("GET", "/api/v1/entities/ent-2")
+            .with_status(502)
+            .expect(1)
+            .create();
+        let m_504 = server
+            .mock("GET", "/api/v1/entities/ent-2")
+            .with_status(504)
+            .expect(1)
+            .create();
+        let m_200_2 = server
+            .mock("GET", "/api/v1/entities/ent-2")
+            .with_status(200)
+            .with_body(r#"{"id":"ent-2","name":"Scope","quantity":1,"fields":[]}"#)
+            .expect(1)
+            .create();
+
+        let ent2 = client.get_entity("ent-2").expect("502/504 should recover");
+        assert_eq!(ent2.name, "Scope");
+        m_502.assert();
+        m_504.assert();
+        m_200_2.assert();
+    }
+
+    #[test]
+    fn test_get_does_not_retry_client_errors_and_redacts_on_exhaustion() {
+        let mut server = Server::new();
+
+        let m_401 = server
+            .mock("GET", "/api/v1/entities/ent-401")
+            .with_status(401)
+            .with_body("unauthorized")
+            .expect(1)
+            .create();
+
+        let client = test_client(&server.url());
+        let err = client.get_entity("ent-401").unwrap_err();
+        assert!(matches!(err, HbctlError::Http { status: 401, .. }));
+        m_401.assert();
+
+        let m_503_all = server
+            .mock("GET", "/api/v1/entities/ent-503")
+            .with_status(503)
+            .with_body("backend failed for token hb_super_secret_key")
+            .expect(4)
+            .create();
+
+        let err = client.get_entity("ent-503").unwrap_err();
+        match err {
+            HbctlError::Http { status, message } => {
+                assert_eq!(status, 503);
+                assert!(!message.contains("hb_super_secret_key"));
+                assert!(message.contains("***"));
+            }
+            other => panic!("expected Http error, got {other:?}"),
+        }
+        m_503_all.assert();
+    }
+
+    #[test]
+    fn test_put_delete_and_safe_post_retry_semantics() {
+        let mut server = Server::new();
+        let client = test_client(&server.url());
+
+        let m_put_502 = server
+            .mock("PUT", "/api/v1/entities/ent-1")
+            .with_status(502)
+            .expect(1)
+            .create();
+        let m_put_200 = server
+            .mock("PUT", "/api/v1/entities/ent-1")
+            .with_status(200)
+            .with_body(r#"{"id":"ent-1","name":"Updated","quantity":1,"fields":[]}"#)
+            .expect(1)
+            .create();
+        let put_ent = client
+            .put_entity(
+                "ent-1",
+                &Entity {
+                    id: "ent-1".to_string(),
+                    name: "Updated".to_string(),
+                    quantity: 1,
+                    ..Default::default()
+                },
+            )
+            .expect("put retry");
+        assert_eq!(put_ent.name, "Updated");
+        m_put_502.assert();
+        m_put_200.assert();
+
+        let m_del_503 = server
+            .mock("DELETE", "/api/v1/entities/ent-1")
+            .with_status(503)
+            .expect(1)
+            .create();
+        let m_del_204 = server
+            .mock("DELETE", "/api/v1/entities/ent-1")
+            .with_status(204)
+            .expect(1)
+            .create();
+        client.delete_entity("ent-1").expect("delete retry");
+        m_del_503.assert();
+        m_del_204.assert();
+
+        let m_post_429 = server
+            .mock("POST", "/api/v1/entities")
+            .with_status(429)
+            .with_header("Retry-After", "0")
+            .expect(1)
+            .create();
+        let m_post_201 = server
+            .mock("POST", "/api/v1/entities")
+            .with_status(201)
+            .with_body(r#"{"id":"ent-new","name":"Widget","quantity":1,"fields":[]}"#)
+            .expect(1)
+            .create();
+        let created = client
+            .create_entity(&CreateEntityRequest {
+                name: "Widget".to_string(),
+                quantity: Some(1),
+                ..Default::default()
+            })
+            .expect("post 429 retry");
+        assert_eq!(created.id, "ent-new");
+        m_post_429.assert();
+        m_post_201.assert();
+
+        // POST must NOT retry 502 (avoid duplicate creates after server-side processing).
+        let m_post_502 = server
+            .mock("POST", "/api/v1/entities")
+            .with_status(502)
+            .expect(1)
+            .create();
+        let err = client
+            .create_entity(&CreateEntityRequest {
+                name: "NoRetry502".to_string(),
+                quantity: Some(1),
+                ..Default::default()
+            })
+            .unwrap_err();
+        assert!(matches!(err, HbctlError::Http { status: 502, .. }));
+        m_post_502.assert();
+
+        // Upload attachment retries 503 and rebuilds multipart form cleanly.
+        let dir = tempdir().expect("tempdir");
+        let upload_path = dir.path().join("manual.txt");
+        fs::write(&upload_path, b"hello homebox").expect("write upload");
+
+        let m_up_503 = server
+            .mock("POST", "/api/v1/entities/ent-1/attachments")
+            .match_body(Matcher::Regex("hello homebox".to_string()))
+            .with_status(503)
+            .expect(1)
+            .create();
+        let m_up_201 = server
+            .mock("POST", "/api/v1/entities/ent-1/attachments")
+            .match_body(Matcher::Regex("hello homebox".to_string()))
+            .with_status(201)
+            .with_body(r#"{"id":"att-1","title":"manual.txt"}"#)
+            .expect(1)
+            .create();
+        let att = client
+            .upload_attachment("ent-1", &upload_path)
+            .expect("upload retry");
+        assert_eq!(att.id, "att-1");
+        m_up_503.assert();
+        m_up_201.assert();
+
+        // Download attachment retries 503 and does not leave a truncated file on failed attempts.
+        let dl_path = dir.path().join("sub/downloaded.txt");
+        let m_dl_503 = server
+            .mock("GET", "/api/v1/entities/ent-1/attachments/att-1")
+            .with_status(503)
+            .expect(1)
+            .create();
+        let m_dl_200 = server
+            .mock("GET", "/api/v1/entities/ent-1/attachments/att-1")
+            .with_status(200)
+            .with_body(b"pdf-bytes")
+            .expect(1)
+            .create();
+        let bytes = client
+            .download_attachment("ent-1", "att-1", &dl_path)
+            .expect("download retry");
+        assert_eq!(bytes, 9);
+        assert_eq!(fs::read(&dl_path).expect("read dl"), b"pdf-bytes");
+        m_dl_503.assert();
+        m_dl_200.assert();
+    }
+
+    fn read_http_headers(stream: &mut std::net::TcpStream) -> String {
+        let mut buf = [0u8; 4096];
+        let mut collected = Vec::new();
+        loop {
+            match stream.read(&mut buf) {
+                Ok(0) => break,
+                Ok(n) => {
+                    collected.extend_from_slice(&buf[..n]);
+                    if collected.windows(4).any(|w| w == b"\r\n\r\n") {
+                        break;
+                    }
+                }
+                Err(_) => break,
+            }
+        }
+        String::from_utf8_lossy(&collected).into_owned()
+    }
+
+    #[test]
+    fn test_get_retries_transient_network_drop() {
+        let listener = TcpListener::bind("127.0.0.1:0").expect("bind");
+        let addr = listener.local_addr().expect("addr");
+
+        let handle = thread::spawn(move || {
+            // 1st connection: drop immediately after accepting to force EOF network error.
+            let (conn1, _) = listener.accept().expect("accept 1");
+            drop(conn1);
+
+            // 2nd connection: read request headers, reply 200 OK.
+            let (mut conn2, _) = listener.accept().expect("accept 2");
+            let _ = read_http_headers(&mut conn2);
+            let body = r#"{"id":"ent-net","name":"Recovered","quantity":1,"fields":[]}"#;
+            let resp = format!(
+                "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
+                body.len(),
+                body
+            );
+            conn2.write_all(resp.as_bytes()).expect("write");
+            conn2.flush().expect("flush");
+        });
+
+        let client = test_client(&format!("http://{addr}"));
+        let ent = client
+            .get_entity("ent-net")
+            .expect("network drop should retry and succeed");
+        assert_eq!(ent.name, "Recovered");
+        handle.join().expect("server thread");
+    }
+
+    #[test]
+    fn test_hydrate_entity_fields_concurrent_preserves_order_and_skips_hydrated() {
+        let mut server = Server::new();
+        let mut mocks = Vec::new();
+        let mut input = Vec::new();
+
+        for idx in 0..12usize {
+            let id = format!("ent-{idx}");
+            if idx % 3 == 0 {
+                // Already hydrated: fields is Some(...)
+                input.push(Entity {
+                    id,
+                    name: format!("Already-{idx}"),
+                    quantity: 1,
+                    fields: Some(vec![CustomField {
+                        name: "Slot".to_string(),
+                        value: Some(Value::String(idx.to_string())),
+                        ..Default::default()
+                    }]),
+                    ..Default::default()
+                });
+            } else if idx == 11 {
+                // Empty id should not be fetched.
+                input.push(Entity {
+                    id: String::new(),
+                    name: "NoId".to_string(),
+                    quantity: 1,
+                    fields: None,
+                    ..Default::default()
+                });
+            } else {
+                let path = format!("/api/v1/entities/{id}");
+                let body = format!(
+                    r#"{{"id":"{id}","name":"Hydrated-{idx}","quantity":1,"fields":[{{"name":"Idx","type":"text","value":"{idx}","textValue":"{idx}"}}]}}"#
+                );
+                mocks.push(
+                    server
+                        .mock("GET", path.as_str())
+                        .with_status(200)
+                        .with_body(body)
+                        .expect(1)
+                        .create(),
+                );
+                input.push(Entity {
+                    id,
+                    name: format!("Summary-{idx}"),
+                    quantity: 1,
+                    fields: None,
+                    ..Default::default()
+                });
+            }
+        }
+
+        let client = test_client(&server.url()).with_hydrate_concurrency(4);
+        let hydrated = client.hydrate_entity_fields(input).expect("hydrate");
+        assert_eq!(hydrated.len(), 12);
+
+        for (idx, ent) in hydrated.iter().enumerate() {
+            if idx % 3 == 0 {
+                assert_eq!(ent.id, format!("ent-{idx}"));
+                assert_eq!(ent.name, format!("Already-{idx}"));
+                assert_eq!(
+                    ent.field_value("Slot").as_deref(),
+                    Some(idx.to_string().as_str())
+                );
+            } else if idx == 11 {
+                assert!(ent.id.is_empty());
+                assert_eq!(ent.name, "NoId");
+                assert!(ent.fields.is_none());
+            } else {
+                assert_eq!(ent.id, format!("ent-{idx}"));
+                assert_eq!(ent.name, format!("Hydrated-{idx}"));
+                assert_eq!(
+                    ent.field_value("Idx").as_deref(),
+                    Some(idx.to_string().as_str())
+                );
+            }
+        }
+
+        for m in mocks {
+            m.assert();
+        }
+    }
+
+    #[test]
+    fn test_hydrate_entity_fields_executes_concurrently() {
+        let listener = TcpListener::bind("127.0.0.1:0").expect("bind");
+        let addr = listener.local_addr().expect("addr");
+
+        let in_flight = Arc::new(AtomicUsize::new(0));
+        let max_in_flight = Arc::new(AtomicUsize::new(0));
+        let in_flight_srv = Arc::clone(&in_flight);
+        let max_srv = Arc::clone(&max_in_flight);
+
+        let srv_handle = thread::spawn(move || {
+            let mut conn_handles = Vec::new();
+            for _ in 0..4 {
+                let (mut stream, _) = listener.accept().expect("accept");
+                let cur = Arc::clone(&in_flight_srv);
+                let max = Arc::clone(&max_srv);
+                conn_handles.push(thread::spawn(move || {
+                    let active = cur.fetch_add(1, Ordering::SeqCst) + 1;
+                    max.fetch_max(active, Ordering::SeqCst);
+
+                    let req = read_http_headers(&mut stream);
+                    let first_line = req.lines().next().unwrap_or("");
+                    let id = first_line
+                        .split_whitespace()
+                        .nth(1)
+                        .and_then(|p| p.rsplit('/').next())
+                        .unwrap_or("unknown");
+
+                    thread::sleep(Duration::from_millis(30));
+
+                    let body = format!(
+                        r#"{{"id":"{id}","name":"Item-{id}","quantity":1,"fields":[]}}"#
+                    );
+                    let resp = format!(
+                        "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
+                        body.len(),
+                        body
+                    );
+                    stream.write_all(resp.as_bytes()).expect("write");
+                    stream.flush().expect("flush");
+                    cur.fetch_sub(1, Ordering::SeqCst);
+                }));
+            }
+            for h in conn_handles {
+                h.join().expect("conn thread");
+            }
+        });
+
+        let entities: Vec<Entity> = (0..4)
+            .map(|i| Entity {
+                id: format!("e-{i}"),
+                name: format!("Summary-{i}"),
+                quantity: 1,
+                fields: None,
+                ..Default::default()
+            })
+            .collect();
+
+        let client = test_client(&format!("http://{addr}")).with_hydrate_concurrency(4);
+        let hydrated = client
+            .hydrate_entity_fields(entities)
+            .expect("concurrent hydrate");
+        srv_handle.join().expect("server thread");
+
+        assert_eq!(hydrated.len(), 4);
+        for (i, ent) in hydrated.iter().enumerate() {
+            assert_eq!(ent.id, format!("e-{i}"));
+            assert_eq!(ent.name, format!("Item-e-{i}"));
+        }
+        assert!(
+            max_in_flight.load(Ordering::SeqCst) >= 2,
+            "expected >= 2 concurrent requests, observed {}",
+            max_in_flight.load(Ordering::SeqCst)
+        );
+    }
+
+    #[test]
+    fn test_hydrate_entity_fields_propagates_error_and_noop() {
+        let mut server = Server::new();
+        let client = test_client(&server.url()).with_hydrate_concurrency(4);
+
+        // Empty and already-hydrated inputs make zero requests.
+        assert!(client.hydrate_entity_fields(Vec::new()).unwrap().is_empty());
+        let already = vec![Entity {
+            id: "ok-1".to_string(),
+            name: "Done".to_string(),
+            quantity: 1,
+            fields: Some(Vec::new()),
+            ..Default::default()
+        }];
+        let out = client.hydrate_entity_fields(already.clone()).unwrap();
+        assert_eq!(out, already);
+
+        // One failing entity returns Err(404).
+        let _ok_mocks: Vec<_> = (0..5)
+            .filter(|i| *i != 2)
+            .map(|i| {
+                server
+                    .mock("GET", format!("/api/v1/entities/ent-{i}").as_str())
+                    .with_status(200)
+                    .with_body(format!(
+                        r#"{{"id":"ent-{i}","name":"Item-{i}","quantity":1,"fields":[]}}"#
+                    ))
+                    .expect_at_most(1)
+                    .create()
+            })
+            .collect();
+        let m_404 = server
+            .mock("GET", "/api/v1/entities/ent-2")
+            .with_status(404)
+            .with_body("missing")
+            .expect(1)
+            .create();
+
+        let entities: Vec<Entity> = (0..5)
+            .map(|i| Entity {
+                id: format!("ent-{i}"),
+                name: format!("Summary-{i}"),
+                quantity: 1,
+                fields: None,
+                ..Default::default()
+            })
+            .collect();
+
+        let err = client.hydrate_entity_fields(entities).unwrap_err();
+        assert!(matches!(err, HbctlError::Http { status: 404, .. }));
+        m_404.assert();
     }
 }
