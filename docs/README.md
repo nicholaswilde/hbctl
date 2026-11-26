@@ -1,4 +1,4 @@
-# :package: hbx
+# :package: hbx :house:
 
 ![GitHub tag (latest SemVer)](https://img.shields.io/github/v/tag/nicholaswilde/hbx?style=for-the-badge)
 [![ci](https://img.shields.io/github/actions/workflow/status/nicholaswilde/hbx/ci.yml?label=ci&style=for-the-badge&branch=main&logo=github-actions)](https://github.com/nicholaswilde/hbx/actions/workflows/ci.yml)
