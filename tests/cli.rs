@@ -1900,3 +1900,353 @@ fn test_update_and_self_update_non_interactive_requires_yes() {
         .stdout(predicate::str::contains("--yes"))
         .stdout(predicate::str::contains("--version"));
 }
+
+#[test]
+fn test_crud_gaps_field_tag_and_item_flags() {
+    if !can_execute_binary() {
+        return;
+    }
+    let mut server = Server::new();
+
+    // 1. field list (table, --json, -q, --select)
+    let get_ent_list = server
+        .mock("GET", "/api/v1/entities/ent-1")
+        .with_status(200)
+        .with_body(fixture("entity_detail.json"))
+        .expect(4)
+        .create();
+
+    hbctl(&server.url())
+        .args(["field", "list", "ent-1"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Manufacturer"))
+        .stdout(predicate::str::contains("Voltage"))
+        .stdout(predicate::str::contains("3.3"));
+
+    hbctl(&server.url())
+        .args(["--json", "field", "list", "ent-1"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"name\":\"Voltage\""));
+
+    hbctl(&server.url())
+        .args(["-q", "field", "list", "ent-1"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Manufacturer\n"))
+        .stdout(predicate::str::contains("Voltage\n"));
+
+    hbctl(&server.url())
+        .args(["field", "list", "ent-1", "--select", "name,type"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Manufacturer"))
+        .stdout(predicate::str::contains("number"));
+    get_ent_list.assert();
+
+    // 2. field delete (case-insensitive, dry-run, json, quiet, and NotFound)
+    hbctl("http://127.0.0.1:1")
+        .args(["field", "delete", "ent-1", "Voltage", "--dry-run"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(
+            "PUT http://127.0.0.1:1/api/v1/entities/ent-1",
+        ))
+        .stdout(predicate::str::contains("removeFields"));
+
+    let get_ent_del = server
+        .mock("GET", "/api/v1/entities/ent-1")
+        .with_status(200)
+        .with_body(fixture("entity_detail.json"))
+        .expect(3)
+        .create();
+
+    let put_field_del = server
+        .mock("PUT", "/api/v1/entities/ent-1")
+        .match_body(Matcher::AllOf(vec![
+            Matcher::Regex("Manufacturer".to_string()),
+            Matcher::Regex("tag-elec".to_string()),
+            Matcher::Regex(r#""id":"fld-3"[^}]*\},\{"id":"fld-5""#.to_string()),
+        ]))
+        .with_status(200)
+        .with_body(fixture("entity_detail.json"))
+        .expect(2)
+        .create();
+
+    hbctl(&server.url())
+        .args(["--json", "field", "delete", "ent-1", "voltage"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"field\":\"voltage\""))
+        .stdout(predicate::str::contains("\"deleted\":true"));
+
+    hbctl(&server.url())
+        .args(["-q", "field", "delete", "ent-1", "voltage"])
+        .assert()
+        .success()
+        .stdout(predicate::eq("ent-1\n"));
+
+    hbctl(&server.url())
+        .args(["field", "delete", "ent-1", "NoSuchField"])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("field not found"));
+
+    get_ent_del.assert();
+    put_field_del.assert();
+
+    // 3. tag update (validation, dry-run, GET->PUT preserving description, json, quiet)
+    hbctl(&server.url())
+        .args(["tag", "update", "tag-elec"])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains(
+            "provide at least one of --name, --description, or --color",
+        ));
+
+    hbctl("http://127.0.0.1:1")
+        .args([
+            "tag",
+            "update",
+            "tag-elec",
+            "--name",
+            "Electronics v2",
+            "--dry-run",
+        ])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(
+            "PUT http://127.0.0.1:1/api/v1/tags/tag-elec",
+        ))
+        .stdout(predicate::str::contains("Electronics v2"));
+
+    let get_tag = server
+        .mock("GET", "/api/v1/tags/tag-elec")
+        .with_status(200)
+        .with_body(r#"{"id":"tag-elec","name":"electronics","description":"Electronic parts"}"#)
+        .expect(2)
+        .create();
+    let put_tag = server
+        .mock("PUT", "/api/v1/tags/tag-elec")
+        .match_body(Matcher::AllOf(vec![
+            Matcher::Regex("Electronics v2".to_string()),
+            Matcher::Regex("Electronic parts".to_string()),
+            Matcher::Regex("#00ff00".to_string()),
+        ]))
+        .with_status(200)
+        .with_body(
+            r##"{"id":"tag-elec","name":"Electronics v2","description":"Electronic parts","color":"#00ff00"}"##,
+        )
+        .expect(2)
+        .create();
+
+    hbctl(&server.url())
+        .args([
+            "--json",
+            "tag",
+            "update",
+            "tag-elec",
+            "--name",
+            "Electronics v2",
+            "--color",
+            "#00ff00",
+        ])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"name\":\"Electronics v2\""))
+        .stdout(predicate::str::contains("\"color\":\"#00ff00\""));
+
+    hbctl(&server.url())
+        .args([
+            "-q",
+            "tag",
+            "update",
+            "tag-elec",
+            "--name",
+            "Electronics v2",
+            "--color",
+            "#00ff00",
+        ])
+        .assert()
+        .success()
+        .stdout(predicate::eq("tag-elec\n"));
+    get_tag.assert();
+    put_tag.assert();
+
+    // 4. tag delete (dry-run, json, quiet)
+    hbctl("http://127.0.0.1:1")
+        .args(["tag", "delete", "tag-elec", "--dry-run"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(
+            "DELETE http://127.0.0.1:1/api/v1/tags/tag-elec",
+        ));
+
+    let del_tag = server
+        .mock("DELETE", "/api/v1/tags/tag-elec")
+        .with_status(204)
+        .expect(2)
+        .create();
+
+    hbctl(&server.url())
+        .args(["--json", "tag", "delete", "tag-elec", "--force"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"id\":\"tag-elec\""))
+        .stdout(predicate::str::contains("\"deleted\":true"));
+
+    hbctl(&server.url())
+        .args(["-q", "tag", "delete", "tag-elec"])
+        .assert()
+        .success()
+        .stdout(predicate::eq("tag-elec\n"));
+    del_tag.assert();
+
+    // 5. item create --serial
+    let post_serial = server
+        .mock("POST", "/api/v1/entities")
+        .with_status(201)
+        .with_body(r#"{"id":"ent-sn-1","name":"Bench PSU","quantity":1,"fields":[]}"#)
+        .expect(1)
+        .create();
+    let put_serial = server
+        .mock("PUT", "/api/v1/entities/ent-sn-1")
+        .match_body(Matcher::AllOf(vec![
+            Matcher::Regex("Serial Number".to_string()),
+            Matcher::Regex("SN-001".to_string()),
+        ]))
+        .with_status(200)
+        .with_body(r#"{"id":"ent-sn-1","name":"Bench PSU","quantity":1,"fields":[{"name":"Serial Number","type":"text","value":"SN-001","textValue":"SN-001"}]}"#)
+        .expect(1)
+        .create();
+
+    hbctl(&server.url())
+        .args([
+            "-q",
+            "item",
+            "create",
+            "--name",
+            "Bench PSU",
+            "--serial",
+            "SN-001",
+        ])
+        .assert()
+        .success()
+        .stdout(predicate::eq("ent-sn-1\n"));
+    post_serial.assert();
+    put_serial.assert();
+
+    // 6. item update --add-tag / --remove-tag / --serial (plus dry-run & unknown remove-tag)
+    hbctl("http://127.0.0.1:1")
+        .args([
+            "item",
+            "update",
+            "ent-1",
+            "--add-tag",
+            "tools",
+            "--remove-tag",
+            "electronics",
+            "--serial",
+            "SN-002",
+            "--dry-run",
+        ])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("addTagIds"))
+        .stdout(predicate::str::contains("removeTagIds"))
+        .stdout(predicate::str::contains("SN-002"));
+
+    let tags_for_update = server
+        .mock("GET", "/api/v1/tags")
+        .with_status(200)
+        .with_body(fixture("tags.json"))
+        .expect(2)
+        .create();
+    let get_for_update = server
+        .mock("GET", "/api/v1/entities/ent-1")
+        .with_status(200)
+        .with_body(fixture("entity_detail.json"))
+        .expect(1)
+        .create();
+    let put_for_update = server
+        .mock("PUT", "/api/v1/entities/ent-1")
+        .match_body(Matcher::AllOf(vec![
+            Matcher::Regex(r#""tagIds":\["tag-tools"\]"#.to_string()),
+            Matcher::Regex(r#""tags":\[\]"#.to_string()),
+            Matcher::Regex("SN-002".to_string()),
+        ]))
+        .with_status(200)
+        .with_body(fixture("entity_detail.json"))
+        .expect(1)
+        .create();
+
+    hbctl(&server.url())
+        .args([
+            "-q",
+            "item",
+            "update",
+            "ent-1",
+            "--add-tag",
+            "tools",
+            "--remove-tag",
+            "electronics",
+            "--serial",
+            "SN-002",
+        ])
+        .assert()
+        .success()
+        .stdout(predicate::eq("ent-1\n"));
+
+    hbctl(&server.url())
+        .args(["item", "update", "ent-1", "--remove-tag", "nonexistent-tag"])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("tag not found"));
+
+    tags_for_update.assert();
+    get_for_update.assert();
+    put_for_update.assert();
+
+    // 7. item upsert --serial
+    let search_upsert = server
+        .mock("GET", "/api/v1/entities")
+        .match_query(Matcher::UrlEncoded("q".into(), "Signal Gen".into()))
+        .with_status(200)
+        .with_body("[]")
+        .expect(1)
+        .create();
+    let post_upsert = server
+        .mock("POST", "/api/v1/entities")
+        .with_status(201)
+        .with_body(r#"{"id":"ent-sn-3","name":"Signal Gen","quantity":1,"fields":[]}"#)
+        .expect(1)
+        .create();
+    let put_upsert = server
+        .mock("PUT", "/api/v1/entities/ent-sn-3")
+        .match_body(Matcher::AllOf(vec![
+            Matcher::Regex("Serial Number".to_string()),
+            Matcher::Regex("SN-003".to_string()),
+        ]))
+        .with_status(200)
+        .with_body(r#"{"id":"ent-sn-3","name":"Signal Gen","quantity":1,"fields":[{"name":"Serial Number","type":"text","value":"SN-003","textValue":"SN-003"}]}"#)
+        .expect(1)
+        .create();
+
+    hbctl(&server.url())
+        .args([
+            "-q",
+            "item",
+            "upsert",
+            "--name",
+            "Signal Gen",
+            "--serial",
+            "SN-003",
+        ])
+        .assert()
+        .success()
+        .stdout(predicate::eq("ent-sn-3\n"));
+    search_upsert.assert();
+    post_upsert.assert();
+    put_upsert.assert();
+}

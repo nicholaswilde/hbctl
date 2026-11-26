@@ -243,6 +243,7 @@ _arguments "${_arguments_options[@]}" : \
 '*--tag=[Tag name or UUID (repeatable; missing tags auto-created)]:TAGS:_default' \
 '--manufacturer=[Manufacturer (normalized into custom field '\''Manufacturer'\'')]:MANUFACTURER:_default' \
 '--model=[Model number (normalized into custom field '\''Model Number'\'')]:MODEL:_default' \
+'--serial=[Serial number (normalized into custom field '\''Serial Number'\'')]:SERIAL:_default' \
 '--notes=[Notes (normalized into custom field '\''Notes'\'')]:NOTES:_default' \
 '--quantity=[Item quantity]:QUANTITY:_default' \
 '--purchase-price=[Purchase price]:PURCHASE_PRICE:_default' \
@@ -271,8 +272,11 @@ _arguments "${_arguments_options[@]}" : \
 '--description=[Updated item description]:DESCRIPTION:_default' \
 '--type=[Entity type name or UUID]:ENTITY_TYPE:_default' \
 '*--tag=[Tag name or UUID to merge (repeatable)]:TAGS:_default' \
+'*--add-tag=[Tag name or UUID to add while preserving existing tags (repeatable)]:ADD_TAGS:_default' \
+'*--remove-tag=[Tag name or UUID to remove while preserving other existing tags (repeatable)]:REMOVE_TAGS:_default' \
 '--manufacturer=[Manufacturer (merged into custom field '\''Manufacturer'\'')]:MANUFACTURER:_default' \
 '--model=[Model number (merged into custom field '\''Model Number'\'')]:MODEL:_default' \
+'--serial=[Serial number (merged into custom field '\''Serial Number'\'')]:SERIAL:_default' \
 '--quantity=[Updated quantity]:QUANTITY:_default' \
 '--purchase-price=[Updated purchase price]:PURCHASE_PRICE:_default' \
 '--purchase-date=[Updated purchase date (YYYY-MM-DD)]:PURCHASE_DATE:_default' \
@@ -304,6 +308,7 @@ _arguments "${_arguments_options[@]}" : \
 '*--tag=[Tag name or UUID (repeatable; missing tags auto-created)]:TAGS:_default' \
 '--manufacturer=[Manufacturer]:MANUFACTURER:_default' \
 '--model=[Model number]:MODEL:_default' \
+'--serial=[Serial number]:SERIAL:_default' \
 '--notes=[Notes]:NOTES:_default' \
 '--quantity=[Quantity]:QUANTITY:_default' \
 '--purchase-price=[Purchase price]:PURCHASE_PRICE:_default' \
@@ -626,7 +631,24 @@ _arguments "${_arguments_options[@]}" : \
         (( CURRENT += 1 ))
         curcontext="${curcontext%:*:*}:hbctl-field-command-$line[1]:"
         case $line[1] in
-            (get)
+            (list)
+_arguments "${_arguments_options[@]}" : \
+'--url=[Homebox base URL (env\: HBCTL_URL > HOMEBOX_URL > http\://<HOMEBOX_IP>\:7745)]:URL:_default' \
+'--api-key=[Homebox API key or Bearer token (env\: HBCTL_API_KEY > HOMEBOX_API_KEY)]:API_KEY:_default' \
+'--output=[Output format (table, json, plain) \[env\: HBCTL_OUTPUT\]]:OUTPUT:(table json plain)' \
+'*--select=[Comma-separated field projection for JSON/table output (e.g. id,name,fields)]:SELECT:_default' \
+'-C+[Path to explicit TOML configuration file]:CONFIG:_files' \
+'--config=[Path to explicit TOML configuration file]:CONFIG:_files' \
+'--json[Shorthand for --output json (emits compact JSON)]' \
+'--dry-run[Preview mutating requests without hitting the server (redacts Authorization)]' \
+'-q[Output only created/affected IDs for shell piping]' \
+'--quiet[Output only created/affected IDs for shell piping]' \
+'-h[Print help]' \
+'--help[Print help]' \
+':item_id -- Entity ID:_default' \
+&& ret=0
+;;
+(get)
 _arguments "${_arguments_options[@]}" : \
 '--url=[Homebox base URL (env\: HBCTL_URL > HOMEBOX_URL > http\://<HOMEBOX_IP>\:7745)]:URL:_default' \
 '--api-key=[Homebox API key or Bearer token (env\: HBCTL_API_KEY > HOMEBOX_API_KEY)]:API_KEY:_default' \
@@ -664,6 +686,24 @@ _arguments "${_arguments_options[@]}" : \
 ':value -- Custom field value:_default' \
 && ret=0
 ;;
+(delete)
+_arguments "${_arguments_options[@]}" : \
+'--url=[Homebox base URL (env\: HBCTL_URL > HOMEBOX_URL > http\://<HOMEBOX_IP>\:7745)]:URL:_default' \
+'--api-key=[Homebox API key or Bearer token (env\: HBCTL_API_KEY > HOMEBOX_API_KEY)]:API_KEY:_default' \
+'--output=[Output format (table, json, plain) \[env\: HBCTL_OUTPUT\]]:OUTPUT:(table json plain)' \
+'*--select=[Comma-separated field projection for JSON/table output (e.g. id,name,fields)]:SELECT:_default' \
+'-C+[Path to explicit TOML configuration file]:CONFIG:_files' \
+'--config=[Path to explicit TOML configuration file]:CONFIG:_files' \
+'--json[Shorthand for --output json (emits compact JSON)]' \
+'--dry-run[Preview mutating requests without hitting the server (redacts Authorization)]' \
+'-q[Output only created/affected IDs for shell piping]' \
+'--quiet[Output only created/affected IDs for shell piping]' \
+'-h[Print help]' \
+'--help[Print help]' \
+':item_id -- Entity ID:_default' \
+':key -- Custom field name:_default' \
+&& ret=0
+;;
 (help)
 _arguments "${_arguments_options[@]}" : \
 ":: :_hbctl__subcmd__field__subcmd__help_commands" \
@@ -676,11 +716,19 @@ _arguments "${_arguments_options[@]}" : \
         (( CURRENT += 1 ))
         curcontext="${curcontext%:*:*}:hbctl-field-help-command-$line[1]:"
         case $line[1] in
-            (get)
+            (list)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+(get)
 _arguments "${_arguments_options[@]}" : \
 && ret=0
 ;;
 (set)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+(delete)
 _arguments "${_arguments_options[@]}" : \
 && ret=0
 ;;
@@ -753,6 +801,44 @@ _arguments "${_arguments_options[@]}" : \
 ':name -- Tag name:_default' \
 && ret=0
 ;;
+(update)
+_arguments "${_arguments_options[@]}" : \
+'--name=[Updated tag name]:NAME:_default' \
+'--description=[Updated tag description]:DESCRIPTION:_default' \
+'--color=[Updated tag hex color]:COLOR:_default' \
+'--url=[Homebox base URL (env\: HBCTL_URL > HOMEBOX_URL > http\://<HOMEBOX_IP>\:7745)]:URL:_default' \
+'--api-key=[Homebox API key or Bearer token (env\: HBCTL_API_KEY > HOMEBOX_API_KEY)]:API_KEY:_default' \
+'--output=[Output format (table, json, plain) \[env\: HBCTL_OUTPUT\]]:OUTPUT:(table json plain)' \
+'*--select=[Comma-separated field projection for JSON/table output (e.g. id,name,fields)]:SELECT:_default' \
+'-C+[Path to explicit TOML configuration file]:CONFIG:_files' \
+'--config=[Path to explicit TOML configuration file]:CONFIG:_files' \
+'--json[Shorthand for --output json (emits compact JSON)]' \
+'--dry-run[Preview mutating requests without hitting the server (redacts Authorization)]' \
+'-q[Output only created/affected IDs for shell piping]' \
+'--quiet[Output only created/affected IDs for shell piping]' \
+'-h[Print help]' \
+'--help[Print help]' \
+':id -- Tag ID:_default' \
+&& ret=0
+;;
+(delete)
+_arguments "${_arguments_options[@]}" : \
+'--url=[Homebox base URL (env\: HBCTL_URL > HOMEBOX_URL > http\://<HOMEBOX_IP>\:7745)]:URL:_default' \
+'--api-key=[Homebox API key or Bearer token (env\: HBCTL_API_KEY > HOMEBOX_API_KEY)]:API_KEY:_default' \
+'--output=[Output format (table, json, plain) \[env\: HBCTL_OUTPUT\]]:OUTPUT:(table json plain)' \
+'*--select=[Comma-separated field projection for JSON/table output (e.g. id,name,fields)]:SELECT:_default' \
+'-C+[Path to explicit TOML configuration file]:CONFIG:_files' \
+'--config=[Path to explicit TOML configuration file]:CONFIG:_files' \
+'--force[Skip interactive confirmation prompt]' \
+'--json[Shorthand for --output json (emits compact JSON)]' \
+'--dry-run[Preview mutating requests without hitting the server (redacts Authorization)]' \
+'-q[Output only created/affected IDs for shell piping]' \
+'--quiet[Output only created/affected IDs for shell piping]' \
+'-h[Print help]' \
+'--help[Print help]' \
+':id -- Tag ID:_default' \
+&& ret=0
+;;
 (help)
 _arguments "${_arguments_options[@]}" : \
 ":: :_hbctl__subcmd__tag__subcmd__help_commands" \
@@ -770,6 +856,14 @@ _arguments "${_arguments_options[@]}" : \
 && ret=0
 ;;
 (create)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+(update)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+(delete)
 _arguments "${_arguments_options[@]}" : \
 && ret=0
 ;;
@@ -1155,11 +1249,19 @@ _arguments "${_arguments_options[@]}" : \
         (( CURRENT += 1 ))
         curcontext="${curcontext%:*:*}:hbctl-help-field-command-$line[1]:"
         case $line[1] in
-            (get)
+            (list)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+(get)
 _arguments "${_arguments_options[@]}" : \
 && ret=0
 ;;
 (set)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+(delete)
 _arguments "${_arguments_options[@]}" : \
 && ret=0
 ;;
@@ -1184,6 +1286,14 @@ _arguments "${_arguments_options[@]}" : \
 && ret=0
 ;;
 (create)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+(update)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+(delete)
 _arguments "${_arguments_options[@]}" : \
 && ret=0
 ;;
@@ -1247,7 +1357,7 @@ _hbctl_commands() {
 'item:Manage inventory items (/api/v1/entities)' \
 'attachment:Manage item attachments (/api/v1/entities/{id}/attachments)' \
 'search:Full-text and structured item search' \
-'field:Get or set typed custom fields on an item' \
+'field:List, get, set, or delete typed custom fields on an item' \
 'tag:Manage tags (/api/v1/tags)' \
 'entity-types:List Homebox entity types (/api/v1/entity-types)' \
 'entity-type:List Homebox entity types (/api/v1/entity-types)' \
@@ -1438,11 +1548,18 @@ _hbctl__subcmd__export_commands() {
 (( $+functions[_hbctl__subcmd__field_commands] )) ||
 _hbctl__subcmd__field_commands() {
     local commands; commands=(
+'list:List all custom fields on an item' \
 'get:Get a custom field value from an item' \
 'set:Set a typed custom field on an item via GET -> Merge -> PUT' \
+'delete:Delete a custom field from an item via GET -> Remove -> PUT' \
 'help:Print this message or the help of the given subcommand(s)' \
     )
     _describe -t commands 'hbctl field commands' commands "$@"
+}
+(( $+functions[_hbctl__subcmd__field__subcmd__delete_commands] )) ||
+_hbctl__subcmd__field__subcmd__delete_commands() {
+    local commands; commands=()
+    _describe -t commands 'hbctl field delete commands' commands "$@"
 }
 (( $+functions[_hbctl__subcmd__field__subcmd__get_commands] )) ||
 _hbctl__subcmd__field__subcmd__get_commands() {
@@ -1452,11 +1569,18 @@ _hbctl__subcmd__field__subcmd__get_commands() {
 (( $+functions[_hbctl__subcmd__field__subcmd__help_commands] )) ||
 _hbctl__subcmd__field__subcmd__help_commands() {
     local commands; commands=(
+'list:List all custom fields on an item' \
 'get:Get a custom field value from an item' \
 'set:Set a typed custom field on an item via GET -> Merge -> PUT' \
+'delete:Delete a custom field from an item via GET -> Remove -> PUT' \
 'help:Print this message or the help of the given subcommand(s)' \
     )
     _describe -t commands 'hbctl field help commands' commands "$@"
+}
+(( $+functions[_hbctl__subcmd__field__subcmd__help__subcmd__delete_commands] )) ||
+_hbctl__subcmd__field__subcmd__help__subcmd__delete_commands() {
+    local commands; commands=()
+    _describe -t commands 'hbctl field help delete commands' commands "$@"
 }
 (( $+functions[_hbctl__subcmd__field__subcmd__help__subcmd__get_commands] )) ||
 _hbctl__subcmd__field__subcmd__help__subcmd__get_commands() {
@@ -1468,10 +1592,20 @@ _hbctl__subcmd__field__subcmd__help__subcmd__help_commands() {
     local commands; commands=()
     _describe -t commands 'hbctl field help help commands' commands "$@"
 }
+(( $+functions[_hbctl__subcmd__field__subcmd__help__subcmd__list_commands] )) ||
+_hbctl__subcmd__field__subcmd__help__subcmd__list_commands() {
+    local commands; commands=()
+    _describe -t commands 'hbctl field help list commands' commands "$@"
+}
 (( $+functions[_hbctl__subcmd__field__subcmd__help__subcmd__set_commands] )) ||
 _hbctl__subcmd__field__subcmd__help__subcmd__set_commands() {
     local commands; commands=()
     _describe -t commands 'hbctl field help set commands' commands "$@"
+}
+(( $+functions[_hbctl__subcmd__field__subcmd__list_commands] )) ||
+_hbctl__subcmd__field__subcmd__list_commands() {
+    local commands; commands=()
+    _describe -t commands 'hbctl field list commands' commands "$@"
 }
 (( $+functions[_hbctl__subcmd__field__subcmd__set_commands] )) ||
 _hbctl__subcmd__field__subcmd__set_commands() {
@@ -1485,7 +1619,7 @@ _hbctl__subcmd__help_commands() {
 'item:Manage inventory items (/api/v1/entities)' \
 'attachment:Manage item attachments (/api/v1/entities/{id}/attachments)' \
 'search:Full-text and structured item search' \
-'field:Get or set typed custom fields on an item' \
+'field:List, get, set, or delete typed custom fields on an item' \
 'tag:Manage tags (/api/v1/tags)' \
 'entity-types:List Homebox entity types (/api/v1/entity-types)' \
 'export:Export filtered items to JSON, CSV, or Markdown' \
@@ -1581,15 +1715,27 @@ _hbctl__subcmd__help__subcmd__export_commands() {
 (( $+functions[_hbctl__subcmd__help__subcmd__field_commands] )) ||
 _hbctl__subcmd__help__subcmd__field_commands() {
     local commands; commands=(
+'list:List all custom fields on an item' \
 'get:Get a custom field value from an item' \
 'set:Set a typed custom field on an item via GET -> Merge -> PUT' \
+'delete:Delete a custom field from an item via GET -> Remove -> PUT' \
     )
     _describe -t commands 'hbctl help field commands' commands "$@"
+}
+(( $+functions[_hbctl__subcmd__help__subcmd__field__subcmd__delete_commands] )) ||
+_hbctl__subcmd__help__subcmd__field__subcmd__delete_commands() {
+    local commands; commands=()
+    _describe -t commands 'hbctl help field delete commands' commands "$@"
 }
 (( $+functions[_hbctl__subcmd__help__subcmd__field__subcmd__get_commands] )) ||
 _hbctl__subcmd__help__subcmd__field__subcmd__get_commands() {
     local commands; commands=()
     _describe -t commands 'hbctl help field get commands' commands "$@"
+}
+(( $+functions[_hbctl__subcmd__help__subcmd__field__subcmd__list_commands] )) ||
+_hbctl__subcmd__help__subcmd__field__subcmd__list_commands() {
+    local commands; commands=()
+    _describe -t commands 'hbctl help field list commands' commands "$@"
 }
 (( $+functions[_hbctl__subcmd__help__subcmd__field__subcmd__set_commands] )) ||
 _hbctl__subcmd__help__subcmd__field__subcmd__set_commands() {
@@ -1670,6 +1816,8 @@ _hbctl__subcmd__help__subcmd__tag_commands() {
     local commands; commands=(
 'list:List all tags' \
 'create:Create a new tag' \
+'update:Update an existing tag by ID' \
+'delete:Delete a tag by ID' \
     )
     _describe -t commands 'hbctl help tag commands' commands "$@"
 }
@@ -1678,10 +1826,20 @@ _hbctl__subcmd__help__subcmd__tag__subcmd__create_commands() {
     local commands; commands=()
     _describe -t commands 'hbctl help tag create commands' commands "$@"
 }
+(( $+functions[_hbctl__subcmd__help__subcmd__tag__subcmd__delete_commands] )) ||
+_hbctl__subcmd__help__subcmd__tag__subcmd__delete_commands() {
+    local commands; commands=()
+    _describe -t commands 'hbctl help tag delete commands' commands "$@"
+}
 (( $+functions[_hbctl__subcmd__help__subcmd__tag__subcmd__list_commands] )) ||
 _hbctl__subcmd__help__subcmd__tag__subcmd__list_commands() {
     local commands; commands=()
     _describe -t commands 'hbctl help tag list commands' commands "$@"
+}
+(( $+functions[_hbctl__subcmd__help__subcmd__tag__subcmd__update_commands] )) ||
+_hbctl__subcmd__help__subcmd__tag__subcmd__update_commands() {
+    local commands; commands=()
+    _describe -t commands 'hbctl help tag update commands' commands "$@"
 }
 (( $+functions[_hbctl__subcmd__help__subcmd__update_commands] )) ||
 _hbctl__subcmd__help__subcmd__update_commands() {
@@ -1818,6 +1976,8 @@ _hbctl__subcmd__tag_commands() {
     local commands; commands=(
 'list:List all tags' \
 'create:Create a new tag' \
+'update:Update an existing tag by ID' \
+'delete:Delete a tag by ID' \
 'help:Print this message or the help of the given subcommand(s)' \
     )
     _describe -t commands 'hbctl tag commands' commands "$@"
@@ -1827,11 +1987,18 @@ _hbctl__subcmd__tag__subcmd__create_commands() {
     local commands; commands=()
     _describe -t commands 'hbctl tag create commands' commands "$@"
 }
+(( $+functions[_hbctl__subcmd__tag__subcmd__delete_commands] )) ||
+_hbctl__subcmd__tag__subcmd__delete_commands() {
+    local commands; commands=()
+    _describe -t commands 'hbctl tag delete commands' commands "$@"
+}
 (( $+functions[_hbctl__subcmd__tag__subcmd__help_commands] )) ||
 _hbctl__subcmd__tag__subcmd__help_commands() {
     local commands; commands=(
 'list:List all tags' \
 'create:Create a new tag' \
+'update:Update an existing tag by ID' \
+'delete:Delete a tag by ID' \
 'help:Print this message or the help of the given subcommand(s)' \
     )
     _describe -t commands 'hbctl tag help commands' commands "$@"
@@ -1840,6 +2007,11 @@ _hbctl__subcmd__tag__subcmd__help_commands() {
 _hbctl__subcmd__tag__subcmd__help__subcmd__create_commands() {
     local commands; commands=()
     _describe -t commands 'hbctl tag help create commands' commands "$@"
+}
+(( $+functions[_hbctl__subcmd__tag__subcmd__help__subcmd__delete_commands] )) ||
+_hbctl__subcmd__tag__subcmd__help__subcmd__delete_commands() {
+    local commands; commands=()
+    _describe -t commands 'hbctl tag help delete commands' commands "$@"
 }
 (( $+functions[_hbctl__subcmd__tag__subcmd__help__subcmd__help_commands] )) ||
 _hbctl__subcmd__tag__subcmd__help__subcmd__help_commands() {
@@ -1851,10 +2023,20 @@ _hbctl__subcmd__tag__subcmd__help__subcmd__list_commands() {
     local commands; commands=()
     _describe -t commands 'hbctl tag help list commands' commands "$@"
 }
+(( $+functions[_hbctl__subcmd__tag__subcmd__help__subcmd__update_commands] )) ||
+_hbctl__subcmd__tag__subcmd__help__subcmd__update_commands() {
+    local commands; commands=()
+    _describe -t commands 'hbctl tag help update commands' commands "$@"
+}
 (( $+functions[_hbctl__subcmd__tag__subcmd__list_commands] )) ||
 _hbctl__subcmd__tag__subcmd__list_commands() {
     local commands; commands=()
     _describe -t commands 'hbctl tag list commands' commands "$@"
+}
+(( $+functions[_hbctl__subcmd__tag__subcmd__update_commands] )) ||
+_hbctl__subcmd__tag__subcmd__update_commands() {
+    local commands; commands=()
+    _describe -t commands 'hbctl tag update commands' commands "$@"
 }
 (( $+functions[_hbctl__subcmd__update_commands] )) ||
 _hbctl__subcmd__update_commands() {

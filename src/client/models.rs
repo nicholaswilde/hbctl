@@ -690,6 +690,23 @@ pub struct EntityPatch {
     #[serde(rename = "purchaseFrom", skip_serializing_if = "Option::is_none")]
     pub purchase_from: Option<String>,
 
+    #[serde(default, rename = "addTagIds", skip_serializing_if = "Vec::is_empty")]
+    pub add_tag_ids: Vec<String>,
+
+    #[serde(
+        default,
+        rename = "removeTagIds",
+        skip_serializing_if = "Vec::is_empty"
+    )]
+    pub remove_tag_ids: Vec<String>,
+
+    #[serde(
+        default,
+        rename = "removeFields",
+        skip_serializing_if = "Vec::is_empty"
+    )]
+    pub remove_fields: Vec<String>,
+
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub fields: Vec<CustomField>,
 }
@@ -741,7 +758,7 @@ pub fn merge_entity_patch(existing: &Entity, patch: &EntityPatch) -> Entity {
         merged.purchase_from = Some(from.clone());
     }
 
-    // Preserve existing tag IDs and merge any new ones without clobbering
+    // Preserve existing tag IDs, merge additive tags, and apply explicit removals
     let mut tag_ids = existing.effective_tag_ids();
     if let Some(ref new_tags) = patch.tag_ids {
         for tid in new_tags {
@@ -750,10 +767,27 @@ pub fn merge_entity_patch(existing: &Entity, patch: &EntityPatch) -> Entity {
             }
         }
     }
+    for tid in &patch.add_tag_ids {
+        if !tid.is_empty() && !tag_ids.contains(tid) {
+            tag_ids.push(tid.clone());
+        }
+    }
+    if !patch.remove_tag_ids.is_empty() {
+        tag_ids.retain(|id| !patch.remove_tag_ids.contains(id));
+        merged.tags.retain(|t| tag_ids.contains(&t.id));
+    }
     merged.tag_ids = tag_ids;
 
-    // Merge custom fields without clobbering unrelated fields
+    // Remove requested fields and merge updates without clobbering unrelated fields
     let mut fields = existing.fields.clone().unwrap_or_default();
+    if !patch.remove_fields.is_empty() {
+        fields.retain(|f| {
+            !patch
+                .remove_fields
+                .iter()
+                .any(|rm| f.name.trim().eq_ignore_ascii_case(rm.trim()))
+        });
+    }
     upsert_custom_fields(&mut fields, &patch.fields);
     merged.fields = Some(fields);
 
@@ -761,8 +795,8 @@ pub fn merge_entity_patch(existing: &Entity, patch: &EntityPatch) -> Entity {
 }
 
 /// Normalize top-level aliases in JSON input (`manufacturer`/`Manufacturer`,
-/// `modelNumber`/`model_number`/`Model Number`, `notes`/`Notes`) into `.fields`
-/// text entries so Homebox v0.26+ custom fields persist uniformly.
+/// `modelNumber`/`model_number`/`Model Number`, `serialNumber`/`serial_number`/`Serial Number`,
+/// `notes`/`Notes`) into `.fields` text entries so Homebox v0.26+ custom fields persist uniformly.
 pub fn normalize_json_aliases(raw: &mut Value) -> Vec<CustomField> {
     let mut extracted = Vec::new();
     let Some(obj) = raw.as_object_mut() else {
@@ -783,6 +817,10 @@ pub fn normalize_json_aliases(raw: &mut Value) -> Vec<CustomField> {
         (
             &["modelNumber", "model_number", "Model Number"],
             "Model Number",
+        ),
+        (
+            &["serialNumber", "serial_number", "Serial Number", "serial"],
+            "Serial Number",
         ),
         (&["notes", "Notes"], "Notes"),
     ];
@@ -1025,5 +1063,69 @@ mod tests {
         assert_eq!(fields[1].display_value(), "5");
         assert_eq!(fields[2].name, "Notes");
         assert_eq!(fields[2].display_value(), "Bin A");
+    }
+
+    #[test]
+    fn test_merge_entity_patch_add_remove_tags_and_remove_fields() {
+        let existing = Entity {
+            id: "ent-1".into(),
+            name: "Sensor".into(),
+            quantity: 1,
+            tags: vec![
+                Tag {
+                    id: "tag-1".into(),
+                    name: "electronics".into(),
+                    ..Default::default()
+                },
+                Tag {
+                    id: "tag-2".into(),
+                    name: "legacy".into(),
+                    ..Default::default()
+                },
+            ],
+            tag_ids: vec!["tag-1".into(), "tag-2".into()],
+            fields: Some(vec![
+                CustomField::new_typed("Manufacturer", FieldValueType::Text, "Bosch").unwrap(),
+                CustomField::new_typed("Voltage", FieldValueType::Number, "3.3").unwrap(),
+            ]),
+            ..Default::default()
+        };
+
+        let patch = EntityPatch {
+            add_tag_ids: vec!["tag-3".into()],
+            remove_tag_ids: vec!["tag-2".into()],
+            remove_fields: vec!["voltage".into()],
+            ..Default::default()
+        };
+
+        let merged = merge_entity_patch(&existing, &patch);
+        assert_eq!(merged.tag_ids, vec!["tag-1", "tag-3"]);
+        assert_eq!(merged.tags.len(), 1);
+        assert_eq!(merged.tags[0].id, "tag-1");
+        let fields = merged.fields.unwrap();
+        assert_eq!(fields.len(), 1);
+        assert_eq!(fields[0].name, "Manufacturer");
+    }
+
+    #[test]
+    fn test_normalize_json_aliases_extracts_serial_number() {
+        let mut payload = json!({
+            "name": "Scope",
+            "serialNumber": "SN-123"
+        });
+        let fields = normalize_json_aliases(&mut payload);
+        assert_eq!(fields.len(), 1);
+        assert_eq!(fields[0].name, "Serial Number");
+        assert_eq!(fields[0].display_value(), "SN-123");
+        assert!(payload.get("serialNumber").is_none());
+
+        let mut payload2 = json!({
+            "name": "Scope",
+            "serial_number": "SN-456"
+        });
+        let fields2 = normalize_json_aliases(&mut payload2);
+        assert_eq!(fields2.len(), 1);
+        assert_eq!(fields2[0].name, "Serial Number");
+        assert_eq!(fields2[0].display_value(), "SN-456");
     }
 }

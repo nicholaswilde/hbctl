@@ -636,6 +636,38 @@ impl HomeboxClient {
         self.handle_response(resp)
     }
 
+    pub fn get_tag(&self, id: &str) -> Result<Tag> {
+        let url = self.endpoint(&format!("tags/{id}"));
+        let resp = self.send_with_retry(RetryMode::Idempotent, || {
+            Ok(self.http.get(&url).header(AUTHORIZATION, &self.auth_header))
+        })?;
+        self.handle_response(resp)
+    }
+
+    pub fn update_tag(&self, id: &str, tag: &Tag) -> Result<Tag> {
+        let url = self.endpoint(&format!("tags/{id}"));
+        let resp = self.send_with_retry(RetryMode::Idempotent, || {
+            Ok(self
+                .http
+                .put(&url)
+                .header(AUTHORIZATION, &self.auth_header)
+                .header(CONTENT_TYPE, "application/json")
+                .json(tag))
+        })?;
+        self.handle_response(resp)
+    }
+
+    pub fn delete_tag(&self, id: &str) -> Result<()> {
+        let url = self.endpoint(&format!("tags/{id}"));
+        let resp = self.send_with_retry(RetryMode::Idempotent, || {
+            Ok(self
+                .http
+                .delete(&url)
+                .header(AUTHORIZATION, &self.auth_header))
+        })?;
+        self.handle_empty_response(resp)
+    }
+
     // -------------------------------------------------------------------------
     // Entity Types (`/api/v1/entity-types`)
     // -------------------------------------------------------------------------
@@ -1418,5 +1450,59 @@ mod tests {
         let err = client.hydrate_entity_fields(entities).unwrap_err();
         assert!(matches!(err, HbctlError::Http { status: 404, .. }));
         m_404.assert();
+    }
+
+    #[test]
+    fn test_tag_get_update_delete_and_retry() {
+        let mut server = Server::new();
+        let client = test_client(&server.url());
+
+        let m_get = server
+            .mock("GET", "/api/v1/tags/tag-1")
+            .with_status(200)
+            .with_body(r#"{"id":"tag-1","name":"electronics","description":"Electronic parts"}"#)
+            .expect(1)
+            .create();
+        let tag = client.get_tag("tag-1").expect("get tag");
+        assert_eq!(tag.name, "electronics");
+        m_get.assert();
+
+        let m_put_503 = server
+            .mock("PUT", "/api/v1/tags/tag-1")
+            .with_status(503)
+            .expect(1)
+            .create();
+        let m_put_200 = server
+            .mock("PUT", "/api/v1/tags/tag-1")
+            .with_status(200)
+            .with_body(
+                r##"{"id":"tag-1","name":"Electronics v2","description":"Electronic parts","color":"#00ff00"}"##,
+            )
+            .expect(1)
+            .create();
+        let updated = client
+            .update_tag(
+                "tag-1",
+                &Tag {
+                    id: "tag-1".to_string(),
+                    name: "Electronics v2".to_string(),
+                    description: "Electronic parts".to_string(),
+                    color: Some("#00ff00".to_string()),
+                    ..Default::default()
+                },
+            )
+            .expect("update tag");
+        assert_eq!(updated.name, "Electronics v2");
+        assert_eq!(updated.color.as_deref(), Some("#00ff00"));
+        m_put_503.assert();
+        m_put_200.assert();
+
+        let m_del = server
+            .mock("DELETE", "/api/v1/tags/tag-1")
+            .with_status(204)
+            .expect(1)
+            .create();
+        client.delete_tag("tag-1").expect("delete tag");
+        m_del.assert();
     }
 }

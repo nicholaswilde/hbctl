@@ -65,6 +65,7 @@ impl Cli {
 }
 
 #[derive(Subcommand, Debug, Clone)]
+#[allow(clippy::large_enum_variant)] // CLI parsed once; keeps Commands::Item(ItemArgs) unboxed
 pub enum Commands {
     /// Authenticate with a remote Homebox instance (login, status, logout, refresh)
     Auth(AuthArgs),
@@ -78,7 +79,7 @@ pub enum Commands {
     /// Full-text and structured item search
     Search(SearchArgs),
 
-    /// Get or set typed custom fields on an item
+    /// List, get, set, or delete typed custom fields on an item
     Field(FieldArgs),
 
     /// Manage tags (/api/v1/tags)
@@ -256,6 +257,10 @@ pub struct ItemCreateArgs {
     #[arg(long)]
     pub model: Option<String>,
 
+    /// Serial number (normalized into custom field 'Serial Number')
+    #[arg(long)]
+    pub serial: Option<String>,
+
     /// Notes (normalized into custom field 'Notes')
     #[arg(long)]
     pub notes: Option<String>,
@@ -310,6 +315,14 @@ pub struct ItemUpdateArgs {
     #[arg(long = "tag")]
     pub tags: Vec<String>,
 
+    /// Tag name or UUID to add while preserving existing tags (repeatable)
+    #[arg(long = "add-tag")]
+    pub add_tags: Vec<String>,
+
+    /// Tag name or UUID to remove while preserving other existing tags (repeatable)
+    #[arg(long = "remove-tag")]
+    pub remove_tags: Vec<String>,
+
     /// Manufacturer (merged into custom field 'Manufacturer')
     #[arg(long)]
     pub manufacturer: Option<String>,
@@ -317,6 +330,10 @@ pub struct ItemUpdateArgs {
     /// Model number (merged into custom field 'Model Number')
     #[arg(long)]
     pub model: Option<String>,
+
+    /// Serial number (merged into custom field 'Serial Number')
+    #[arg(long)]
+    pub serial: Option<String>,
 
     /// Updated quantity
     #[arg(long)]
@@ -376,6 +393,10 @@ pub struct ItemUpsertArgs {
     /// Model number
     #[arg(long)]
     pub model: Option<String>,
+
+    /// Serial number
+    #[arg(long)]
+    pub serial: Option<String>,
 
     /// Notes
     #[arg(long)]
@@ -581,6 +602,11 @@ pub struct FieldArgs {
 
 #[derive(Subcommand, Debug, Clone)]
 pub enum FieldCommands {
+    /// List all custom fields on an item
+    List {
+        /// Entity ID
+        item_id: String,
+    },
     /// Get a custom field value from an item
     Get {
         /// Entity ID
@@ -599,6 +625,13 @@ pub enum FieldCommands {
         /// Custom field value type
         #[arg(long = "type", value_enum, default_value_t = FieldValueType::Text)]
         field_type: FieldValueType,
+    },
+    /// Delete a custom field from an item via GET -> Remove -> PUT
+    Delete {
+        /// Entity ID
+        item_id: String,
+        /// Custom field name
+        key: String,
     },
 }
 
@@ -620,6 +653,28 @@ pub enum TagCommands {
     Create {
         /// Tag name
         name: String,
+    },
+    /// Update an existing tag by ID
+    Update {
+        /// Tag ID
+        id: String,
+        /// Updated tag name
+        #[arg(long)]
+        name: Option<String>,
+        /// Updated tag description
+        #[arg(long)]
+        description: Option<String>,
+        /// Updated tag hex color
+        #[arg(long)]
+        color: Option<String>,
+    },
+    /// Delete a tag by ID
+    Delete {
+        /// Tag ID
+        id: String,
+        /// Skip interactive confirmation prompt
+        #[arg(long)]
+        force: bool,
     },
 }
 
@@ -756,5 +811,98 @@ mod tests {
         ])
         .unwrap();
         assert!(matches!(cli.command, Commands::Export(_)));
+    }
+
+    #[test]
+    fn test_cli_parse_crud_gap_commands_and_flags() {
+        let cli = Cli::try_parse_from(["hbctl", "field", "list", "ent-1"]).unwrap();
+        assert!(matches!(
+            cli.command,
+            Commands::Field(FieldArgs {
+                command: FieldCommands::List { .. }
+            })
+        ));
+
+        let cli = Cli::try_parse_from(["hbctl", "field", "delete", "ent-1", "Voltage"]).unwrap();
+        assert!(matches!(
+            cli.command,
+            Commands::Field(FieldArgs {
+                command: FieldCommands::Delete { .. }
+            })
+        ));
+
+        let cli = Cli::try_parse_from([
+            "hbctl",
+            "tag",
+            "update",
+            "tag-1",
+            "--name",
+            "Sensors",
+            "--description",
+            "All sensors",
+            "--color",
+            "#ff0000",
+        ])
+        .unwrap();
+        assert!(matches!(
+            cli.command,
+            Commands::Tag(TagArgs {
+                command: TagCommands::Update { .. }
+            })
+        ));
+
+        let cli = Cli::try_parse_from(["hbctl", "tag", "delete", "tag-1", "--force"]).unwrap();
+        assert!(matches!(
+            cli.command,
+            Commands::Tag(TagArgs {
+                command: TagCommands::Delete { force: true, .. }
+            })
+        ));
+
+        let cli = Cli::try_parse_from([
+            "hbctl", "item", "create", "--name", "Scope", "--serial", "SN-1",
+        ])
+        .unwrap();
+        match cli.command {
+            Commands::Item(ItemArgs {
+                command: ItemCommands::Create(a),
+            }) => assert_eq!(a.serial.as_deref(), Some("SN-1")),
+            other => panic!("unexpected command: {other:?}"),
+        }
+
+        let cli = Cli::try_parse_from([
+            "hbctl",
+            "item",
+            "update",
+            "ent-1",
+            "--add-tag",
+            "tools",
+            "--remove-tag",
+            "legacy",
+            "--serial",
+            "SN-2",
+        ])
+        .unwrap();
+        match cli.command {
+            Commands::Item(ItemArgs {
+                command: ItemCommands::Update(a),
+            }) => {
+                assert_eq!(a.add_tags, vec!["tools"]);
+                assert_eq!(a.remove_tags, vec!["legacy"]);
+                assert_eq!(a.serial.as_deref(), Some("SN-2"));
+            }
+            other => panic!("unexpected command: {other:?}"),
+        }
+
+        let cli = Cli::try_parse_from([
+            "hbctl", "item", "upsert", "--name", "Scope", "--serial", "SN-3",
+        ])
+        .unwrap();
+        match cli.command {
+            Commands::Item(ItemArgs {
+                command: ItemCommands::Upsert(a),
+            }) => assert_eq!(a.serial.as_deref(), Some("SN-3")),
+            other => panic!("unexpected command: {other:?}"),
+        }
     }
 }

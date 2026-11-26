@@ -39,7 +39,7 @@ Register-ArgumentCompleter -Native -CommandName 'hbctl' -ScriptBlock {
             [CompletionResult]::new('item', 'item', [CompletionResultType]::ParameterValue, 'Manage inventory items (/api/v1/entities)')
             [CompletionResult]::new('attachment', 'attachment', [CompletionResultType]::ParameterValue, 'Manage item attachments (/api/v1/entities/{id}/attachments)')
             [CompletionResult]::new('search', 'search', [CompletionResultType]::ParameterValue, 'Full-text and structured item search')
-            [CompletionResult]::new('field', 'field', [CompletionResultType]::ParameterValue, 'Get or set typed custom fields on an item')
+            [CompletionResult]::new('field', 'field', [CompletionResultType]::ParameterValue, 'List, get, set, or delete typed custom fields on an item')
             [CompletionResult]::new('tag', 'tag', [CompletionResultType]::ParameterValue, 'Manage tags (/api/v1/tags)')
             [CompletionResult]::new('entity-types', 'entity-types', [CompletionResultType]::ParameterValue, 'List Homebox entity types (/api/v1/entity-types)')
             [CompletionResult]::new('entity-type', 'entity-type', [CompletionResultType]::ParameterValue, 'List Homebox entity types (/api/v1/entity-types)')
@@ -227,6 +227,7 @@ Register-ArgumentCompleter -Native -CommandName 'hbctl' -ScriptBlock {
             [CompletionResult]::new('--tag', '--tag', [CompletionResultType]::ParameterName, 'Tag name or UUID (repeatable; missing tags auto-created)')
             [CompletionResult]::new('--manufacturer', '--manufacturer', [CompletionResultType]::ParameterName, 'Manufacturer (normalized into custom field ''Manufacturer'')')
             [CompletionResult]::new('--model', '--model', [CompletionResultType]::ParameterName, 'Model number (normalized into custom field ''Model Number'')')
+            [CompletionResult]::new('--serial', '--serial', [CompletionResultType]::ParameterName, 'Serial number (normalized into custom field ''Serial Number'')')
             [CompletionResult]::new('--notes', '--notes', [CompletionResultType]::ParameterName, 'Notes (normalized into custom field ''Notes'')')
             [CompletionResult]::new('--quantity', '--quantity', [CompletionResultType]::ParameterName, 'Item quantity')
             [CompletionResult]::new('--purchase-price', '--purchase-price', [CompletionResultType]::ParameterName, 'Purchase price')
@@ -254,8 +255,11 @@ Register-ArgumentCompleter -Native -CommandName 'hbctl' -ScriptBlock {
             [CompletionResult]::new('--description', '--description', [CompletionResultType]::ParameterName, 'Updated item description')
             [CompletionResult]::new('--type', '--type', [CompletionResultType]::ParameterName, 'Entity type name or UUID')
             [CompletionResult]::new('--tag', '--tag', [CompletionResultType]::ParameterName, 'Tag name or UUID to merge (repeatable)')
+            [CompletionResult]::new('--add-tag', '--add-tag', [CompletionResultType]::ParameterName, 'Tag name or UUID to add while preserving existing tags (repeatable)')
+            [CompletionResult]::new('--remove-tag', '--remove-tag', [CompletionResultType]::ParameterName, 'Tag name or UUID to remove while preserving other existing tags (repeatable)')
             [CompletionResult]::new('--manufacturer', '--manufacturer', [CompletionResultType]::ParameterName, 'Manufacturer (merged into custom field ''Manufacturer'')')
             [CompletionResult]::new('--model', '--model', [CompletionResultType]::ParameterName, 'Model number (merged into custom field ''Model Number'')')
+            [CompletionResult]::new('--serial', '--serial', [CompletionResultType]::ParameterName, 'Serial number (merged into custom field ''Serial Number'')')
             [CompletionResult]::new('--quantity', '--quantity', [CompletionResultType]::ParameterName, 'Updated quantity')
             [CompletionResult]::new('--purchase-price', '--purchase-price', [CompletionResultType]::ParameterName, 'Updated purchase price')
             [CompletionResult]::new('--purchase-date', '--purchase-date', [CompletionResultType]::ParameterName, 'Updated purchase date (YYYY-MM-DD)')
@@ -285,6 +289,7 @@ Register-ArgumentCompleter -Native -CommandName 'hbctl' -ScriptBlock {
             [CompletionResult]::new('--tag', '--tag', [CompletionResultType]::ParameterName, 'Tag name or UUID (repeatable; missing tags auto-created)')
             [CompletionResult]::new('--manufacturer', '--manufacturer', [CompletionResultType]::ParameterName, 'Manufacturer')
             [CompletionResult]::new('--model', '--model', [CompletionResultType]::ParameterName, 'Model number')
+            [CompletionResult]::new('--serial', '--serial', [CompletionResultType]::ParameterName, 'Serial number')
             [CompletionResult]::new('--notes', '--notes', [CompletionResultType]::ParameterName, 'Notes')
             [CompletionResult]::new('--quantity', '--quantity', [CompletionResultType]::ParameterName, 'Quantity')
             [CompletionResult]::new('--purchase-price', '--purchase-price', [CompletionResultType]::ParameterName, 'Purchase price')
@@ -540,9 +545,26 @@ Register-ArgumentCompleter -Native -CommandName 'hbctl' -ScriptBlock {
             [CompletionResult]::new('--quiet', '--quiet', [CompletionResultType]::ParameterName, 'Output only created/affected IDs for shell piping')
             [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
             [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('list', 'list', [CompletionResultType]::ParameterValue, 'List all custom fields on an item')
             [CompletionResult]::new('get', 'get', [CompletionResultType]::ParameterValue, 'Get a custom field value from an item')
             [CompletionResult]::new('set', 'set', [CompletionResultType]::ParameterValue, 'Set a typed custom field on an item via GET -> Merge -> PUT')
+            [CompletionResult]::new('delete', 'delete', [CompletionResultType]::ParameterValue, 'Delete a custom field from an item via GET -> Remove -> PUT')
             [CompletionResult]::new('help', 'help', [CompletionResultType]::ParameterValue, 'Print this message or the help of the given subcommand(s)')
+            break
+        }
+        'hbctl;field;list' {
+            [CompletionResult]::new('--url', '--url', [CompletionResultType]::ParameterName, 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)')
+            [CompletionResult]::new('--api-key', '--api-key', [CompletionResultType]::ParameterName, 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)')
+            [CompletionResult]::new('--output', '--output', [CompletionResultType]::ParameterName, 'Output format (table, json, plain) [env: HBCTL_OUTPUT]')
+            [CompletionResult]::new('--select', '--select', [CompletionResultType]::ParameterName, 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)')
+            [CompletionResult]::new('-C', '-C ', [CompletionResultType]::ParameterName, 'Path to explicit TOML configuration file')
+            [CompletionResult]::new('--config', '--config', [CompletionResultType]::ParameterName, 'Path to explicit TOML configuration file')
+            [CompletionResult]::new('--json', '--json', [CompletionResultType]::ParameterName, 'Shorthand for --output json (emits compact JSON)')
+            [CompletionResult]::new('--dry-run', '--dry-run', [CompletionResultType]::ParameterName, 'Preview mutating requests without hitting the server (redacts Authorization)')
+            [CompletionResult]::new('-q', '-q', [CompletionResultType]::ParameterName, 'Output only created/affected IDs for shell piping')
+            [CompletionResult]::new('--quiet', '--quiet', [CompletionResultType]::ParameterName, 'Output only created/affected IDs for shell piping')
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
             break
         }
         'hbctl;field;get' {
@@ -576,16 +598,39 @@ Register-ArgumentCompleter -Native -CommandName 'hbctl' -ScriptBlock {
             [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
             break
         }
+        'hbctl;field;delete' {
+            [CompletionResult]::new('--url', '--url', [CompletionResultType]::ParameterName, 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)')
+            [CompletionResult]::new('--api-key', '--api-key', [CompletionResultType]::ParameterName, 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)')
+            [CompletionResult]::new('--output', '--output', [CompletionResultType]::ParameterName, 'Output format (table, json, plain) [env: HBCTL_OUTPUT]')
+            [CompletionResult]::new('--select', '--select', [CompletionResultType]::ParameterName, 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)')
+            [CompletionResult]::new('-C', '-C ', [CompletionResultType]::ParameterName, 'Path to explicit TOML configuration file')
+            [CompletionResult]::new('--config', '--config', [CompletionResultType]::ParameterName, 'Path to explicit TOML configuration file')
+            [CompletionResult]::new('--json', '--json', [CompletionResultType]::ParameterName, 'Shorthand for --output json (emits compact JSON)')
+            [CompletionResult]::new('--dry-run', '--dry-run', [CompletionResultType]::ParameterName, 'Preview mutating requests without hitting the server (redacts Authorization)')
+            [CompletionResult]::new('-q', '-q', [CompletionResultType]::ParameterName, 'Output only created/affected IDs for shell piping')
+            [CompletionResult]::new('--quiet', '--quiet', [CompletionResultType]::ParameterName, 'Output only created/affected IDs for shell piping')
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
         'hbctl;field;help' {
+            [CompletionResult]::new('list', 'list', [CompletionResultType]::ParameterValue, 'List all custom fields on an item')
             [CompletionResult]::new('get', 'get', [CompletionResultType]::ParameterValue, 'Get a custom field value from an item')
             [CompletionResult]::new('set', 'set', [CompletionResultType]::ParameterValue, 'Set a typed custom field on an item via GET -> Merge -> PUT')
+            [CompletionResult]::new('delete', 'delete', [CompletionResultType]::ParameterValue, 'Delete a custom field from an item via GET -> Remove -> PUT')
             [CompletionResult]::new('help', 'help', [CompletionResultType]::ParameterValue, 'Print this message or the help of the given subcommand(s)')
+            break
+        }
+        'hbctl;field;help;list' {
             break
         }
         'hbctl;field;help;get' {
             break
         }
         'hbctl;field;help;set' {
+            break
+        }
+        'hbctl;field;help;delete' {
             break
         }
         'hbctl;field;help;help' {
@@ -606,6 +651,8 @@ Register-ArgumentCompleter -Native -CommandName 'hbctl' -ScriptBlock {
             [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
             [CompletionResult]::new('list', 'list', [CompletionResultType]::ParameterValue, 'List all tags')
             [CompletionResult]::new('create', 'create', [CompletionResultType]::ParameterValue, 'Create a new tag')
+            [CompletionResult]::new('update', 'update', [CompletionResultType]::ParameterValue, 'Update an existing tag by ID')
+            [CompletionResult]::new('delete', 'delete', [CompletionResultType]::ParameterValue, 'Delete a tag by ID')
             [CompletionResult]::new('help', 'help', [CompletionResultType]::ParameterValue, 'Print this message or the help of the given subcommand(s)')
             break
         }
@@ -639,9 +686,45 @@ Register-ArgumentCompleter -Native -CommandName 'hbctl' -ScriptBlock {
             [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
             break
         }
+        'hbctl;tag;update' {
+            [CompletionResult]::new('--name', '--name', [CompletionResultType]::ParameterName, 'Updated tag name')
+            [CompletionResult]::new('--description', '--description', [CompletionResultType]::ParameterName, 'Updated tag description')
+            [CompletionResult]::new('--color', '--color', [CompletionResultType]::ParameterName, 'Updated tag hex color')
+            [CompletionResult]::new('--url', '--url', [CompletionResultType]::ParameterName, 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)')
+            [CompletionResult]::new('--api-key', '--api-key', [CompletionResultType]::ParameterName, 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)')
+            [CompletionResult]::new('--output', '--output', [CompletionResultType]::ParameterName, 'Output format (table, json, plain) [env: HBCTL_OUTPUT]')
+            [CompletionResult]::new('--select', '--select', [CompletionResultType]::ParameterName, 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)')
+            [CompletionResult]::new('-C', '-C ', [CompletionResultType]::ParameterName, 'Path to explicit TOML configuration file')
+            [CompletionResult]::new('--config', '--config', [CompletionResultType]::ParameterName, 'Path to explicit TOML configuration file')
+            [CompletionResult]::new('--json', '--json', [CompletionResultType]::ParameterName, 'Shorthand for --output json (emits compact JSON)')
+            [CompletionResult]::new('--dry-run', '--dry-run', [CompletionResultType]::ParameterName, 'Preview mutating requests without hitting the server (redacts Authorization)')
+            [CompletionResult]::new('-q', '-q', [CompletionResultType]::ParameterName, 'Output only created/affected IDs for shell piping')
+            [CompletionResult]::new('--quiet', '--quiet', [CompletionResultType]::ParameterName, 'Output only created/affected IDs for shell piping')
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'hbctl;tag;delete' {
+            [CompletionResult]::new('--url', '--url', [CompletionResultType]::ParameterName, 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)')
+            [CompletionResult]::new('--api-key', '--api-key', [CompletionResultType]::ParameterName, 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)')
+            [CompletionResult]::new('--output', '--output', [CompletionResultType]::ParameterName, 'Output format (table, json, plain) [env: HBCTL_OUTPUT]')
+            [CompletionResult]::new('--select', '--select', [CompletionResultType]::ParameterName, 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)')
+            [CompletionResult]::new('-C', '-C ', [CompletionResultType]::ParameterName, 'Path to explicit TOML configuration file')
+            [CompletionResult]::new('--config', '--config', [CompletionResultType]::ParameterName, 'Path to explicit TOML configuration file')
+            [CompletionResult]::new('--force', '--force', [CompletionResultType]::ParameterName, 'Skip interactive confirmation prompt')
+            [CompletionResult]::new('--json', '--json', [CompletionResultType]::ParameterName, 'Shorthand for --output json (emits compact JSON)')
+            [CompletionResult]::new('--dry-run', '--dry-run', [CompletionResultType]::ParameterName, 'Preview mutating requests without hitting the server (redacts Authorization)')
+            [CompletionResult]::new('-q', '-q', [CompletionResultType]::ParameterName, 'Output only created/affected IDs for shell piping')
+            [CompletionResult]::new('--quiet', '--quiet', [CompletionResultType]::ParameterName, 'Output only created/affected IDs for shell piping')
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
         'hbctl;tag;help' {
             [CompletionResult]::new('list', 'list', [CompletionResultType]::ParameterValue, 'List all tags')
             [CompletionResult]::new('create', 'create', [CompletionResultType]::ParameterValue, 'Create a new tag')
+            [CompletionResult]::new('update', 'update', [CompletionResultType]::ParameterValue, 'Update an existing tag by ID')
+            [CompletionResult]::new('delete', 'delete', [CompletionResultType]::ParameterValue, 'Delete a tag by ID')
             [CompletionResult]::new('help', 'help', [CompletionResultType]::ParameterValue, 'Print this message or the help of the given subcommand(s)')
             break
         }
@@ -649,6 +732,12 @@ Register-ArgumentCompleter -Native -CommandName 'hbctl' -ScriptBlock {
             break
         }
         'hbctl;tag;help;create' {
+            break
+        }
+        'hbctl;tag;help;update' {
+            break
+        }
+        'hbctl;tag;help;delete' {
             break
         }
         'hbctl;tag;help;help' {
@@ -833,7 +922,7 @@ Register-ArgumentCompleter -Native -CommandName 'hbctl' -ScriptBlock {
             [CompletionResult]::new('item', 'item', [CompletionResultType]::ParameterValue, 'Manage inventory items (/api/v1/entities)')
             [CompletionResult]::new('attachment', 'attachment', [CompletionResultType]::ParameterValue, 'Manage item attachments (/api/v1/entities/{id}/attachments)')
             [CompletionResult]::new('search', 'search', [CompletionResultType]::ParameterValue, 'Full-text and structured item search')
-            [CompletionResult]::new('field', 'field', [CompletionResultType]::ParameterValue, 'Get or set typed custom fields on an item')
+            [CompletionResult]::new('field', 'field', [CompletionResultType]::ParameterValue, 'List, get, set, or delete typed custom fields on an item')
             [CompletionResult]::new('tag', 'tag', [CompletionResultType]::ParameterValue, 'Manage tags (/api/v1/tags)')
             [CompletionResult]::new('entity-types', 'entity-types', [CompletionResultType]::ParameterValue, 'List Homebox entity types (/api/v1/entity-types)')
             [CompletionResult]::new('export', 'export', [CompletionResultType]::ParameterValue, 'Export filtered items to JSON, CSV, or Markdown')
@@ -920,8 +1009,13 @@ Register-ArgumentCompleter -Native -CommandName 'hbctl' -ScriptBlock {
             break
         }
         'hbctl;help;field' {
+            [CompletionResult]::new('list', 'list', [CompletionResultType]::ParameterValue, 'List all custom fields on an item')
             [CompletionResult]::new('get', 'get', [CompletionResultType]::ParameterValue, 'Get a custom field value from an item')
             [CompletionResult]::new('set', 'set', [CompletionResultType]::ParameterValue, 'Set a typed custom field on an item via GET -> Merge -> PUT')
+            [CompletionResult]::new('delete', 'delete', [CompletionResultType]::ParameterValue, 'Delete a custom field from an item via GET -> Remove -> PUT')
+            break
+        }
+        'hbctl;help;field;list' {
             break
         }
         'hbctl;help;field;get' {
@@ -930,15 +1024,26 @@ Register-ArgumentCompleter -Native -CommandName 'hbctl' -ScriptBlock {
         'hbctl;help;field;set' {
             break
         }
+        'hbctl;help;field;delete' {
+            break
+        }
         'hbctl;help;tag' {
             [CompletionResult]::new('list', 'list', [CompletionResultType]::ParameterValue, 'List all tags')
             [CompletionResult]::new('create', 'create', [CompletionResultType]::ParameterValue, 'Create a new tag')
+            [CompletionResult]::new('update', 'update', [CompletionResultType]::ParameterValue, 'Update an existing tag by ID')
+            [CompletionResult]::new('delete', 'delete', [CompletionResultType]::ParameterValue, 'Delete a tag by ID')
             break
         }
         'hbctl;help;tag;list' {
             break
         }
         'hbctl;help;tag;create' {
+            break
+        }
+        'hbctl;help;tag;update' {
+            break
+        }
+        'hbctl;help;tag;delete' {
             break
         }
         'hbctl;help;entity-types' {

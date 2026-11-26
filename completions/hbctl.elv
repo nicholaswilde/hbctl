@@ -36,7 +36,7 @@ set edit:completion:arg-completer[hbctl] = {|@words|
             cand item 'Manage inventory items (/api/v1/entities)'
             cand attachment 'Manage item attachments (/api/v1/entities/{id}/attachments)'
             cand search 'Full-text and structured item search'
-            cand field 'Get or set typed custom fields on an item'
+            cand field 'List, get, set, or delete typed custom fields on an item'
             cand tag 'Manage tags (/api/v1/tags)'
             cand entity-types 'List Homebox entity types (/api/v1/entity-types)'
             cand entity-type 'List Homebox entity types (/api/v1/entity-types)'
@@ -209,6 +209,7 @@ set edit:completion:arg-completer[hbctl] = {|@words|
             cand --tag 'Tag name or UUID (repeatable; missing tags auto-created)'
             cand --manufacturer 'Manufacturer (normalized into custom field ''Manufacturer'')'
             cand --model 'Model number (normalized into custom field ''Model Number'')'
+            cand --serial 'Serial number (normalized into custom field ''Serial Number'')'
             cand --notes 'Notes (normalized into custom field ''Notes'')'
             cand --quantity 'Item quantity'
             cand --purchase-price 'Purchase price'
@@ -235,8 +236,11 @@ set edit:completion:arg-completer[hbctl] = {|@words|
             cand --description 'Updated item description'
             cand --type 'Entity type name or UUID'
             cand --tag 'Tag name or UUID to merge (repeatable)'
+            cand --add-tag 'Tag name or UUID to add while preserving existing tags (repeatable)'
+            cand --remove-tag 'Tag name or UUID to remove while preserving other existing tags (repeatable)'
             cand --manufacturer 'Manufacturer (merged into custom field ''Manufacturer'')'
             cand --model 'Model number (merged into custom field ''Model Number'')'
+            cand --serial 'Serial number (merged into custom field ''Serial Number'')'
             cand --quantity 'Updated quantity'
             cand --purchase-price 'Updated purchase price'
             cand --purchase-date 'Updated purchase date (YYYY-MM-DD)'
@@ -265,6 +269,7 @@ set edit:completion:arg-completer[hbctl] = {|@words|
             cand --tag 'Tag name or UUID (repeatable; missing tags auto-created)'
             cand --manufacturer 'Manufacturer'
             cand --model 'Model number'
+            cand --serial 'Serial number'
             cand --notes 'Notes'
             cand --quantity 'Quantity'
             cand --purchase-price 'Purchase price'
@@ -494,9 +499,25 @@ set edit:completion:arg-completer[hbctl] = {|@words|
             cand --quiet 'Output only created/affected IDs for shell piping'
             cand -h 'Print help'
             cand --help 'Print help'
+            cand list 'List all custom fields on an item'
             cand get 'Get a custom field value from an item'
             cand set 'Set a typed custom field on an item via GET -> Merge -> PUT'
+            cand delete 'Delete a custom field from an item via GET -> Remove -> PUT'
             cand help 'Print this message or the help of the given subcommand(s)'
+        }
+        &'hbctl;field;list'= {
+            cand --url 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
+            cand --api-key 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)'
+            cand --output 'Output format (table, json, plain) [env: HBCTL_OUTPUT]'
+            cand --select 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)'
+            cand -C 'Path to explicit TOML configuration file'
+            cand --config 'Path to explicit TOML configuration file'
+            cand --json 'Shorthand for --output json (emits compact JSON)'
+            cand --dry-run 'Preview mutating requests without hitting the server (redacts Authorization)'
+            cand -q 'Output only created/affected IDs for shell piping'
+            cand --quiet 'Output only created/affected IDs for shell piping'
+            cand -h 'Print help'
+            cand --help 'Print help'
         }
         &'hbctl;field;get'= {
             cand --url 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
@@ -527,14 +548,34 @@ set edit:completion:arg-completer[hbctl] = {|@words|
             cand -h 'Print help'
             cand --help 'Print help'
         }
+        &'hbctl;field;delete'= {
+            cand --url 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
+            cand --api-key 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)'
+            cand --output 'Output format (table, json, plain) [env: HBCTL_OUTPUT]'
+            cand --select 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)'
+            cand -C 'Path to explicit TOML configuration file'
+            cand --config 'Path to explicit TOML configuration file'
+            cand --json 'Shorthand for --output json (emits compact JSON)'
+            cand --dry-run 'Preview mutating requests without hitting the server (redacts Authorization)'
+            cand -q 'Output only created/affected IDs for shell piping'
+            cand --quiet 'Output only created/affected IDs for shell piping'
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
         &'hbctl;field;help'= {
+            cand list 'List all custom fields on an item'
             cand get 'Get a custom field value from an item'
             cand set 'Set a typed custom field on an item via GET -> Merge -> PUT'
+            cand delete 'Delete a custom field from an item via GET -> Remove -> PUT'
             cand help 'Print this message or the help of the given subcommand(s)'
+        }
+        &'hbctl;field;help;list'= {
         }
         &'hbctl;field;help;get'= {
         }
         &'hbctl;field;help;set'= {
+        }
+        &'hbctl;field;help;delete'= {
         }
         &'hbctl;field;help;help'= {
         }
@@ -553,6 +594,8 @@ set edit:completion:arg-completer[hbctl] = {|@words|
             cand --help 'Print help'
             cand list 'List all tags'
             cand create 'Create a new tag'
+            cand update 'Update an existing tag by ID'
+            cand delete 'Delete a tag by ID'
             cand help 'Print this message or the help of the given subcommand(s)'
         }
         &'hbctl;tag;list'= {
@@ -583,14 +626,52 @@ set edit:completion:arg-completer[hbctl] = {|@words|
             cand -h 'Print help'
             cand --help 'Print help'
         }
+        &'hbctl;tag;update'= {
+            cand --name 'Updated tag name'
+            cand --description 'Updated tag description'
+            cand --color 'Updated tag hex color'
+            cand --url 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
+            cand --api-key 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)'
+            cand --output 'Output format (table, json, plain) [env: HBCTL_OUTPUT]'
+            cand --select 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)'
+            cand -C 'Path to explicit TOML configuration file'
+            cand --config 'Path to explicit TOML configuration file'
+            cand --json 'Shorthand for --output json (emits compact JSON)'
+            cand --dry-run 'Preview mutating requests without hitting the server (redacts Authorization)'
+            cand -q 'Output only created/affected IDs for shell piping'
+            cand --quiet 'Output only created/affected IDs for shell piping'
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'hbctl;tag;delete'= {
+            cand --url 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
+            cand --api-key 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)'
+            cand --output 'Output format (table, json, plain) [env: HBCTL_OUTPUT]'
+            cand --select 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)'
+            cand -C 'Path to explicit TOML configuration file'
+            cand --config 'Path to explicit TOML configuration file'
+            cand --force 'Skip interactive confirmation prompt'
+            cand --json 'Shorthand for --output json (emits compact JSON)'
+            cand --dry-run 'Preview mutating requests without hitting the server (redacts Authorization)'
+            cand -q 'Output only created/affected IDs for shell piping'
+            cand --quiet 'Output only created/affected IDs for shell piping'
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
         &'hbctl;tag;help'= {
             cand list 'List all tags'
             cand create 'Create a new tag'
+            cand update 'Update an existing tag by ID'
+            cand delete 'Delete a tag by ID'
             cand help 'Print this message or the help of the given subcommand(s)'
         }
         &'hbctl;tag;help;list'= {
         }
         &'hbctl;tag;help;create'= {
+        }
+        &'hbctl;tag;help;update'= {
+        }
+        &'hbctl;tag;help;delete'= {
         }
         &'hbctl;tag;help;help'= {
         }
@@ -758,7 +839,7 @@ set edit:completion:arg-completer[hbctl] = {|@words|
             cand item 'Manage inventory items (/api/v1/entities)'
             cand attachment 'Manage item attachments (/api/v1/entities/{id}/attachments)'
             cand search 'Full-text and structured item search'
-            cand field 'Get or set typed custom fields on an item'
+            cand field 'List, get, set, or delete typed custom fields on an item'
             cand tag 'Manage tags (/api/v1/tags)'
             cand entity-types 'List Homebox entity types (/api/v1/entity-types)'
             cand export 'Export filtered items to JSON, CSV, or Markdown'
@@ -824,20 +905,32 @@ set edit:completion:arg-completer[hbctl] = {|@words|
         &'hbctl;help;search'= {
         }
         &'hbctl;help;field'= {
+            cand list 'List all custom fields on an item'
             cand get 'Get a custom field value from an item'
             cand set 'Set a typed custom field on an item via GET -> Merge -> PUT'
+            cand delete 'Delete a custom field from an item via GET -> Remove -> PUT'
+        }
+        &'hbctl;help;field;list'= {
         }
         &'hbctl;help;field;get'= {
         }
         &'hbctl;help;field;set'= {
         }
+        &'hbctl;help;field;delete'= {
+        }
         &'hbctl;help;tag'= {
             cand list 'List all tags'
             cand create 'Create a new tag'
+            cand update 'Update an existing tag by ID'
+            cand delete 'Delete a tag by ID'
         }
         &'hbctl;help;tag;list'= {
         }
         &'hbctl;help;tag;create'= {
+        }
+        &'hbctl;help;tag;update'= {
+        }
+        &'hbctl;help;tag;delete'= {
         }
         &'hbctl;help;entity-types'= {
             cand list 'List all entity types'

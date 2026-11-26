@@ -171,6 +171,7 @@ fn append_alias_and_cli_fields(
     target: &mut Vec<CustomField>,
     manufacturer: Option<&str>,
     model: Option<&str>,
+    serial: Option<&str>,
     notes: Option<&str>,
     cli_fields: &[String],
     field_type: FieldValueType,
@@ -181,6 +182,10 @@ fn append_alias_and_cli_fields(
     }
     if let Some(m) = model {
         let cf = CustomField::new_typed("Model Number", FieldValueType::Text, m)?;
+        upsert_custom_fields(target, &[cf]);
+    }
+    if let Some(s) = serial {
+        let cf = CustomField::new_typed("Serial Number", FieldValueType::Text, s)?;
         upsert_custom_fields(target, &[cf]);
     }
     if let Some(n) = notes {
@@ -240,6 +245,7 @@ fn handle_create(
         &mut parsed.fields,
         args.manufacturer.as_deref(),
         args.model.as_deref(),
+        args.serial.as_deref(),
         args.notes.as_deref(),
         &args.fields,
         args.field_type,
@@ -357,6 +363,7 @@ fn handle_update(
         &mut parsed.fields,
         args.manufacturer.as_deref(),
         args.model.as_deref(),
+        args.serial.as_deref(),
         args.notes.as_deref(),
         &args.fields,
         args.field_type,
@@ -377,7 +384,10 @@ fn handle_update(
             purchase_price: parsed.purchase_price,
             purchase_date: parsed.purchase_date,
             purchase_from: parsed.purchase_from,
+            add_tag_ids: args.add_tags.clone(),
+            remove_tag_ids: args.remove_tags.clone(),
             fields: parsed.fields,
+            ..Default::default()
         };
         let preview = HomeboxClient::build_dry_run(
             base_url,
@@ -396,6 +406,16 @@ fn handle_update(
     } else {
         Some(resolver.resolve_tag_ids(&parsed.tags, true)?)
     };
+    let add_tag_ids = if args.add_tags.is_empty() {
+        Vec::new()
+    } else {
+        resolver.resolve_tag_ids(&args.add_tags, true)?
+    };
+    let remove_tag_ids = if args.remove_tags.is_empty() {
+        Vec::new()
+    } else {
+        resolver.resolve_tag_ids(&args.remove_tags, false)?
+    };
     let entity_type_id = match parsed.entity_type {
         Some(ref et) => Some(resolver.resolve_entity_type_id(et)?),
         None => None,
@@ -410,7 +430,10 @@ fn handle_update(
         purchase_price: parsed.purchase_price,
         purchase_date: parsed.purchase_date,
         purchase_from: parsed.purchase_from,
+        add_tag_ids,
+        remove_tag_ids,
         fields: parsed.fields,
+        ..Default::default()
     };
 
     let updated = client.update_entity(&args.id, &patch)?;
@@ -429,6 +452,7 @@ fn handle_upsert(
         &mut fields,
         args.manufacturer.as_deref(),
         args.model.as_deref(),
+        args.serial.as_deref(),
         args.notes.as_deref(),
         &args.fields,
         args.field_type,
@@ -482,6 +506,7 @@ fn handle_upsert(
             purchase_date: args.purchase_date.clone(),
             purchase_from: args.purchase_from.clone(),
             fields,
+            ..Default::default()
         };
         client.update_entity(&found.id, &patch)?
     } else {
@@ -654,6 +679,10 @@ fn parse_csv_import(raw: &str) -> Result<Vec<ParsedItemInput>> {
                     let cf = CustomField::new_typed("Model Number", FieldValueType::Text, val)?;
                     upsert_custom_fields(&mut item.fields, &[cf]);
                 }
+                "serial" | "serialnumber" | "serial_number" | "serial number" => {
+                    let cf = CustomField::new_typed("Serial Number", FieldValueType::Text, val)?;
+                    upsert_custom_fields(&mut item.fields, &[cf]);
+                }
                 "notes" => {
                     let cf = CustomField::new_typed("Notes", FieldValueType::Text, val)?;
                     upsert_custom_fields(&mut item.fields, &[cf]);
@@ -753,6 +782,7 @@ fn handle_import(
                     purchase_date: rec.purchase_date,
                     purchase_from: rec.purchase_from,
                     fields: rec.fields,
+                    ..Default::default()
                 };
                 let updated = client.update_entity(&existing.id, &patch)?;
                 summary.updated += 1;
