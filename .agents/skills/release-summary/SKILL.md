@@ -16,22 +16,22 @@ This skill uses `scripts/release_summary.py` to retrieve git commit logs, format
 1. Execute the Python script. If no range is provided, it automatically detects the latest two tags:
 
    ```bash
-   ./scripts/release_summary.py [range]
+   rtk uv run scripts/release_summary.py [range]
    # or
    task release:summary
 
    # Preview without modifying GitHub
-   ./scripts/release_summary.py --dry-run
+   rtk uv run scripts/release_summary.py --dry-run
    ```
 
 2. **Special Thanks**: If the user asks to add special thanks (e.g. to a contributor or tester), pass `--thanks` (and optionally `--for` / `--reason`):
 
    ```bash
    # Name and reason
-   ./scripts/release_summary.py [range] --thanks "<Name>" --for "<reason>"
+   rtk uv run scripts/release_summary.py [range] --thanks "<Name>" --for "<reason>"
 
    # Or full message
-   ./scripts/release_summary.py [range] --thanks "Huge thanks to **<Name>** for <reason>!"
+   rtk uv run scripts/release_summary.py [range] --thanks "Huge thanks to **<Name>** for <reason>!"
    ```
 
    This generates the section:
