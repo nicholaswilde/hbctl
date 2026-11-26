@@ -32,7 +32,7 @@ Actual output or error message here
 
 - OS: [e.g. Linux (Ubuntu 24.04), macOS 15, Windows 11]
 - Architecture: [e.g. x86_64, aarch64, armv7]
-- `hbx` Version: [e.g. `hbx --version`]
+- `hbctl` Version: [e.g. `hbctl --version`]
 - Homebox Version: [e.g. `v0.26.x`]
 
 ## :memo: Additional Context

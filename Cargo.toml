@@ -1,16 +1,16 @@
 [package]
-name = "hbx"
+name = "hbctl"
 version = "0.1.1"
 edition = "2021"
 authors = ["Nicholas Wilde"]
 description = "A fast, agent-friendly Rust CLI for remote Homebox v0.26+ instances"
 
 [lib]
-name = "hbx"
+name = "hbctl"
 path = "src/lib.rs"
 
 [[bin]]
-name = "hbx"
+name = "hbctl"
 path = "src/main.rs"
 
 [dependencies]
@@ -80,33 +80,33 @@ section = "utils"
 priority = "optional"
 assets = [
   [
-    "target/release/hbx",
+    "target/release/hbctl",
     "usr/bin/",
     "755",
   ],
   [
-    "assets/hbx.1",
+    "assets/hbctl.1",
     "usr/share/man/man1/",
     "644",
   ],
   [
-    "completions/hbx.bash",
-    "usr/share/bash-completion/completions/hbx",
+    "completions/hbctl.bash",
+    "usr/share/bash-completion/completions/hbctl",
     "644",
   ],
   [
-    "completions/_hbx",
-    "usr/share/zsh/vendor-completions/_hbx",
+    "completions/_hbctl",
+    "usr/share/zsh/vendor-completions/_hbctl",
     "644",
   ],
   [
-    "completions/hbx.fish",
-    "usr/share/fish/vendor_completions.d/hbx.fish",
+    "completions/hbctl.fish",
+    "usr/share/fish/vendor_completions.d/hbctl.fish",
     "644",
   ],
   [
     "docs/README.md",
-    "usr/share/doc/hbx/README.md",
+    "usr/share/doc/hbctl/README.md",
     "644",
   ],
 ]

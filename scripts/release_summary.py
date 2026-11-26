@@ -17,7 +17,7 @@ def get_repo_slug():
             return m.group(1)
     except Exception:
         pass
-    return "nicholaswilde/hbx"
+    return "nicholaswilde/hbctl"
 
 
 def format_special_thanks(thanks, reason=None):

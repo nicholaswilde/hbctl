@@ -9,9 +9,9 @@ use std::os::unix::fs::{OpenOptionsExt, PermissionsExt};
 use directories::BaseDirs;
 use serde::{Deserialize, Serialize};
 
-use crate::error::{HbxError, Result};
+use crate::error::{HbctlError, Result};
 
-/// Storage backend where an `hbx auth` secret token is persisted.
+/// Storage backend where an `hbctl auth` secret token is persisted.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum CredentialBackend {
@@ -79,25 +79,29 @@ pub trait SecretStore {
     fn delete_token(&self, account: &str) -> Result<bool>;
 }
 
-/// Default local fallback credentials path (`~/.config/hbx/credentials.json` or XDG equivalent).
+/// Default local fallback credentials path (`~/.config/hbctl/credentials.json` or XDG equivalent).
 pub fn default_credentials_file_path() -> Option<PathBuf> {
     if let Ok(xdg) = std::env::var("XDG_CONFIG_HOME") {
         let trimmed = xdg.trim();
         if !trimmed.is_empty() {
-            return Some(PathBuf::from(trimmed).join("hbx").join("credentials.json"));
+            return Some(
+                PathBuf::from(trimmed)
+                    .join("hbctl")
+                    .join("credentials.json"),
+            );
         }
     }
     BaseDirs::new().map(|dirs| {
         dirs.home_dir()
             .join(".config")
-            .join("hbx")
+            .join("hbctl")
             .join("credentials.json")
     })
 }
 
-/// Returns true when keyring access should be bypassed via env (`HBX_INSECURE_STORAGE=1|true`).
+/// Returns true when keyring access should be bypassed via env (`HBCTL_INSECURE_STORAGE=1|true`).
 pub fn env_forces_file_storage() -> bool {
-    std::env::var("HBX_INSECURE_STORAGE")
+    std::env::var("HBCTL_INSECURE_STORAGE")
         .map(|v| matches!(v.trim().to_ascii_lowercase().as_str(), "1" | "true" | "yes"))
         .unwrap_or(false)
 }
@@ -187,7 +191,7 @@ pub struct KeyringSecretStore {
 }
 
 impl KeyringSecretStore {
-    pub const DEFAULT_SERVICE: &'static str = "hbx";
+    pub const DEFAULT_SERVICE: &'static str = "hbctl";
 
     pub fn new(service: impl Into<String>) -> Self {
         Self {
@@ -205,32 +209,32 @@ impl Default for KeyringSecretStore {
 impl SecretStore for KeyringSecretStore {
     fn set_token(&self, account: &str, token: &str) -> Result<CredentialBackend> {
         let entry = keyring::Entry::new(&self.service, account)
-            .map_err(|e| HbxError::Config(format!("keyring init failed: {e}")))?;
+            .map_err(|e| HbctlError::Config(format!("keyring init failed: {e}")))?;
         entry
             .set_password(token)
-            .map_err(|e| HbxError::Config(format!("keyring save failed: {e}")))?;
+            .map_err(|e| HbctlError::Config(format!("keyring save failed: {e}")))?;
         Ok(CredentialBackend::Keyring)
     }
 
     fn get_token(&self, account: &str) -> Result<Option<(String, CredentialBackend)>> {
         let entry = keyring::Entry::new(&self.service, account)
-            .map_err(|e| HbxError::Config(format!("keyring init failed: {e}")))?;
+            .map_err(|e| HbctlError::Config(format!("keyring init failed: {e}")))?;
         match entry.get_password() {
             Ok(secret) if !secret.trim().is_empty() => {
                 Ok(Some((secret, CredentialBackend::Keyring)))
             }
             Ok(_) | Err(keyring::Error::NoEntry) => Ok(None),
-            Err(e) => Err(HbxError::Config(format!("keyring read failed: {e}"))),
+            Err(e) => Err(HbctlError::Config(format!("keyring read failed: {e}"))),
         }
     }
 
     fn delete_token(&self, account: &str) -> Result<bool> {
         let entry = keyring::Entry::new(&self.service, account)
-            .map_err(|e| HbxError::Config(format!("keyring init failed: {e}")))?;
+            .map_err(|e| HbctlError::Config(format!("keyring init failed: {e}")))?;
         match entry.delete_credential() {
             Ok(()) => Ok(true),
             Err(keyring::Error::NoEntry) => Ok(false),
-            Err(e) => Err(HbxError::Config(format!("keyring delete failed: {e}"))),
+            Err(e) => Err(HbctlError::Config(format!("keyring delete failed: {e}"))),
         }
     }
 }
@@ -255,7 +259,7 @@ impl AutoSecretStore {
 
     pub fn from_defaults(insecure_storage: bool) -> Result<Self> {
         let path = default_credentials_file_path().ok_or_else(|| {
-            HbxError::Config("unable to determine user config directory for credentials".into())
+            HbctlError::Config("unable to determine user config directory for credentials".into())
         })?;
         Ok(Self::new(
             KeyringSecretStore::default(),
@@ -345,7 +349,7 @@ mod tests {
     #[test]
     fn test_file_secret_store_lifecycle_and_permissions() {
         let dir = tempdir().unwrap();
-        let path = dir.path().join("hbx").join("credentials.json");
+        let path = dir.path().join("hbctl").join("credentials.json");
         let store = FileSecretStore::new(path.clone());
 
         assert_eq!(store.get_token("http://box:7745/api/v1").unwrap(), None);
@@ -377,7 +381,7 @@ mod tests {
         let dir = tempdir().unwrap();
         let path = dir.path().join("credentials.json");
         let store = AutoSecretStore::new(
-            KeyringSecretStore::new("hbx-test-unused"),
+            KeyringSecretStore::new("hbctl-test-unused"),
             FileSecretStore::new(path.clone()),
             true,
         );

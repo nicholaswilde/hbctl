@@ -18,20 +18,20 @@ fn fixture(name: &str) -> String {
 
 /// Preflight guard for `cross`/QEMU environments without binfmt_misc sysroot.
 fn can_execute_binary() -> bool {
-    let bin = env!("CARGO_BIN_EXE_hbx");
+    let bin = env!("CARGO_BIN_EXE_hbctl");
     matches!(
         StdCommand::new(bin).arg("--version").output(),
         Ok(o) if o.status.success()
     )
 }
 
-fn hbx(server_url: &str) -> Command {
-    let mut cmd = Command::new(env!("CARGO_BIN_EXE_hbx"));
+fn hbctl(server_url: &str) -> Command {
+    let mut cmd = Command::new(env!("CARGO_BIN_EXE_hbctl"));
     for var in [
-        "HBX_URL",
-        "HBX_API_KEY",
-        "HBX_OUTPUT",
-        "HBX_CONFIG",
+        "HBCTL_URL",
+        "HBCTL_API_KEY",
+        "HBCTL_OUTPUT",
+        "HBCTL_CONFIG",
         "HOMEBOX_URL",
         "HOMEBOX_IP",
         "HOMEBOX_API_KEY",
@@ -40,9 +40,9 @@ fn hbx(server_url: &str) -> Command {
     }
     cmd.env(
         "XDG_CONFIG_HOME",
-        std::env::temp_dir().join("hbx-test-empty-xdg"),
+        std::env::temp_dir().join("hbctl-test-empty-xdg"),
     )
-    .env("HBX_INSECURE_STORAGE", "1")
+    .env("HBCTL_INSECURE_STORAGE", "1")
     .arg("--url")
     .arg(server_url)
     .arg("--api-key")
@@ -110,7 +110,7 @@ fn test_item_crud_and_followup_put_for_fields() {
         )
         .create();
 
-    let output = hbx(&server.url())
+    let output = hbctl(&server.url())
         .args([
             "--json",
             "item",
@@ -163,7 +163,7 @@ fn test_item_crud_and_followup_put_for_fields() {
         .with_body(fixture("entity_detail.json"))
         .create();
 
-    hbx(&server.url())
+    hbctl(&server.url())
         .args([
             "--quiet",
             "item",
@@ -187,7 +187,7 @@ fn test_item_crud_and_followup_put_for_fields() {
         .with_status(204)
         .create();
 
-    hbx(&server.url())
+    hbctl(&server.url())
         .args(["-q", "item", "delete", "ent-1", "--force"])
         .assert()
         .success()
@@ -232,7 +232,7 @@ fn test_item_list_json_select_and_hydration() {
         )
         .create();
 
-    let out = hbx(&server.url())
+    let out = hbctl(&server.url())
         .args([
             "--json",
             "--select",
@@ -297,7 +297,7 @@ fn test_item_upsert_existing_and_new() {
         .with_body(fixture("entity_detail.json"))
         .create();
 
-    hbx(&server.url())
+    hbctl(&server.url())
         .args([
             "-q",
             "item",
@@ -374,7 +374,7 @@ fn test_item_import_skip_and_update_existing() {
         .expect(2)
         .create();
 
-    let out = hbx(&server.url())
+    let out = hbctl(&server.url())
         .args([
             "--json",
             "item",
@@ -412,7 +412,7 @@ fn test_item_import_skip_and_update_existing() {
         )
         .create();
 
-    let out2 = hbx(&server.url())
+    let out2 = hbctl(&server.url())
         .args([
             "--json",
             "item",
@@ -454,7 +454,7 @@ fn test_item_dedup_dry_run_and_merge() {
         .create();
 
     // 1. Dry-run merge: ZERO PUT/DELETE requests, Authorization redacted
-    let dry_out = hbx(&server.url())
+    let dry_out = hbctl(&server.url())
         .args(["--json", "item", "dedup", "--merge", "--dry-run"])
         .assert()
         .success()
@@ -496,7 +496,7 @@ fn test_item_dedup_dry_run_and_merge() {
         .with_status(204)
         .create();
 
-    hbx(&server.url())
+    hbctl(&server.url())
         .args(["-q", "item", "dedup", "--merge"])
         .assert()
         .success()
@@ -527,7 +527,7 @@ fn test_attachment_upload_skip_existing_and_image_guard() {
     fs::write(&big_png, vec![0u8; 520 * 1024]).unwrap();
 
     // 1. Oversized image rejected without --force (no HTTP calls needed)
-    hbx(&server.url())
+    hbctl(&server.url())
         .args(["attachment", "upload", "ent-1", big_png.to_str().unwrap()])
         .assert()
         .failure()
@@ -550,7 +550,7 @@ fn test_attachment_upload_skip_existing_and_image_guard() {
         .expect(1)
         .create();
 
-    let out = hbx(&server.url())
+    let out = hbctl(&server.url())
         .args([
             "--json",
             "attachment",
@@ -598,7 +598,7 @@ fn test_attachment_download_all_ext_pdf_streaming() {
         .expect(1)
         .create();
 
-    hbx(&server.url())
+    hbctl(&server.url())
         .args([
             "--json",
             "attachment",
@@ -663,14 +663,14 @@ fn test_search_field_tag_entity_types_export_and_dry_run() {
         .expect_at_least(2)
         .create();
 
-    hbx(&server.url())
+    hbctl(&server.url())
         .args(["-q", "search", "--manufacturer", "Espressif"])
         .assert()
         .success()
         .stdout(predicate::eq("ent-1\n"));
 
     // 2. field get (prefers numberValue = 3.3 over stale value)
-    hbx(&server.url())
+    hbctl(&server.url())
         .args(["-q", "field", "get", "ent-1", "Voltage"])
         .assert()
         .success()
@@ -684,7 +684,7 @@ fn test_search_field_tag_entity_types_export_and_dry_run() {
         .with_body(fixture("entity_detail.json"))
         .create();
 
-    hbx(&server.url())
+    hbctl(&server.url())
         .args([
             "-q", "field", "set", "ent-1", "Tested", "false", "--type", "boolean",
         ])
@@ -700,7 +700,7 @@ fn test_search_field_tag_entity_types_export_and_dry_run() {
         .with_body(fixture("tags.json"))
         .create();
 
-    hbx(&server.url())
+    hbctl(&server.url())
         .args(["--json", "tag", "list"])
         .assert()
         .success()
@@ -713,7 +713,7 @@ fn test_search_field_tag_entity_types_export_and_dry_run() {
         .with_body(json!({"id": "tag-new", "name": "sensors"}).to_string())
         .create();
 
-    hbx(&server.url())
+    hbctl(&server.url())
         .args(["-q", "tag", "create", "sensors"])
         .assert()
         .success()
@@ -727,7 +727,7 @@ fn test_search_field_tag_entity_types_export_and_dry_run() {
         .with_body(fixture("entity_types.json"))
         .create();
 
-    hbx(&server.url())
+    hbctl(&server.url())
         .args(["entity-types"])
         .assert()
         .success()
@@ -736,7 +736,7 @@ fn test_search_field_tag_entity_types_export_and_dry_run() {
     et_mock.assert();
 
     // 6. export --format markdown --field Manufacturer --field Voltage
-    let md = hbx(&server.url())
+    let md = hbctl(&server.url())
         .args([
             "export",
             "--format",
@@ -760,7 +760,7 @@ fn test_search_field_tag_entity_types_export_and_dry_run() {
     assert!(md_str.contains("| ent-2 | Fluke 87V | 1 | tools | Fluke |  |"));
 
     // 7. --dry-run never hits server and redacts Authorization
-    let dry = hbx("http://127.0.0.1:1")
+    let dry = hbctl("http://127.0.0.1:1")
         .args([
             "item",
             "create",
@@ -826,7 +826,7 @@ fn test_csv_import_attachment_ops_and_csv_export() {
         )
         .create();
 
-    hbx(&server.url())
+    hbctl(&server.url())
         .args(["-q", "item", "import", csv_path.to_str().unwrap()])
         .assert()
         .success()
@@ -844,7 +844,7 @@ fn test_csv_import_attachment_ops_and_csv_export() {
         .expect(2)
         .create();
 
-    hbx(&server.url())
+    hbctl(&server.url())
         .args(["--json", "attachment", "list", "ent-1"])
         .assert()
         .success()
@@ -856,7 +856,7 @@ fn test_csv_import_attachment_ops_and_csv_export() {
         .with_status(204)
         .create();
 
-    hbx(&server.url())
+    hbctl(&server.url())
         .args(["-q", "attachment", "delete", "ent-1", "att-img-1"])
         .assert()
         .success()
@@ -874,7 +874,7 @@ fn test_csv_import_attachment_ops_and_csv_export() {
         )
         .create();
 
-    hbx(&server.url())
+    hbctl(&server.url())
         .args([
             "-q",
             "attachment",
@@ -913,7 +913,7 @@ fn test_csv_import_attachment_ops_and_csv_export() {
         )
         .create();
 
-    hbx(&server.url())
+    hbctl(&server.url())
         .args(["export", "--format", "csv", "--field", "Voltage"])
         .assert()
         .success()
@@ -940,7 +940,7 @@ fn test_item_get_list_pagination_from_json_upsert_new_and_dry_runs() {
         .expect(3)
         .create();
 
-    hbx(&server.url())
+    hbctl(&server.url())
         .args(["item", "get", "ent-1"])
         .assert()
         .success()
@@ -948,13 +948,13 @@ fn test_item_get_list_pagination_from_json_upsert_new_and_dry_runs() {
         .stdout(predicate::str::contains("purchasePrice"))
         .stdout(predicate::str::contains("field:Voltage"));
 
-    hbx(&server.url())
+    hbctl(&server.url())
         .args(["--output", "plain", "item", "get", "ent-1"])
         .assert()
         .success()
         .stdout(predicate::str::contains("id\tent-1"));
 
-    hbx(&server.url())
+    hbctl(&server.url())
         .args(["--select", "id,name,Voltage", "item", "get", "ent-1"])
         .assert()
         .success()
@@ -1012,7 +1012,7 @@ fn test_item_get_list_pagination_from_json_upsert_new_and_dry_runs() {
         )
         .create();
 
-    hbx(&server.url())
+    hbctl(&server.url())
         .args([
             "item",
             "list",
@@ -1067,7 +1067,7 @@ fn test_item_get_list_pagination_from_json_upsert_new_and_dry_runs() {
         )
         .create();
 
-    hbx(&server.url())
+    hbctl(&server.url())
         .args([
             "item",
             "create",
@@ -1115,7 +1115,7 @@ fn test_item_get_list_pagination_from_json_upsert_new_and_dry_runs() {
         )
         .create();
 
-    hbx(&server.url())
+    hbctl(&server.url())
         .args([
             "-q",
             "item",
@@ -1140,7 +1140,7 @@ fn test_item_get_list_pagination_from_json_upsert_new_and_dry_runs() {
     types_mock.assert();
 
     // 5. dry-run previews for update, upsert, delete, import
-    hbx("http://127.0.0.1:1")
+    hbctl("http://127.0.0.1:1")
         .args(["item", "update", "ent-1", "--name", "Renamed", "--dry-run"])
         .assert()
         .success()
@@ -1149,13 +1149,13 @@ fn test_item_get_list_pagination_from_json_upsert_new_and_dry_runs() {
         ))
         .stdout(predicate::str::contains("Bearer ***"));
 
-    hbx("http://127.0.0.1:1")
+    hbctl("http://127.0.0.1:1")
         .args(["item", "upsert", "--name", "Preview", "--dry-run"])
         .assert()
         .success()
         .stdout(predicate::str::contains("Bearer ***"));
 
-    hbx("http://127.0.0.1:1")
+    hbctl("http://127.0.0.1:1")
         .args(["item", "delete", "ent-1", "--dry-run"])
         .assert()
         .success()
@@ -1165,7 +1165,7 @@ fn test_item_get_list_pagination_from_json_upsert_new_and_dry_runs() {
 
     let import_json_path =
         PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/import_items.json");
-    hbx("http://127.0.0.1:1")
+    hbctl("http://127.0.0.1:1")
         .args([
             "item",
             "import",
@@ -1195,7 +1195,7 @@ fn test_dedup_report_and_attachment_overwrite_single_download() {
         .with_body(fixture("dedup_entities.json"))
         .create();
 
-    hbx(&server.url())
+    hbctl(&server.url())
         .args(["item", "dedup"])
         .assert()
         .success()
@@ -1213,7 +1213,7 @@ fn test_dedup_report_and_attachment_overwrite_single_download() {
         )
         .create();
 
-    hbx(&server.url())
+    hbctl(&server.url())
         .args(["item", "dedup"])
         .assert()
         .success()
@@ -1244,7 +1244,7 @@ fn test_dedup_report_and_attachment_overwrite_single_download() {
         )
         .create();
 
-    hbx(&server.url())
+    hbctl(&server.url())
         .args([
             "attachment",
             "upload",
@@ -1260,7 +1260,7 @@ fn test_dedup_report_and_attachment_overwrite_single_download() {
     post_new.assert();
 
     // attachment list (table)
-    hbx(&server.url())
+    hbctl(&server.url())
         .args(["attachment", "list", "ent-1"])
         .assert()
         .success()
@@ -1275,7 +1275,7 @@ fn test_dedup_report_and_attachment_overwrite_single_download() {
         .expect(2)
         .create();
 
-    hbx(&server.url())
+    hbctl(&server.url())
         .args([
             "attachment",
             "download",
@@ -1289,7 +1289,7 @@ fn test_dedup_report_and_attachment_overwrite_single_download() {
         .stdout(predicate::str::contains("downloaded"));
 
     // Second run without --overwrite skips existing file
-    hbx(&server.url())
+    hbctl(&server.url())
         .args([
             "attachment",
             "download",
@@ -1304,7 +1304,7 @@ fn test_dedup_report_and_attachment_overwrite_single_download() {
         .stdout(predicate::str::contains("skipped"));
 
     // Third run with --overwrite downloads again
-    hbx(&server.url())
+    hbctl(&server.url())
         .args([
             "-q",
             "attachment",
@@ -1323,7 +1323,7 @@ fn test_dedup_report_and_attachment_overwrite_single_download() {
     get_ent.assert();
 
     // attachment dry-runs
-    hbx("http://127.0.0.1:1")
+    hbctl("http://127.0.0.1:1")
         .args([
             "attachment",
             "upload",
@@ -1337,7 +1337,7 @@ fn test_dedup_report_and_attachment_overwrite_single_download() {
             "POST http://127.0.0.1:1/api/v1/entities/ent-1/attachments",
         ));
 
-    hbx("http://127.0.0.1:1")
+    hbctl("http://127.0.0.1:1")
         .args(["attachment", "delete", "ent-1", "att-1", "--dry-run"])
         .assert()
         .success()
@@ -1368,25 +1368,25 @@ fn test_field_tag_entity_types_export_config_completions_and_error_redaction() {
         .expect(2)
         .create();
 
-    hbx(&server.url())
+    hbctl(&server.url())
         .args(["field", "get", "ent-1", "Voltage"])
         .assert()
         .success()
         .stdout(predicate::str::contains("3.3"));
 
-    hbx(&server.url())
+    hbctl(&server.url())
         .args(["--json", "field", "get", "ent-1", "Voltage"])
         .assert()
         .success()
         .stdout(predicate::str::contains("\"numberValue\":3.3"));
 
-    hbx(&server.url())
+    hbctl(&server.url())
         .args(["field", "get", "ent-1", "NoSuchField"])
         .assert()
         .failure()
         .stderr(predicate::str::contains("field not found"));
 
-    hbx(&server.url())
+    hbctl(&server.url())
         .args([
             "field", "set", "ent-1", "Voltage", "3.3", "--type", "number",
         ])
@@ -1394,7 +1394,7 @@ fn test_field_tag_entity_types_export_config_completions_and_error_redaction() {
         .success()
         .stdout(predicate::str::contains("Voltage"));
 
-    hbx(&server.url())
+    hbctl(&server.url())
         .args([
             "--json", "field", "set", "ent-1", "Voltage", "3.3", "--type", "number",
         ])
@@ -1402,7 +1402,7 @@ fn test_field_tag_entity_types_export_config_completions_and_error_redaction() {
         .success()
         .stdout(predicate::str::contains("\"name\":\"Voltage\""));
 
-    hbx("http://127.0.0.1:1")
+    hbctl("http://127.0.0.1:1")
         .args([
             "field",
             "set",
@@ -1428,19 +1428,19 @@ fn test_field_tag_entity_types_export_config_completions_and_error_redaction() {
         .expect(5)
         .create();
 
-    hbx(&server.url())
+    hbctl(&server.url())
         .args(["tag", "list"])
         .assert()
         .success()
         .stdout(predicate::str::contains("electronics"));
 
-    hbx(&server.url())
+    hbctl(&server.url())
         .args(["-q", "tag", "list"])
         .assert()
         .success()
         .stdout(predicate::str::contains("tag-elec"));
 
-    hbx(&server.url())
+    hbctl(&server.url())
         .args(["--select", "id,name", "tag", "list"])
         .assert()
         .success()
@@ -1452,14 +1452,14 @@ fn test_field_tag_entity_types_export_config_completions_and_error_redaction() {
         .with_body(json!({"id": "tag-c", "name": "cables"}).to_string())
         .create();
 
-    hbx(&server.url())
+    hbctl(&server.url())
         .args(["tag", "create", "cables"])
         .assert()
         .success()
         .stdout(predicate::str::contains("cables"));
     tag_create.assert();
 
-    hbx("http://127.0.0.1:1")
+    hbctl("http://127.0.0.1:1")
         .args(["tag", "create", "cables", "--dry-run"])
         .assert()
         .success()
@@ -1474,12 +1474,12 @@ fn test_field_tag_entity_types_export_config_completions_and_error_redaction() {
         .with_body(fixture("entity_types.json"))
         .expect(2)
         .create();
-    hbx(&server.url())
+    hbctl(&server.url())
         .args(["--json", "entity-types"])
         .assert()
         .success()
         .stdout(predicate::str::contains("\"isLocation\":true"));
-    hbx(&server.url())
+    hbctl(&server.url())
         .args(["-q", "entity-types"])
         .assert()
         .success()
@@ -1507,7 +1507,7 @@ fn test_field_tag_entity_types_export_config_completions_and_error_redaction() {
         .expect(2)
         .create();
 
-    hbx(&server.url())
+    hbctl(&server.url())
         .args([
             "export",
             "--tag",
@@ -1525,7 +1525,7 @@ fn test_field_tag_entity_types_export_config_completions_and_error_redaction() {
         .success()
         .stdout(predicate::str::contains("\"Voltage\":\"3.3\""));
 
-    hbx(&server.url())
+    hbctl(&server.url())
         .args(["export", "--format", "json"])
         .assert()
         .success()
@@ -1543,12 +1543,12 @@ fn test_field_tag_entity_types_export_config_completions_and_error_redaction() {
     )
     .unwrap();
 
-    let mut cfg_cmd = Command::new(env!("CARGO_BIN_EXE_hbx"));
+    let mut cfg_cmd = Command::new(env!("CARGO_BIN_EXE_hbctl"));
     for var in [
-        "HBX_URL",
-        "HBX_API_KEY",
-        "HBX_OUTPUT",
-        "HBX_CONFIG",
+        "HBCTL_URL",
+        "HBCTL_API_KEY",
+        "HBCTL_OUTPUT",
+        "HBCTL_CONFIG",
         "HOMEBOX_URL",
         "HOMEBOX_IP",
         "HOMEBOX_API_KEY",
@@ -1567,7 +1567,7 @@ fn test_field_tag_entity_types_export_config_completions_and_error_redaction() {
         .with_status(401)
         .with_body("unauthorized for Bearer hb_test_secret_token_999")
         .create();
-    hbx(&server.url())
+    hbctl(&server.url())
         .args(["item", "get", "bad-id"])
         .assert()
         .failure()
@@ -1576,17 +1576,17 @@ fn test_field_tag_entity_types_export_config_completions_and_error_redaction() {
     err_mock.assert();
 
     // 6. completions & man subcommands
-    Command::new(env!("CARGO_BIN_EXE_hbx"))
+    Command::new(env!("CARGO_BIN_EXE_hbctl"))
         .args(["completions", "bash"])
         .assert()
         .success()
-        .stdout(predicate::str::contains("_hbx"));
+        .stdout(predicate::str::contains("_hbctl"));
 
-    Command::new(env!("CARGO_BIN_EXE_hbx"))
+    Command::new(env!("CARGO_BIN_EXE_hbctl"))
         .args(["man"])
         .assert()
         .success()
-        .stdout(predicate::str::contains(".TH hbx"));
+        .stdout(predicate::str::contains(".TH hbctl"));
 }
 
 #[test]
@@ -1598,12 +1598,12 @@ fn test_auth_login_status_refresh_logout_precedence_and_redaction() {
     let xdg_dir = tempdir().unwrap();
 
     let base_cmd = || {
-        let mut cmd = Command::new(env!("CARGO_BIN_EXE_hbx"));
+        let mut cmd = Command::new(env!("CARGO_BIN_EXE_hbctl"));
         for var in [
-            "HBX_URL",
-            "HBX_API_KEY",
-            "HBX_OUTPUT",
-            "HBX_CONFIG",
+            "HBCTL_URL",
+            "HBCTL_API_KEY",
+            "HBCTL_OUTPUT",
+            "HBCTL_CONFIG",
             "HOMEBOX_URL",
             "HOMEBOX_IP",
             "HOMEBOX_API_KEY",
@@ -1611,7 +1611,7 @@ fn test_auth_login_status_refresh_logout_precedence_and_redaction() {
             cmd.env_remove(var);
         }
         cmd.env("XDG_CONFIG_HOME", xdg_dir.path())
-            .env("HBX_INSECURE_STORAGE", "1");
+            .env("HBCTL_INSECURE_STORAGE", "1");
         cmd
     };
 
@@ -1695,7 +1695,7 @@ fn test_auth_login_status_refresh_logout_precedence_and_redaction() {
     assert_eq!(login_json["email"], "nick@example.com");
 
     // Ensure config.toml does NOT contain plaintext secret
-    let cfg_contents = fs::read_to_string(xdg_dir.path().join("hbx/config.toml")).unwrap();
+    let cfg_contents = fs::read_to_string(xdg_dir.path().join("hbctl/config.toml")).unwrap();
     assert!(!cfg_contents.contains("hb_live_api_key_42"));
     assert!(cfg_contents.contains("token_type = \"api_key\""));
 
@@ -1877,7 +1877,7 @@ fn test_update_and_self_update_non_interactive_requires_yes() {
     }
 
     // Works without Homebox URL/API key configured and rejects non-TTY without --yes
-    Command::new(env!("CARGO_BIN_EXE_hbx"))
+    Command::new(env!("CARGO_BIN_EXE_hbctl"))
         .args(["update"])
         .assert()
         .failure()
@@ -1885,14 +1885,14 @@ fn test_update_and_self_update_non_interactive_requires_yes() {
         .stderr(predicate::str::contains("--yes"));
 
     // Alias `self-update` behaves identically
-    Command::new(env!("CARGO_BIN_EXE_hbx"))
+    Command::new(env!("CARGO_BIN_EXE_hbctl"))
         .args(["self-update"])
         .assert()
         .failure()
         .stderr(predicate::str::contains("--yes"));
 
     // Help text advertises flags
-    Command::new(env!("CARGO_BIN_EXE_hbx"))
+    Command::new(env!("CARGO_BIN_EXE_hbctl"))
         .args(["update", "--help"])
         .assert()
         .success()

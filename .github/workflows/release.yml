@@ -140,9 +140,9 @@ jobs:
         echo "TARGET_FLAGS=--target ${{ matrix.target }}" >> $GITHUB_ENV
         echo "TARGET_DIR=./target/${{ matrix.target }}" >> $GITHUB_ENV
         if [[ "${{ matrix.os }}" == windows-* ]]; then
-          bin="target/${{ matrix.target }}/release/hbx.exe"
+          bin="target/${{ matrix.target }}/release/hbctl.exe"
         else
-          bin="target/${{ matrix.target }}/release/hbx"
+          bin="target/${{ matrix.target }}/release/hbctl"
         fi
         echo "BIN=$bin" >> $GITHUB_ENV
 
@@ -155,15 +155,15 @@ jobs:
       shell: bash
       run: |
         outdir="${{ env.TARGET_DIR }}/release"
-        staging="hbx-${{ needs.create-release.outputs.version }}-${{ matrix.target }}"
+        staging="hbctl-${{ needs.create-release.outputs.version }}-${{ matrix.target }}"
         echo "staging is: $staging"
         mkdir -p "$staging"
 
         # Copy binary
         if [ "${{ matrix.os }}" = "windows-latest" ]; then
-          cp "$outdir/hbx.exe" "$staging/"
+          cp "$outdir/hbctl.exe" "$staging/"
         else
-          cp "$outdir/hbx" "$staging/"
+          cp "$outdir/hbctl" "$staging/"
         fi
 
         # Copy docs
@@ -180,9 +180,9 @@ jobs:
         fi
 
         # Copy man page
-        if [ -f "assets/hbx.1" ]; then
+        if [ -f "assets/hbctl.1" ]; then
           mkdir -p "$staging/assets"
-          cp assets/hbx.1 "$staging/assets/"
+          cp assets/hbctl.1 "$staging/assets/"
         fi
 
         # Compress
@@ -266,7 +266,7 @@ jobs:
           cd apt-repo
           git add pool/main/*.deb
           if ! git diff --staged --quiet; then
-            git commit -m "feat(pkg): add hbx ${{ needs.create-release.outputs.version }} debs (amd64, arm64, armhf, armel)"
+            git commit -m "feat(pkg): add hbctl ${{ needs.create-release.outputs.version }} debs (amd64, arm64, armhf, armel)"
             git push origin main
           fi
 
@@ -297,7 +297,7 @@ jobs:
             -H "Authorization: token ${APT_REPO_TOKEN}" \
             -H "Accept: application/vnd.github.v3+json" \
             https://api.github.com/repos/nicholaswilde/homebrew-tap/dispatches \
-            -d "{\"event_type\": \"update-formula\", \"client_payload\": {\"formula\": \"hbx\", \"version\": \"${{ needs.create-release.outputs.version }}\"}}"
+            -d "{\"event_type\": \"update-formula\", \"client_payload\": {\"formula\": \"hbctl\", \"version\": \"${{ needs.create-release.outputs.version }}\"}}"
 
   update-scoop-bucket:
     name: update-scoop-bucket
@@ -314,4 +314,4 @@ jobs:
             -H "Authorization: token ${APT_REPO_TOKEN}" \
             -H "Accept: application/vnd.github.v3+json" \
             https://api.github.com/repos/nicholaswilde/scoop-bucket/dispatches \
-            -d "{\"event_type\": \"update-manifest\", \"client_payload\": {\"manifest\": \"hbx\", \"version\": \"${{ needs.create-release.outputs.version }}\"}}"
+            -d "{\"event_type\": \"update-manifest\", \"client_payload\": {\"manifest\": \"hbctl\", \"version\": \"${{ needs.create-release.outputs.version }}\"}}"

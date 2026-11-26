@@ -1,29 +1,29 @@
 # =============================================================================
-# hbx Configuration Example (config.example.toml)
+# hbctl Configuration Example (config.example.toml)
 # =============================================================================
-# Copy this file to ~/.config/hbx/config.toml or project-local .hbx.toml
+# Copy this file to ~/.config/hbctl/config.toml or project-local .hbctl.toml
 # to customize default behavior.
 #
 # Precedence:
-#   CLI Flags > Environment Variables / .env > .hbx.toml > ~/.config/hbx/config.toml > Defaults
+#   CLI Flags > Environment Variables / .env > .hbctl.toml > ~/.config/hbctl/config.toml > Defaults
 # =============================================================================
 
 # Base URL of the remote Homebox instance (with or without /api/v1).
-# CLI: --url <URL> | Env: HBX_URL > HOMEBOX_URL > HOMEBOX_IP (http://<HOMEBOX_IP>:7745)
+# CLI: --url <URL> | Env: HBCTL_URL > HOMEBOX_URL > HOMEBOX_IP (http://<HOMEBOX_IP>:7745)
 # url = "http://192.168.1.50:7745"
 
 # Homebox API key (hb_...) or Bearer token.
-# Prefer `hbx auth login` (stores secret in OS keyring with 0600 file fallback) or env vars.
-# CLI: --api-key <KEY> | Env: HBX_API_KEY > HOMEBOX_API_KEY
+# Prefer `hbctl auth login` (stores secret in OS keyring with 0600 file fallback) or env vars.
+# CLI: --api-key <KEY> | Env: HBCTL_API_KEY > HOMEBOX_API_KEY
 # api_key = "hb_..."
 
-# Non-secret authentication metadata managed automatically by `hbx auth login` / `refresh`:
+# Non-secret authentication metadata managed automatically by `hbctl auth login` / `refresh`:
 # token_type = "api_key"          # "api_key" or "jwt"
 # expires_at = "2027-01-01T00:00:00Z"
 # credential_backend = "keyring"  # "keyring" or "file"
 
 # Default output format: "table", "json", or "plain".
-# CLI: --output <table|json|plain> (--json) | Env: HBX_OUTPUT
+# CLI: --output <table|json|plain> (--json) | Env: HBCTL_OUTPUT
 # output = "table"
 
 # HTTP request timeout in seconds for standard API operations (default: 30).

@@ -2,14 +2,14 @@
 use builtin;
 use str;
 
-set edit:completion:arg-completer[hbx] = {|@words|
+set edit:completion:arg-completer[hbctl] = {|@words|
     fn spaces {|n|
         builtin:repeat $n ' ' | str:join ''
     }
     fn cand {|text desc|
         edit:complex-candidate $text &display=$text' '(spaces (- 14 (wcswidth $text)))$desc
     }
-    var command = 'hbx'
+    var command = 'hbctl'
     for word $words[1..-1] {
         if (str:has-prefix $word '-') {
             break
@@ -17,10 +17,10 @@ set edit:completion:arg-completer[hbx] = {|@words|
         set command = $command';'$word
     }
     var completions = [
-        &'hbx'= {
-            cand --url 'Homebox base URL (env: HBX_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
-            cand --api-key 'Homebox API key or Bearer token (env: HBX_API_KEY > HOMEBOX_API_KEY)'
-            cand --output 'Output format (table, json, plain) [env: HBX_OUTPUT]'
+        &'hbctl'= {
+            cand --url 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
+            cand --api-key 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)'
+            cand --output 'Output format (table, json, plain) [env: HBCTL_OUTPUT]'
             cand --select 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)'
             cand -C 'Path to explicit TOML configuration file'
             cand --config 'Path to explicit TOML configuration file'
@@ -43,14 +43,14 @@ set edit:completion:arg-completer[hbx] = {|@words|
             cand export 'Export filtered items to JSON, CSV, or Markdown'
             cand completions 'Generate shell completion scripts'
             cand man 'Generate UNIX roff man page'
-            cand update 'Check for and install the latest hbx release from GitHub'
-            cand self-update 'Check for and install the latest hbx release from GitHub'
+            cand update 'Check for and install the latest hbctl release from GitHub'
+            cand self-update 'Check for and install the latest hbctl release from GitHub'
             cand help 'Print this message or the help of the given subcommand(s)'
         }
-        &'hbx;auth'= {
-            cand --url 'Homebox base URL (env: HBX_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
-            cand --api-key 'Homebox API key or Bearer token (env: HBX_API_KEY > HOMEBOX_API_KEY)'
-            cand --output 'Output format (table, json, plain) [env: HBX_OUTPUT]'
+        &'hbctl;auth'= {
+            cand --url 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
+            cand --api-key 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)'
+            cand --output 'Output format (table, json, plain) [env: HBCTL_OUTPUT]'
             cand --select 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)'
             cand -C 'Path to explicit TOML configuration file'
             cand --config 'Path to explicit TOML configuration file'
@@ -66,12 +66,12 @@ set edit:completion:arg-completer[hbx] = {|@words|
             cand refresh 'Refresh an active JWT session token'
             cand help 'Print this message or the help of the given subcommand(s)'
         }
-        &'hbx;auth;login'= {
+        &'hbctl;auth;login'= {
             cand -u 'Email or username for password login (POST /api/v1/users/login)'
             cand --username 'Email or username for password login (POST /api/v1/users/login)'
-            cand --url 'Homebox base URL (env: HBX_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
-            cand --api-key 'Homebox API key or Bearer token (env: HBX_API_KEY > HOMEBOX_API_KEY)'
-            cand --output 'Output format (table, json, plain) [env: HBX_OUTPUT]'
+            cand --url 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
+            cand --api-key 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)'
+            cand --output 'Output format (table, json, plain) [env: HBCTL_OUTPUT]'
             cand --select 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)'
             cand -C 'Path to explicit TOML configuration file'
             cand --config 'Path to explicit TOML configuration file'
@@ -85,10 +85,10 @@ set edit:completion:arg-completer[hbx] = {|@words|
             cand -h 'Print help'
             cand --help 'Print help'
         }
-        &'hbx;auth;status'= {
-            cand --url 'Homebox base URL (env: HBX_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
-            cand --api-key 'Homebox API key or Bearer token (env: HBX_API_KEY > HOMEBOX_API_KEY)'
-            cand --output 'Output format (table, json, plain) [env: HBX_OUTPUT]'
+        &'hbctl;auth;status'= {
+            cand --url 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
+            cand --api-key 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)'
+            cand --output 'Output format (table, json, plain) [env: HBCTL_OUTPUT]'
             cand --select 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)'
             cand -C 'Path to explicit TOML configuration file'
             cand --config 'Path to explicit TOML configuration file'
@@ -99,10 +99,10 @@ set edit:completion:arg-completer[hbx] = {|@words|
             cand -h 'Print help'
             cand --help 'Print help'
         }
-        &'hbx;auth;logout'= {
-            cand --url 'Homebox base URL (env: HBX_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
-            cand --api-key 'Homebox API key or Bearer token (env: HBX_API_KEY > HOMEBOX_API_KEY)'
-            cand --output 'Output format (table, json, plain) [env: HBX_OUTPUT]'
+        &'hbctl;auth;logout'= {
+            cand --url 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
+            cand --api-key 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)'
+            cand --output 'Output format (table, json, plain) [env: HBCTL_OUTPUT]'
             cand --select 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)'
             cand -C 'Path to explicit TOML configuration file'
             cand --config 'Path to explicit TOML configuration file'
@@ -114,10 +114,10 @@ set edit:completion:arg-completer[hbx] = {|@words|
             cand -h 'Print help'
             cand --help 'Print help'
         }
-        &'hbx;auth;refresh'= {
-            cand --url 'Homebox base URL (env: HBX_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
-            cand --api-key 'Homebox API key or Bearer token (env: HBX_API_KEY > HOMEBOX_API_KEY)'
-            cand --output 'Output format (table, json, plain) [env: HBX_OUTPUT]'
+        &'hbctl;auth;refresh'= {
+            cand --url 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
+            cand --api-key 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)'
+            cand --output 'Output format (table, json, plain) [env: HBCTL_OUTPUT]'
             cand --select 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)'
             cand -C 'Path to explicit TOML configuration file'
             cand --config 'Path to explicit TOML configuration file'
@@ -129,27 +129,27 @@ set edit:completion:arg-completer[hbx] = {|@words|
             cand -h 'Print help'
             cand --help 'Print help'
         }
-        &'hbx;auth;help'= {
+        &'hbctl;auth;help'= {
             cand login 'Authenticate with Homebox via API key (--with-token) or email/password'
             cand status 'Check authentication status and validate the active session'
             cand logout 'Remove stored credentials from OS keyring and local fallback store'
             cand refresh 'Refresh an active JWT session token'
             cand help 'Print this message or the help of the given subcommand(s)'
         }
-        &'hbx;auth;help;login'= {
+        &'hbctl;auth;help;login'= {
         }
-        &'hbx;auth;help;status'= {
+        &'hbctl;auth;help;status'= {
         }
-        &'hbx;auth;help;logout'= {
+        &'hbctl;auth;help;logout'= {
         }
-        &'hbx;auth;help;refresh'= {
+        &'hbctl;auth;help;refresh'= {
         }
-        &'hbx;auth;help;help'= {
+        &'hbctl;auth;help;help'= {
         }
-        &'hbx;item'= {
-            cand --url 'Homebox base URL (env: HBX_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
-            cand --api-key 'Homebox API key or Bearer token (env: HBX_API_KEY > HOMEBOX_API_KEY)'
-            cand --output 'Output format (table, json, plain) [env: HBX_OUTPUT]'
+        &'hbctl;item'= {
+            cand --url 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
+            cand --api-key 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)'
+            cand --output 'Output format (table, json, plain) [env: HBCTL_OUTPUT]'
             cand --select 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)'
             cand -C 'Path to explicit TOML configuration file'
             cand --config 'Path to explicit TOML configuration file'
@@ -169,14 +169,14 @@ set edit:completion:arg-completer[hbx] = {|@words|
             cand dedup 'Detect (and optionally delete or merge) duplicate items'
             cand help 'Print this message or the help of the given subcommand(s)'
         }
-        &'hbx;item;list'= {
+        &'hbctl;item;list'= {
             cand --tag 'Filter by tag name or UUID'
             cand --type 'Filter by entity type name or UUID'
             cand --has-field 'Only include items having the named custom field (hydrates details if missing)'
             cand --page-size 'Page size for listing'
-            cand --url 'Homebox base URL (env: HBX_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
-            cand --api-key 'Homebox API key or Bearer token (env: HBX_API_KEY > HOMEBOX_API_KEY)'
-            cand --output 'Output format (table, json, plain) [env: HBX_OUTPUT]'
+            cand --url 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
+            cand --api-key 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)'
+            cand --output 'Output format (table, json, plain) [env: HBCTL_OUTPUT]'
             cand --select 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)'
             cand -C 'Path to explicit TOML configuration file'
             cand --config 'Path to explicit TOML configuration file'
@@ -188,10 +188,10 @@ set edit:completion:arg-completer[hbx] = {|@words|
             cand -h 'Print help'
             cand --help 'Print help'
         }
-        &'hbx;item;get'= {
-            cand --url 'Homebox base URL (env: HBX_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
-            cand --api-key 'Homebox API key or Bearer token (env: HBX_API_KEY > HOMEBOX_API_KEY)'
-            cand --output 'Output format (table, json, plain) [env: HBX_OUTPUT]'
+        &'hbctl;item;get'= {
+            cand --url 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
+            cand --api-key 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)'
+            cand --output 'Output format (table, json, plain) [env: HBCTL_OUTPUT]'
             cand --select 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)'
             cand -C 'Path to explicit TOML configuration file'
             cand --config 'Path to explicit TOML configuration file'
@@ -202,7 +202,7 @@ set edit:completion:arg-completer[hbx] = {|@words|
             cand -h 'Print help'
             cand --help 'Print help'
         }
-        &'hbx;item;create'= {
+        &'hbctl;item;create'= {
             cand --name 'Item name (required unless supplied via --from-json)'
             cand --description 'Item description'
             cand --type 'Entity type name or UUID'
@@ -217,9 +217,9 @@ set edit:completion:arg-completer[hbx] = {|@words|
             cand --field 'Custom field KEY=VAL (repeatable)'
             cand --field-type 'Value type for --field entries'
             cand --from-json 'Load initial item JSON from file path or ''-'' for stdin'
-            cand --url 'Homebox base URL (env: HBX_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
-            cand --api-key 'Homebox API key or Bearer token (env: HBX_API_KEY > HOMEBOX_API_KEY)'
-            cand --output 'Output format (table, json, plain) [env: HBX_OUTPUT]'
+            cand --url 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
+            cand --api-key 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)'
+            cand --output 'Output format (table, json, plain) [env: HBCTL_OUTPUT]'
             cand --select 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)'
             cand -C 'Path to explicit TOML configuration file'
             cand --config 'Path to explicit TOML configuration file'
@@ -230,7 +230,7 @@ set edit:completion:arg-completer[hbx] = {|@words|
             cand -h 'Print help'
             cand --help 'Print help'
         }
-        &'hbx;item;update'= {
+        &'hbctl;item;update'= {
             cand --name 'Updated item name'
             cand --description 'Updated item description'
             cand --type 'Entity type name or UUID'
@@ -245,9 +245,9 @@ set edit:completion:arg-completer[hbx] = {|@words|
             cand --field 'Custom field KEY=VAL to upsert (repeatable)'
             cand --field-type 'Value type for --field entries'
             cand --from-json 'Load patch JSON from file path or ''-'' for stdin'
-            cand --url 'Homebox base URL (env: HBX_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
-            cand --api-key 'Homebox API key or Bearer token (env: HBX_API_KEY > HOMEBOX_API_KEY)'
-            cand --output 'Output format (table, json, plain) [env: HBX_OUTPUT]'
+            cand --url 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
+            cand --api-key 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)'
+            cand --output 'Output format (table, json, plain) [env: HBCTL_OUTPUT]'
             cand --select 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)'
             cand -C 'Path to explicit TOML configuration file'
             cand --config 'Path to explicit TOML configuration file'
@@ -258,7 +258,7 @@ set edit:completion:arg-completer[hbx] = {|@words|
             cand -h 'Print help'
             cand --help 'Print help'
         }
-        &'hbx;item;upsert'= {
+        &'hbctl;item;upsert'= {
             cand --name 'Item name to match or create'
             cand --description 'Item description'
             cand --type 'Entity type name or UUID'
@@ -272,9 +272,9 @@ set edit:completion:arg-completer[hbx] = {|@words|
             cand --purchase-from 'Purchase source'
             cand --field 'Custom field KEY=VAL (repeatable)'
             cand --field-type 'Value type for --field entries'
-            cand --url 'Homebox base URL (env: HBX_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
-            cand --api-key 'Homebox API key or Bearer token (env: HBX_API_KEY > HOMEBOX_API_KEY)'
-            cand --output 'Output format (table, json, plain) [env: HBX_OUTPUT]'
+            cand --url 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
+            cand --api-key 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)'
+            cand --output 'Output format (table, json, plain) [env: HBCTL_OUTPUT]'
             cand --select 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)'
             cand -C 'Path to explicit TOML configuration file'
             cand --config 'Path to explicit TOML configuration file'
@@ -285,10 +285,10 @@ set edit:completion:arg-completer[hbx] = {|@words|
             cand -h 'Print help'
             cand --help 'Print help'
         }
-        &'hbx;item;delete'= {
-            cand --url 'Homebox base URL (env: HBX_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
-            cand --api-key 'Homebox API key or Bearer token (env: HBX_API_KEY > HOMEBOX_API_KEY)'
-            cand --output 'Output format (table, json, plain) [env: HBX_OUTPUT]'
+        &'hbctl;item;delete'= {
+            cand --url 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
+            cand --api-key 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)'
+            cand --output 'Output format (table, json, plain) [env: HBCTL_OUTPUT]'
             cand --select 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)'
             cand -C 'Path to explicit TOML configuration file'
             cand --config 'Path to explicit TOML configuration file'
@@ -300,11 +300,11 @@ set edit:completion:arg-completer[hbx] = {|@words|
             cand -h 'Print help'
             cand --help 'Print help'
         }
-        &'hbx;item;import'= {
+        &'hbctl;item;import'= {
             cand --format 'Input format (inferred from extension if omitted; defaults to json for stdin)'
-            cand --url 'Homebox base URL (env: HBX_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
-            cand --api-key 'Homebox API key or Bearer token (env: HBX_API_KEY > HOMEBOX_API_KEY)'
-            cand --output 'Output format (table, json, plain) [env: HBX_OUTPUT]'
+            cand --url 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
+            cand --api-key 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)'
+            cand --output 'Output format (table, json, plain) [env: HBCTL_OUTPUT]'
             cand --select 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)'
             cand -C 'Path to explicit TOML configuration file'
             cand --config 'Path to explicit TOML configuration file'
@@ -317,11 +317,11 @@ set edit:completion:arg-completer[hbx] = {|@words|
             cand -h 'Print help'
             cand --help 'Print help'
         }
-        &'hbx;item;dedup'= {
+        &'hbctl;item;dedup'= {
             cand --threshold 'Jaccard similarity threshold for near-duplicate detection (0.0..=1.0)'
-            cand --url 'Homebox base URL (env: HBX_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
-            cand --api-key 'Homebox API key or Bearer token (env: HBX_API_KEY > HOMEBOX_API_KEY)'
-            cand --output 'Output format (table, json, plain) [env: HBX_OUTPUT]'
+            cand --url 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
+            cand --api-key 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)'
+            cand --output 'Output format (table, json, plain) [env: HBCTL_OUTPUT]'
             cand --select 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)'
             cand -C 'Path to explicit TOML configuration file'
             cand --config 'Path to explicit TOML configuration file'
@@ -334,7 +334,7 @@ set edit:completion:arg-completer[hbx] = {|@words|
             cand -h 'Print help'
             cand --help 'Print help'
         }
-        &'hbx;item;help'= {
+        &'hbctl;item;help'= {
             cand list 'List inventory items'
             cand get 'Fetch a single item by ID'
             cand create 'Create a new item (auto-persists custom fields via follow-up PUT)'
@@ -345,28 +345,28 @@ set edit:completion:arg-completer[hbx] = {|@words|
             cand dedup 'Detect (and optionally delete or merge) duplicate items'
             cand help 'Print this message or the help of the given subcommand(s)'
         }
-        &'hbx;item;help;list'= {
+        &'hbctl;item;help;list'= {
         }
-        &'hbx;item;help;get'= {
+        &'hbctl;item;help;get'= {
         }
-        &'hbx;item;help;create'= {
+        &'hbctl;item;help;create'= {
         }
-        &'hbx;item;help;update'= {
+        &'hbctl;item;help;update'= {
         }
-        &'hbx;item;help;upsert'= {
+        &'hbctl;item;help;upsert'= {
         }
-        &'hbx;item;help;delete'= {
+        &'hbctl;item;help;delete'= {
         }
-        &'hbx;item;help;import'= {
+        &'hbctl;item;help;import'= {
         }
-        &'hbx;item;help;dedup'= {
+        &'hbctl;item;help;dedup'= {
         }
-        &'hbx;item;help;help'= {
+        &'hbctl;item;help;help'= {
         }
-        &'hbx;attachment'= {
-            cand --url 'Homebox base URL (env: HBX_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
-            cand --api-key 'Homebox API key or Bearer token (env: HBX_API_KEY > HOMEBOX_API_KEY)'
-            cand --output 'Output format (table, json, plain) [env: HBX_OUTPUT]'
+        &'hbctl;attachment'= {
+            cand --url 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
+            cand --api-key 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)'
+            cand --output 'Output format (table, json, plain) [env: HBCTL_OUTPUT]'
             cand --select 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)'
             cand -C 'Path to explicit TOML configuration file'
             cand --config 'Path to explicit TOML configuration file'
@@ -382,10 +382,10 @@ set edit:completion:arg-completer[hbx] = {|@words|
             cand delete 'Delete an attachment from an item'
             cand help 'Print this message or the help of the given subcommand(s)'
         }
-        &'hbx;attachment;upload'= {
-            cand --url 'Homebox base URL (env: HBX_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
-            cand --api-key 'Homebox API key or Bearer token (env: HBX_API_KEY > HOMEBOX_API_KEY)'
-            cand --output 'Output format (table, json, plain) [env: HBX_OUTPUT]'
+        &'hbctl;attachment;upload'= {
+            cand --url 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
+            cand --api-key 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)'
+            cand --output 'Output format (table, json, plain) [env: HBCTL_OUTPUT]'
             cand --select 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)'
             cand -C 'Path to explicit TOML configuration file'
             cand --config 'Path to explicit TOML configuration file'
@@ -399,10 +399,10 @@ set edit:completion:arg-completer[hbx] = {|@words|
             cand -h 'Print help'
             cand --help 'Print help'
         }
-        &'hbx;attachment;list'= {
-            cand --url 'Homebox base URL (env: HBX_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
-            cand --api-key 'Homebox API key or Bearer token (env: HBX_API_KEY > HOMEBOX_API_KEY)'
-            cand --output 'Output format (table, json, plain) [env: HBX_OUTPUT]'
+        &'hbctl;attachment;list'= {
+            cand --url 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
+            cand --api-key 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)'
+            cand --output 'Output format (table, json, plain) [env: HBCTL_OUTPUT]'
             cand --select 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)'
             cand -C 'Path to explicit TOML configuration file'
             cand --config 'Path to explicit TOML configuration file'
@@ -413,13 +413,13 @@ set edit:completion:arg-completer[hbx] = {|@words|
             cand -h 'Print help'
             cand --help 'Print help'
         }
-        &'hbx;attachment;download'= {
+        &'hbctl;attachment;download'= {
             cand --mime 'Filter attachments by MIME type (e.g. application/pdf)'
             cand --ext 'Filter attachments by file extension (e.g. pdf)'
             cand --out 'Output file path (single download) or directory (multi-download / --all)'
-            cand --url 'Homebox base URL (env: HBX_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
-            cand --api-key 'Homebox API key or Bearer token (env: HBX_API_KEY > HOMEBOX_API_KEY)'
-            cand --output 'Output format (table, json, plain) [env: HBX_OUTPUT]'
+            cand --url 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
+            cand --api-key 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)'
+            cand --output 'Output format (table, json, plain) [env: HBCTL_OUTPUT]'
             cand --select 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)'
             cand -C 'Path to explicit TOML configuration file'
             cand --config 'Path to explicit TOML configuration file'
@@ -432,10 +432,10 @@ set edit:completion:arg-completer[hbx] = {|@words|
             cand -h 'Print help'
             cand --help 'Print help'
         }
-        &'hbx;attachment;delete'= {
-            cand --url 'Homebox base URL (env: HBX_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
-            cand --api-key 'Homebox API key or Bearer token (env: HBX_API_KEY > HOMEBOX_API_KEY)'
-            cand --output 'Output format (table, json, plain) [env: HBX_OUTPUT]'
+        &'hbctl;attachment;delete'= {
+            cand --url 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
+            cand --api-key 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)'
+            cand --output 'Output format (table, json, plain) [env: HBCTL_OUTPUT]'
             cand --select 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)'
             cand -C 'Path to explicit TOML configuration file'
             cand --config 'Path to explicit TOML configuration file'
@@ -446,31 +446,31 @@ set edit:completion:arg-completer[hbx] = {|@words|
             cand -h 'Print help'
             cand --help 'Print help'
         }
-        &'hbx;attachment;help'= {
+        &'hbctl;attachment;help'= {
             cand upload 'Upload one or more files as item attachments'
             cand list 'List attachments on an item'
             cand download 'Stream-download one or all attachments from an item'
             cand delete 'Delete an attachment from an item'
             cand help 'Print this message or the help of the given subcommand(s)'
         }
-        &'hbx;attachment;help;upload'= {
+        &'hbctl;attachment;help;upload'= {
         }
-        &'hbx;attachment;help;list'= {
+        &'hbctl;attachment;help;list'= {
         }
-        &'hbx;attachment;help;download'= {
+        &'hbctl;attachment;help;download'= {
         }
-        &'hbx;attachment;help;delete'= {
+        &'hbctl;attachment;help;delete'= {
         }
-        &'hbx;attachment;help;help'= {
+        &'hbctl;attachment;help;help'= {
         }
-        &'hbx;search'= {
+        &'hbctl;search'= {
             cand --tag 'Filter by tag name or UUID'
             cand --model 'Filter by model number (exact or substring, case-insensitive)'
             cand --serial 'Filter by serial number (exact or substring, case-insensitive)'
             cand --manufacturer 'Filter by manufacturer (exact or substring, case-insensitive)'
-            cand --url 'Homebox base URL (env: HBX_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
-            cand --api-key 'Homebox API key or Bearer token (env: HBX_API_KEY > HOMEBOX_API_KEY)'
-            cand --output 'Output format (table, json, plain) [env: HBX_OUTPUT]'
+            cand --url 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
+            cand --api-key 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)'
+            cand --output 'Output format (table, json, plain) [env: HBCTL_OUTPUT]'
             cand --select 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)'
             cand -C 'Path to explicit TOML configuration file'
             cand --config 'Path to explicit TOML configuration file'
@@ -481,10 +481,10 @@ set edit:completion:arg-completer[hbx] = {|@words|
             cand -h 'Print help'
             cand --help 'Print help'
         }
-        &'hbx;field'= {
-            cand --url 'Homebox base URL (env: HBX_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
-            cand --api-key 'Homebox API key or Bearer token (env: HBX_API_KEY > HOMEBOX_API_KEY)'
-            cand --output 'Output format (table, json, plain) [env: HBX_OUTPUT]'
+        &'hbctl;field'= {
+            cand --url 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
+            cand --api-key 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)'
+            cand --output 'Output format (table, json, plain) [env: HBCTL_OUTPUT]'
             cand --select 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)'
             cand -C 'Path to explicit TOML configuration file'
             cand --config 'Path to explicit TOML configuration file'
@@ -498,10 +498,10 @@ set edit:completion:arg-completer[hbx] = {|@words|
             cand set 'Set a typed custom field on an item via GET -> Merge -> PUT'
             cand help 'Print this message or the help of the given subcommand(s)'
         }
-        &'hbx;field;get'= {
-            cand --url 'Homebox base URL (env: HBX_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
-            cand --api-key 'Homebox API key or Bearer token (env: HBX_API_KEY > HOMEBOX_API_KEY)'
-            cand --output 'Output format (table, json, plain) [env: HBX_OUTPUT]'
+        &'hbctl;field;get'= {
+            cand --url 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
+            cand --api-key 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)'
+            cand --output 'Output format (table, json, plain) [env: HBCTL_OUTPUT]'
             cand --select 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)'
             cand -C 'Path to explicit TOML configuration file'
             cand --config 'Path to explicit TOML configuration file'
@@ -512,11 +512,11 @@ set edit:completion:arg-completer[hbx] = {|@words|
             cand -h 'Print help'
             cand --help 'Print help'
         }
-        &'hbx;field;set'= {
+        &'hbctl;field;set'= {
             cand --type 'Custom field value type'
-            cand --url 'Homebox base URL (env: HBX_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
-            cand --api-key 'Homebox API key or Bearer token (env: HBX_API_KEY > HOMEBOX_API_KEY)'
-            cand --output 'Output format (table, json, plain) [env: HBX_OUTPUT]'
+            cand --url 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
+            cand --api-key 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)'
+            cand --output 'Output format (table, json, plain) [env: HBCTL_OUTPUT]'
             cand --select 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)'
             cand -C 'Path to explicit TOML configuration file'
             cand --config 'Path to explicit TOML configuration file'
@@ -527,21 +527,21 @@ set edit:completion:arg-completer[hbx] = {|@words|
             cand -h 'Print help'
             cand --help 'Print help'
         }
-        &'hbx;field;help'= {
+        &'hbctl;field;help'= {
             cand get 'Get a custom field value from an item'
             cand set 'Set a typed custom field on an item via GET -> Merge -> PUT'
             cand help 'Print this message or the help of the given subcommand(s)'
         }
-        &'hbx;field;help;get'= {
+        &'hbctl;field;help;get'= {
         }
-        &'hbx;field;help;set'= {
+        &'hbctl;field;help;set'= {
         }
-        &'hbx;field;help;help'= {
+        &'hbctl;field;help;help'= {
         }
-        &'hbx;tag'= {
-            cand --url 'Homebox base URL (env: HBX_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
-            cand --api-key 'Homebox API key or Bearer token (env: HBX_API_KEY > HOMEBOX_API_KEY)'
-            cand --output 'Output format (table, json, plain) [env: HBX_OUTPUT]'
+        &'hbctl;tag'= {
+            cand --url 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
+            cand --api-key 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)'
+            cand --output 'Output format (table, json, plain) [env: HBCTL_OUTPUT]'
             cand --select 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)'
             cand -C 'Path to explicit TOML configuration file'
             cand --config 'Path to explicit TOML configuration file'
@@ -555,10 +555,10 @@ set edit:completion:arg-completer[hbx] = {|@words|
             cand create 'Create a new tag'
             cand help 'Print this message or the help of the given subcommand(s)'
         }
-        &'hbx;tag;list'= {
-            cand --url 'Homebox base URL (env: HBX_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
-            cand --api-key 'Homebox API key or Bearer token (env: HBX_API_KEY > HOMEBOX_API_KEY)'
-            cand --output 'Output format (table, json, plain) [env: HBX_OUTPUT]'
+        &'hbctl;tag;list'= {
+            cand --url 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
+            cand --api-key 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)'
+            cand --output 'Output format (table, json, plain) [env: HBCTL_OUTPUT]'
             cand --select 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)'
             cand -C 'Path to explicit TOML configuration file'
             cand --config 'Path to explicit TOML configuration file'
@@ -569,10 +569,10 @@ set edit:completion:arg-completer[hbx] = {|@words|
             cand -h 'Print help'
             cand --help 'Print help'
         }
-        &'hbx;tag;create'= {
-            cand --url 'Homebox base URL (env: HBX_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
-            cand --api-key 'Homebox API key or Bearer token (env: HBX_API_KEY > HOMEBOX_API_KEY)'
-            cand --output 'Output format (table, json, plain) [env: HBX_OUTPUT]'
+        &'hbctl;tag;create'= {
+            cand --url 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
+            cand --api-key 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)'
+            cand --output 'Output format (table, json, plain) [env: HBCTL_OUTPUT]'
             cand --select 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)'
             cand -C 'Path to explicit TOML configuration file'
             cand --config 'Path to explicit TOML configuration file'
@@ -583,21 +583,21 @@ set edit:completion:arg-completer[hbx] = {|@words|
             cand -h 'Print help'
             cand --help 'Print help'
         }
-        &'hbx;tag;help'= {
+        &'hbctl;tag;help'= {
             cand list 'List all tags'
             cand create 'Create a new tag'
             cand help 'Print this message or the help of the given subcommand(s)'
         }
-        &'hbx;tag;help;list'= {
+        &'hbctl;tag;help;list'= {
         }
-        &'hbx;tag;help;create'= {
+        &'hbctl;tag;help;create'= {
         }
-        &'hbx;tag;help;help'= {
+        &'hbctl;tag;help;help'= {
         }
-        &'hbx;entity-types'= {
-            cand --url 'Homebox base URL (env: HBX_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
-            cand --api-key 'Homebox API key or Bearer token (env: HBX_API_KEY > HOMEBOX_API_KEY)'
-            cand --output 'Output format (table, json, plain) [env: HBX_OUTPUT]'
+        &'hbctl;entity-types'= {
+            cand --url 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
+            cand --api-key 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)'
+            cand --output 'Output format (table, json, plain) [env: HBCTL_OUTPUT]'
             cand --select 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)'
             cand -C 'Path to explicit TOML configuration file'
             cand --config 'Path to explicit TOML configuration file'
@@ -610,10 +610,10 @@ set edit:completion:arg-completer[hbx] = {|@words|
             cand list 'List all entity types'
             cand help 'Print this message or the help of the given subcommand(s)'
         }
-        &'hbx;entity-type'= {
-            cand --url 'Homebox base URL (env: HBX_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
-            cand --api-key 'Homebox API key or Bearer token (env: HBX_API_KEY > HOMEBOX_API_KEY)'
-            cand --output 'Output format (table, json, plain) [env: HBX_OUTPUT]'
+        &'hbctl;entity-type'= {
+            cand --url 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
+            cand --api-key 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)'
+            cand --output 'Output format (table, json, plain) [env: HBCTL_OUTPUT]'
             cand --select 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)'
             cand -C 'Path to explicit TOML configuration file'
             cand --config 'Path to explicit TOML configuration file'
@@ -626,10 +626,10 @@ set edit:completion:arg-completer[hbx] = {|@words|
             cand list 'List all entity types'
             cand help 'Print this message or the help of the given subcommand(s)'
         }
-        &'hbx;entity-types;list'= {
-            cand --url 'Homebox base URL (env: HBX_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
-            cand --api-key 'Homebox API key or Bearer token (env: HBX_API_KEY > HOMEBOX_API_KEY)'
-            cand --output 'Output format (table, json, plain) [env: HBX_OUTPUT]'
+        &'hbctl;entity-types;list'= {
+            cand --url 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
+            cand --api-key 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)'
+            cand --output 'Output format (table, json, plain) [env: HBCTL_OUTPUT]'
             cand --select 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)'
             cand -C 'Path to explicit TOML configuration file'
             cand --config 'Path to explicit TOML configuration file'
@@ -640,10 +640,10 @@ set edit:completion:arg-completer[hbx] = {|@words|
             cand -h 'Print help'
             cand --help 'Print help'
         }
-        &'hbx;entity-type;list'= {
-            cand --url 'Homebox base URL (env: HBX_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
-            cand --api-key 'Homebox API key or Bearer token (env: HBX_API_KEY > HOMEBOX_API_KEY)'
-            cand --output 'Output format (table, json, plain) [env: HBX_OUTPUT]'
+        &'hbctl;entity-type;list'= {
+            cand --url 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
+            cand --api-key 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)'
+            cand --output 'Output format (table, json, plain) [env: HBCTL_OUTPUT]'
             cand --select 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)'
             cand -C 'Path to explicit TOML configuration file'
             cand --config 'Path to explicit TOML configuration file'
@@ -654,31 +654,31 @@ set edit:completion:arg-completer[hbx] = {|@words|
             cand -h 'Print help'
             cand --help 'Print help'
         }
-        &'hbx;entity-types;help'= {
+        &'hbctl;entity-types;help'= {
             cand list 'List all entity types'
             cand help 'Print this message or the help of the given subcommand(s)'
         }
-        &'hbx;entity-types;help;list'= {
+        &'hbctl;entity-types;help;list'= {
         }
-        &'hbx;entity-types;help;help'= {
+        &'hbctl;entity-types;help;help'= {
         }
-        &'hbx;entity-type;help'= {
+        &'hbctl;entity-type;help'= {
             cand list 'List all entity types'
             cand help 'Print this message or the help of the given subcommand(s)'
         }
-        &'hbx;entity-type;help;list'= {
+        &'hbctl;entity-type;help;list'= {
         }
-        &'hbx;entity-type;help;help'= {
+        &'hbctl;entity-type;help;help'= {
         }
-        &'hbx;export'= {
+        &'hbctl;export'= {
             cand --tag 'Filter by tag name or UUID'
             cand --has-field 'Require items to have the named custom field'
             cand --field 'Custom field column(s) to include in export (repeatable)'
             cand --sort 'Sort exported items by name or id'
             cand --format 'Export format (json, csv, markdown)'
-            cand --url 'Homebox base URL (env: HBX_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
-            cand --api-key 'Homebox API key or Bearer token (env: HBX_API_KEY > HOMEBOX_API_KEY)'
-            cand --output 'Output format (table, json, plain) [env: HBX_OUTPUT]'
+            cand --url 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
+            cand --api-key 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)'
+            cand --output 'Output format (table, json, plain) [env: HBCTL_OUTPUT]'
             cand --select 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)'
             cand -C 'Path to explicit TOML configuration file'
             cand --config 'Path to explicit TOML configuration file'
@@ -689,10 +689,10 @@ set edit:completion:arg-completer[hbx] = {|@words|
             cand -h 'Print help'
             cand --help 'Print help'
         }
-        &'hbx;completions'= {
-            cand --url 'Homebox base URL (env: HBX_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
-            cand --api-key 'Homebox API key or Bearer token (env: HBX_API_KEY > HOMEBOX_API_KEY)'
-            cand --output 'Output format (table, json, plain) [env: HBX_OUTPUT]'
+        &'hbctl;completions'= {
+            cand --url 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
+            cand --api-key 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)'
+            cand --output 'Output format (table, json, plain) [env: HBCTL_OUTPUT]'
             cand --select 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)'
             cand -C 'Path to explicit TOML configuration file'
             cand --config 'Path to explicit TOML configuration file'
@@ -703,10 +703,10 @@ set edit:completion:arg-completer[hbx] = {|@words|
             cand -h 'Print help'
             cand --help 'Print help'
         }
-        &'hbx;man'= {
-            cand --url 'Homebox base URL (env: HBX_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
-            cand --api-key 'Homebox API key or Bearer token (env: HBX_API_KEY > HOMEBOX_API_KEY)'
-            cand --output 'Output format (table, json, plain) [env: HBX_OUTPUT]'
+        &'hbctl;man'= {
+            cand --url 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
+            cand --api-key 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)'
+            cand --output 'Output format (table, json, plain) [env: HBCTL_OUTPUT]'
             cand --select 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)'
             cand -C 'Path to explicit TOML configuration file'
             cand --config 'Path to explicit TOML configuration file'
@@ -717,11 +717,11 @@ set edit:completion:arg-completer[hbx] = {|@words|
             cand -h 'Print help'
             cand --help 'Print help'
         }
-        &'hbx;update'= {
+        &'hbctl;update'= {
             cand --version 'Target a specific release version or tag (e.g. 0.1.0 or v0.1.0)'
-            cand --url 'Homebox base URL (env: HBX_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
-            cand --api-key 'Homebox API key or Bearer token (env: HBX_API_KEY > HOMEBOX_API_KEY)'
-            cand --output 'Output format (table, json, plain) [env: HBX_OUTPUT]'
+            cand --url 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
+            cand --api-key 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)'
+            cand --output 'Output format (table, json, plain) [env: HBCTL_OUTPUT]'
             cand --select 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)'
             cand -C 'Path to explicit TOML configuration file'
             cand --config 'Path to explicit TOML configuration file'
@@ -735,11 +735,11 @@ set edit:completion:arg-completer[hbx] = {|@words|
             cand -h 'Print help'
             cand --help 'Print help'
         }
-        &'hbx;self-update'= {
+        &'hbctl;self-update'= {
             cand --version 'Target a specific release version or tag (e.g. 0.1.0 or v0.1.0)'
-            cand --url 'Homebox base URL (env: HBX_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
-            cand --api-key 'Homebox API key or Bearer token (env: HBX_API_KEY > HOMEBOX_API_KEY)'
-            cand --output 'Output format (table, json, plain) [env: HBX_OUTPUT]'
+            cand --url 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
+            cand --api-key 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)'
+            cand --output 'Output format (table, json, plain) [env: HBCTL_OUTPUT]'
             cand --select 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)'
             cand -C 'Path to explicit TOML configuration file'
             cand --config 'Path to explicit TOML configuration file'
@@ -753,7 +753,7 @@ set edit:completion:arg-completer[hbx] = {|@words|
             cand -h 'Print help'
             cand --help 'Print help'
         }
-        &'hbx;help'= {
+        &'hbctl;help'= {
             cand auth 'Authenticate with a remote Homebox instance (login, status, logout, refresh)'
             cand item 'Manage inventory items (/api/v1/entities)'
             cand attachment 'Manage item attachments (/api/v1/entities/{id}/attachments)'
@@ -764,24 +764,24 @@ set edit:completion:arg-completer[hbx] = {|@words|
             cand export 'Export filtered items to JSON, CSV, or Markdown'
             cand completions 'Generate shell completion scripts'
             cand man 'Generate UNIX roff man page'
-            cand update 'Check for and install the latest hbx release from GitHub'
+            cand update 'Check for and install the latest hbctl release from GitHub'
             cand help 'Print this message or the help of the given subcommand(s)'
         }
-        &'hbx;help;auth'= {
+        &'hbctl;help;auth'= {
             cand login 'Authenticate with Homebox via API key (--with-token) or email/password'
             cand status 'Check authentication status and validate the active session'
             cand logout 'Remove stored credentials from OS keyring and local fallback store'
             cand refresh 'Refresh an active JWT session token'
         }
-        &'hbx;help;auth;login'= {
+        &'hbctl;help;auth;login'= {
         }
-        &'hbx;help;auth;status'= {
+        &'hbctl;help;auth;status'= {
         }
-        &'hbx;help;auth;logout'= {
+        &'hbctl;help;auth;logout'= {
         }
-        &'hbx;help;auth;refresh'= {
+        &'hbctl;help;auth;refresh'= {
         }
-        &'hbx;help;item'= {
+        &'hbctl;help;item'= {
             cand list 'List inventory items'
             cand get 'Fetch a single item by ID'
             cand create 'Create a new item (auto-persists custom fields via follow-up PUT)'
@@ -791,68 +791,68 @@ set edit:completion:arg-completer[hbx] = {|@words|
             cand import 'Bulk import items from JSON or CSV (file or ''-'' for stdin)'
             cand dedup 'Detect (and optionally delete or merge) duplicate items'
         }
-        &'hbx;help;item;list'= {
+        &'hbctl;help;item;list'= {
         }
-        &'hbx;help;item;get'= {
+        &'hbctl;help;item;get'= {
         }
-        &'hbx;help;item;create'= {
+        &'hbctl;help;item;create'= {
         }
-        &'hbx;help;item;update'= {
+        &'hbctl;help;item;update'= {
         }
-        &'hbx;help;item;upsert'= {
+        &'hbctl;help;item;upsert'= {
         }
-        &'hbx;help;item;delete'= {
+        &'hbctl;help;item;delete'= {
         }
-        &'hbx;help;item;import'= {
+        &'hbctl;help;item;import'= {
         }
-        &'hbx;help;item;dedup'= {
+        &'hbctl;help;item;dedup'= {
         }
-        &'hbx;help;attachment'= {
+        &'hbctl;help;attachment'= {
             cand upload 'Upload one or more files as item attachments'
             cand list 'List attachments on an item'
             cand download 'Stream-download one or all attachments from an item'
             cand delete 'Delete an attachment from an item'
         }
-        &'hbx;help;attachment;upload'= {
+        &'hbctl;help;attachment;upload'= {
         }
-        &'hbx;help;attachment;list'= {
+        &'hbctl;help;attachment;list'= {
         }
-        &'hbx;help;attachment;download'= {
+        &'hbctl;help;attachment;download'= {
         }
-        &'hbx;help;attachment;delete'= {
+        &'hbctl;help;attachment;delete'= {
         }
-        &'hbx;help;search'= {
+        &'hbctl;help;search'= {
         }
-        &'hbx;help;field'= {
+        &'hbctl;help;field'= {
             cand get 'Get a custom field value from an item'
             cand set 'Set a typed custom field on an item via GET -> Merge -> PUT'
         }
-        &'hbx;help;field;get'= {
+        &'hbctl;help;field;get'= {
         }
-        &'hbx;help;field;set'= {
+        &'hbctl;help;field;set'= {
         }
-        &'hbx;help;tag'= {
+        &'hbctl;help;tag'= {
             cand list 'List all tags'
             cand create 'Create a new tag'
         }
-        &'hbx;help;tag;list'= {
+        &'hbctl;help;tag;list'= {
         }
-        &'hbx;help;tag;create'= {
+        &'hbctl;help;tag;create'= {
         }
-        &'hbx;help;entity-types'= {
+        &'hbctl;help;entity-types'= {
             cand list 'List all entity types'
         }
-        &'hbx;help;entity-types;list'= {
+        &'hbctl;help;entity-types;list'= {
         }
-        &'hbx;help;export'= {
+        &'hbctl;help;export'= {
         }
-        &'hbx;help;completions'= {
+        &'hbctl;help;completions'= {
         }
-        &'hbx;help;man'= {
+        &'hbctl;help;man'= {
         }
-        &'hbx;help;update'= {
+        &'hbctl;help;update'= {
         }
-        &'hbx;help;help'= {
+        &'hbctl;help;help'= {
         }
     ]
     $completions[$command]

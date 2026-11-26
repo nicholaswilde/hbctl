@@ -1,6 +1,6 @@
 use crate::client::models::{EntityType, Tag};
 use crate::client::HomeboxClient;
-use crate::error::{HbxError, Result};
+use crate::error::{HbctlError, Result};
 
 /// Case-insensitive name-to-UUID resolver for Homebox tags and entity types.
 /// Caches list responses within a single command execution.
@@ -41,7 +41,7 @@ impl<'a> Resolver<'a> {
     pub fn resolve_tag_id(&mut self, name_or_id: &str, auto_create: bool) -> Result<String> {
         let needle = name_or_id.trim();
         if needle.is_empty() {
-            return Err(HbxError::InvalidInput("tag cannot be empty".to_string()));
+            return Err(HbctlError::InvalidInput("tag cannot be empty".to_string()));
         }
 
         let tags = self.tags()?;
@@ -63,7 +63,7 @@ impl<'a> Resolver<'a> {
         } else if is_uuid_like(needle) {
             Ok(needle.to_string())
         } else {
-            Err(HbxError::NotFound {
+            Err(HbctlError::NotFound {
                 kind: "tag".to_string(),
                 query: needle.to_string(),
             })
@@ -86,7 +86,7 @@ impl<'a> Resolver<'a> {
     pub fn resolve_entity_type_id(&mut self, name_or_id: &str) -> Result<String> {
         let needle = name_or_id.trim();
         if needle.is_empty() {
-            return Err(HbxError::InvalidInput(
+            return Err(HbctlError::InvalidInput(
                 "entity type cannot be empty".to_string(),
             ));
         }
@@ -102,7 +102,7 @@ impl<'a> Resolver<'a> {
         if is_uuid_like(needle) {
             Ok(needle.to_string())
         } else {
-            Err(HbxError::NotFound {
+            Err(HbctlError::NotFound {
                 kind: "entity type".to_string(),
                 query: needle.to_string(),
             })

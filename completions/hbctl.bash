@@ -1,4 +1,4 @@
-_hbx() {
+_hbctl() {
     local i cur prev opts cmd
     COMPREPLY=()
     if [[ "${BASH_VERSINFO[0]}" -ge 4 ]]; then
@@ -14,310 +14,310 @@ _hbx() {
     do
         case "${cmd},${i}" in
             ",$1")
-                cmd="hbx"
+                cmd="hbctl"
                 ;;
-            hbx,attachment)
-                cmd="hbx__subcmd__attachment"
+            hbctl,attachment)
+                cmd="hbctl__subcmd__attachment"
                 ;;
-            hbx,auth)
-                cmd="hbx__subcmd__auth"
+            hbctl,auth)
+                cmd="hbctl__subcmd__auth"
                 ;;
-            hbx,completions)
-                cmd="hbx__subcmd__completions"
+            hbctl,completions)
+                cmd="hbctl__subcmd__completions"
                 ;;
-            hbx,entity-type)
-                cmd="hbx__subcmd__entity__subcmd__types"
+            hbctl,entity-type)
+                cmd="hbctl__subcmd__entity__subcmd__types"
                 ;;
-            hbx,entity-types)
-                cmd="hbx__subcmd__entity__subcmd__types"
+            hbctl,entity-types)
+                cmd="hbctl__subcmd__entity__subcmd__types"
                 ;;
-            hbx,export)
-                cmd="hbx__subcmd__export"
+            hbctl,export)
+                cmd="hbctl__subcmd__export"
                 ;;
-            hbx,field)
-                cmd="hbx__subcmd__field"
+            hbctl,field)
+                cmd="hbctl__subcmd__field"
                 ;;
-            hbx,help)
-                cmd="hbx__subcmd__help"
+            hbctl,help)
+                cmd="hbctl__subcmd__help"
                 ;;
-            hbx,item)
-                cmd="hbx__subcmd__item"
+            hbctl,item)
+                cmd="hbctl__subcmd__item"
                 ;;
-            hbx,man)
-                cmd="hbx__subcmd__man"
+            hbctl,man)
+                cmd="hbctl__subcmd__man"
                 ;;
-            hbx,search)
-                cmd="hbx__subcmd__search"
+            hbctl,search)
+                cmd="hbctl__subcmd__search"
                 ;;
-            hbx,self-update)
-                cmd="hbx__subcmd__update"
+            hbctl,self-update)
+                cmd="hbctl__subcmd__update"
                 ;;
-            hbx,tag)
-                cmd="hbx__subcmd__tag"
+            hbctl,tag)
+                cmd="hbctl__subcmd__tag"
                 ;;
-            hbx,update)
-                cmd="hbx__subcmd__update"
+            hbctl,update)
+                cmd="hbctl__subcmd__update"
                 ;;
-            hbx__subcmd__attachment,delete)
-                cmd="hbx__subcmd__attachment__subcmd__delete"
+            hbctl__subcmd__attachment,delete)
+                cmd="hbctl__subcmd__attachment__subcmd__delete"
                 ;;
-            hbx__subcmd__attachment,download)
-                cmd="hbx__subcmd__attachment__subcmd__download"
+            hbctl__subcmd__attachment,download)
+                cmd="hbctl__subcmd__attachment__subcmd__download"
                 ;;
-            hbx__subcmd__attachment,help)
-                cmd="hbx__subcmd__attachment__subcmd__help"
+            hbctl__subcmd__attachment,help)
+                cmd="hbctl__subcmd__attachment__subcmd__help"
                 ;;
-            hbx__subcmd__attachment,list)
-                cmd="hbx__subcmd__attachment__subcmd__list"
+            hbctl__subcmd__attachment,list)
+                cmd="hbctl__subcmd__attachment__subcmd__list"
                 ;;
-            hbx__subcmd__attachment,upload)
-                cmd="hbx__subcmd__attachment__subcmd__upload"
+            hbctl__subcmd__attachment,upload)
+                cmd="hbctl__subcmd__attachment__subcmd__upload"
                 ;;
-            hbx__subcmd__attachment__subcmd__help,delete)
-                cmd="hbx__subcmd__attachment__subcmd__help__subcmd__delete"
+            hbctl__subcmd__attachment__subcmd__help,delete)
+                cmd="hbctl__subcmd__attachment__subcmd__help__subcmd__delete"
                 ;;
-            hbx__subcmd__attachment__subcmd__help,download)
-                cmd="hbx__subcmd__attachment__subcmd__help__subcmd__download"
+            hbctl__subcmd__attachment__subcmd__help,download)
+                cmd="hbctl__subcmd__attachment__subcmd__help__subcmd__download"
                 ;;
-            hbx__subcmd__attachment__subcmd__help,help)
-                cmd="hbx__subcmd__attachment__subcmd__help__subcmd__help"
+            hbctl__subcmd__attachment__subcmd__help,help)
+                cmd="hbctl__subcmd__attachment__subcmd__help__subcmd__help"
                 ;;
-            hbx__subcmd__attachment__subcmd__help,list)
-                cmd="hbx__subcmd__attachment__subcmd__help__subcmd__list"
+            hbctl__subcmd__attachment__subcmd__help,list)
+                cmd="hbctl__subcmd__attachment__subcmd__help__subcmd__list"
                 ;;
-            hbx__subcmd__attachment__subcmd__help,upload)
-                cmd="hbx__subcmd__attachment__subcmd__help__subcmd__upload"
+            hbctl__subcmd__attachment__subcmd__help,upload)
+                cmd="hbctl__subcmd__attachment__subcmd__help__subcmd__upload"
                 ;;
-            hbx__subcmd__auth,help)
-                cmd="hbx__subcmd__auth__subcmd__help"
+            hbctl__subcmd__auth,help)
+                cmd="hbctl__subcmd__auth__subcmd__help"
                 ;;
-            hbx__subcmd__auth,login)
-                cmd="hbx__subcmd__auth__subcmd__login"
+            hbctl__subcmd__auth,login)
+                cmd="hbctl__subcmd__auth__subcmd__login"
                 ;;
-            hbx__subcmd__auth,logout)
-                cmd="hbx__subcmd__auth__subcmd__logout"
+            hbctl__subcmd__auth,logout)
+                cmd="hbctl__subcmd__auth__subcmd__logout"
                 ;;
-            hbx__subcmd__auth,refresh)
-                cmd="hbx__subcmd__auth__subcmd__refresh"
+            hbctl__subcmd__auth,refresh)
+                cmd="hbctl__subcmd__auth__subcmd__refresh"
                 ;;
-            hbx__subcmd__auth,status)
-                cmd="hbx__subcmd__auth__subcmd__status"
+            hbctl__subcmd__auth,status)
+                cmd="hbctl__subcmd__auth__subcmd__status"
                 ;;
-            hbx__subcmd__auth__subcmd__help,help)
-                cmd="hbx__subcmd__auth__subcmd__help__subcmd__help"
+            hbctl__subcmd__auth__subcmd__help,help)
+                cmd="hbctl__subcmd__auth__subcmd__help__subcmd__help"
                 ;;
-            hbx__subcmd__auth__subcmd__help,login)
-                cmd="hbx__subcmd__auth__subcmd__help__subcmd__login"
+            hbctl__subcmd__auth__subcmd__help,login)
+                cmd="hbctl__subcmd__auth__subcmd__help__subcmd__login"
                 ;;
-            hbx__subcmd__auth__subcmd__help,logout)
-                cmd="hbx__subcmd__auth__subcmd__help__subcmd__logout"
+            hbctl__subcmd__auth__subcmd__help,logout)
+                cmd="hbctl__subcmd__auth__subcmd__help__subcmd__logout"
                 ;;
-            hbx__subcmd__auth__subcmd__help,refresh)
-                cmd="hbx__subcmd__auth__subcmd__help__subcmd__refresh"
+            hbctl__subcmd__auth__subcmd__help,refresh)
+                cmd="hbctl__subcmd__auth__subcmd__help__subcmd__refresh"
                 ;;
-            hbx__subcmd__auth__subcmd__help,status)
-                cmd="hbx__subcmd__auth__subcmd__help__subcmd__status"
+            hbctl__subcmd__auth__subcmd__help,status)
+                cmd="hbctl__subcmd__auth__subcmd__help__subcmd__status"
                 ;;
-            hbx__subcmd__entity__subcmd__types,help)
-                cmd="hbx__subcmd__entity__subcmd__types__subcmd__help"
+            hbctl__subcmd__entity__subcmd__types,help)
+                cmd="hbctl__subcmd__entity__subcmd__types__subcmd__help"
                 ;;
-            hbx__subcmd__entity__subcmd__types,list)
-                cmd="hbx__subcmd__entity__subcmd__types__subcmd__list"
+            hbctl__subcmd__entity__subcmd__types,list)
+                cmd="hbctl__subcmd__entity__subcmd__types__subcmd__list"
                 ;;
-            hbx__subcmd__entity__subcmd__types__subcmd__help,help)
-                cmd="hbx__subcmd__entity__subcmd__types__subcmd__help__subcmd__help"
+            hbctl__subcmd__entity__subcmd__types__subcmd__help,help)
+                cmd="hbctl__subcmd__entity__subcmd__types__subcmd__help__subcmd__help"
                 ;;
-            hbx__subcmd__entity__subcmd__types__subcmd__help,list)
-                cmd="hbx__subcmd__entity__subcmd__types__subcmd__help__subcmd__list"
+            hbctl__subcmd__entity__subcmd__types__subcmd__help,list)
+                cmd="hbctl__subcmd__entity__subcmd__types__subcmd__help__subcmd__list"
                 ;;
-            hbx__subcmd__field,get)
-                cmd="hbx__subcmd__field__subcmd__get"
+            hbctl__subcmd__field,get)
+                cmd="hbctl__subcmd__field__subcmd__get"
                 ;;
-            hbx__subcmd__field,help)
-                cmd="hbx__subcmd__field__subcmd__help"
+            hbctl__subcmd__field,help)
+                cmd="hbctl__subcmd__field__subcmd__help"
                 ;;
-            hbx__subcmd__field,set)
-                cmd="hbx__subcmd__field__subcmd__set"
+            hbctl__subcmd__field,set)
+                cmd="hbctl__subcmd__field__subcmd__set"
                 ;;
-            hbx__subcmd__field__subcmd__help,get)
-                cmd="hbx__subcmd__field__subcmd__help__subcmd__get"
+            hbctl__subcmd__field__subcmd__help,get)
+                cmd="hbctl__subcmd__field__subcmd__help__subcmd__get"
                 ;;
-            hbx__subcmd__field__subcmd__help,help)
-                cmd="hbx__subcmd__field__subcmd__help__subcmd__help"
+            hbctl__subcmd__field__subcmd__help,help)
+                cmd="hbctl__subcmd__field__subcmd__help__subcmd__help"
                 ;;
-            hbx__subcmd__field__subcmd__help,set)
-                cmd="hbx__subcmd__field__subcmd__help__subcmd__set"
+            hbctl__subcmd__field__subcmd__help,set)
+                cmd="hbctl__subcmd__field__subcmd__help__subcmd__set"
                 ;;
-            hbx__subcmd__help,attachment)
-                cmd="hbx__subcmd__help__subcmd__attachment"
+            hbctl__subcmd__help,attachment)
+                cmd="hbctl__subcmd__help__subcmd__attachment"
                 ;;
-            hbx__subcmd__help,auth)
-                cmd="hbx__subcmd__help__subcmd__auth"
+            hbctl__subcmd__help,auth)
+                cmd="hbctl__subcmd__help__subcmd__auth"
                 ;;
-            hbx__subcmd__help,completions)
-                cmd="hbx__subcmd__help__subcmd__completions"
+            hbctl__subcmd__help,completions)
+                cmd="hbctl__subcmd__help__subcmd__completions"
                 ;;
-            hbx__subcmd__help,entity-types)
-                cmd="hbx__subcmd__help__subcmd__entity__subcmd__types"
+            hbctl__subcmd__help,entity-types)
+                cmd="hbctl__subcmd__help__subcmd__entity__subcmd__types"
                 ;;
-            hbx__subcmd__help,export)
-                cmd="hbx__subcmd__help__subcmd__export"
+            hbctl__subcmd__help,export)
+                cmd="hbctl__subcmd__help__subcmd__export"
                 ;;
-            hbx__subcmd__help,field)
-                cmd="hbx__subcmd__help__subcmd__field"
+            hbctl__subcmd__help,field)
+                cmd="hbctl__subcmd__help__subcmd__field"
                 ;;
-            hbx__subcmd__help,help)
-                cmd="hbx__subcmd__help__subcmd__help"
+            hbctl__subcmd__help,help)
+                cmd="hbctl__subcmd__help__subcmd__help"
                 ;;
-            hbx__subcmd__help,item)
-                cmd="hbx__subcmd__help__subcmd__item"
+            hbctl__subcmd__help,item)
+                cmd="hbctl__subcmd__help__subcmd__item"
                 ;;
-            hbx__subcmd__help,man)
-                cmd="hbx__subcmd__help__subcmd__man"
+            hbctl__subcmd__help,man)
+                cmd="hbctl__subcmd__help__subcmd__man"
                 ;;
-            hbx__subcmd__help,search)
-                cmd="hbx__subcmd__help__subcmd__search"
+            hbctl__subcmd__help,search)
+                cmd="hbctl__subcmd__help__subcmd__search"
                 ;;
-            hbx__subcmd__help,tag)
-                cmd="hbx__subcmd__help__subcmd__tag"
+            hbctl__subcmd__help,tag)
+                cmd="hbctl__subcmd__help__subcmd__tag"
                 ;;
-            hbx__subcmd__help,update)
-                cmd="hbx__subcmd__help__subcmd__update"
+            hbctl__subcmd__help,update)
+                cmd="hbctl__subcmd__help__subcmd__update"
                 ;;
-            hbx__subcmd__help__subcmd__attachment,delete)
-                cmd="hbx__subcmd__help__subcmd__attachment__subcmd__delete"
+            hbctl__subcmd__help__subcmd__attachment,delete)
+                cmd="hbctl__subcmd__help__subcmd__attachment__subcmd__delete"
                 ;;
-            hbx__subcmd__help__subcmd__attachment,download)
-                cmd="hbx__subcmd__help__subcmd__attachment__subcmd__download"
+            hbctl__subcmd__help__subcmd__attachment,download)
+                cmd="hbctl__subcmd__help__subcmd__attachment__subcmd__download"
                 ;;
-            hbx__subcmd__help__subcmd__attachment,list)
-                cmd="hbx__subcmd__help__subcmd__attachment__subcmd__list"
+            hbctl__subcmd__help__subcmd__attachment,list)
+                cmd="hbctl__subcmd__help__subcmd__attachment__subcmd__list"
                 ;;
-            hbx__subcmd__help__subcmd__attachment,upload)
-                cmd="hbx__subcmd__help__subcmd__attachment__subcmd__upload"
+            hbctl__subcmd__help__subcmd__attachment,upload)
+                cmd="hbctl__subcmd__help__subcmd__attachment__subcmd__upload"
                 ;;
-            hbx__subcmd__help__subcmd__auth,login)
-                cmd="hbx__subcmd__help__subcmd__auth__subcmd__login"
+            hbctl__subcmd__help__subcmd__auth,login)
+                cmd="hbctl__subcmd__help__subcmd__auth__subcmd__login"
                 ;;
-            hbx__subcmd__help__subcmd__auth,logout)
-                cmd="hbx__subcmd__help__subcmd__auth__subcmd__logout"
+            hbctl__subcmd__help__subcmd__auth,logout)
+                cmd="hbctl__subcmd__help__subcmd__auth__subcmd__logout"
                 ;;
-            hbx__subcmd__help__subcmd__auth,refresh)
-                cmd="hbx__subcmd__help__subcmd__auth__subcmd__refresh"
+            hbctl__subcmd__help__subcmd__auth,refresh)
+                cmd="hbctl__subcmd__help__subcmd__auth__subcmd__refresh"
                 ;;
-            hbx__subcmd__help__subcmd__auth,status)
-                cmd="hbx__subcmd__help__subcmd__auth__subcmd__status"
+            hbctl__subcmd__help__subcmd__auth,status)
+                cmd="hbctl__subcmd__help__subcmd__auth__subcmd__status"
                 ;;
-            hbx__subcmd__help__subcmd__entity__subcmd__types,list)
-                cmd="hbx__subcmd__help__subcmd__entity__subcmd__types__subcmd__list"
+            hbctl__subcmd__help__subcmd__entity__subcmd__types,list)
+                cmd="hbctl__subcmd__help__subcmd__entity__subcmd__types__subcmd__list"
                 ;;
-            hbx__subcmd__help__subcmd__field,get)
-                cmd="hbx__subcmd__help__subcmd__field__subcmd__get"
+            hbctl__subcmd__help__subcmd__field,get)
+                cmd="hbctl__subcmd__help__subcmd__field__subcmd__get"
                 ;;
-            hbx__subcmd__help__subcmd__field,set)
-                cmd="hbx__subcmd__help__subcmd__field__subcmd__set"
+            hbctl__subcmd__help__subcmd__field,set)
+                cmd="hbctl__subcmd__help__subcmd__field__subcmd__set"
                 ;;
-            hbx__subcmd__help__subcmd__item,create)
-                cmd="hbx__subcmd__help__subcmd__item__subcmd__create"
+            hbctl__subcmd__help__subcmd__item,create)
+                cmd="hbctl__subcmd__help__subcmd__item__subcmd__create"
                 ;;
-            hbx__subcmd__help__subcmd__item,dedup)
-                cmd="hbx__subcmd__help__subcmd__item__subcmd__dedup"
+            hbctl__subcmd__help__subcmd__item,dedup)
+                cmd="hbctl__subcmd__help__subcmd__item__subcmd__dedup"
                 ;;
-            hbx__subcmd__help__subcmd__item,delete)
-                cmd="hbx__subcmd__help__subcmd__item__subcmd__delete"
+            hbctl__subcmd__help__subcmd__item,delete)
+                cmd="hbctl__subcmd__help__subcmd__item__subcmd__delete"
                 ;;
-            hbx__subcmd__help__subcmd__item,get)
-                cmd="hbx__subcmd__help__subcmd__item__subcmd__get"
+            hbctl__subcmd__help__subcmd__item,get)
+                cmd="hbctl__subcmd__help__subcmd__item__subcmd__get"
                 ;;
-            hbx__subcmd__help__subcmd__item,import)
-                cmd="hbx__subcmd__help__subcmd__item__subcmd__import"
+            hbctl__subcmd__help__subcmd__item,import)
+                cmd="hbctl__subcmd__help__subcmd__item__subcmd__import"
                 ;;
-            hbx__subcmd__help__subcmd__item,list)
-                cmd="hbx__subcmd__help__subcmd__item__subcmd__list"
+            hbctl__subcmd__help__subcmd__item,list)
+                cmd="hbctl__subcmd__help__subcmd__item__subcmd__list"
                 ;;
-            hbx__subcmd__help__subcmd__item,update)
-                cmd="hbx__subcmd__help__subcmd__item__subcmd__update"
+            hbctl__subcmd__help__subcmd__item,update)
+                cmd="hbctl__subcmd__help__subcmd__item__subcmd__update"
                 ;;
-            hbx__subcmd__help__subcmd__item,upsert)
-                cmd="hbx__subcmd__help__subcmd__item__subcmd__upsert"
+            hbctl__subcmd__help__subcmd__item,upsert)
+                cmd="hbctl__subcmd__help__subcmd__item__subcmd__upsert"
                 ;;
-            hbx__subcmd__help__subcmd__tag,create)
-                cmd="hbx__subcmd__help__subcmd__tag__subcmd__create"
+            hbctl__subcmd__help__subcmd__tag,create)
+                cmd="hbctl__subcmd__help__subcmd__tag__subcmd__create"
                 ;;
-            hbx__subcmd__help__subcmd__tag,list)
-                cmd="hbx__subcmd__help__subcmd__tag__subcmd__list"
+            hbctl__subcmd__help__subcmd__tag,list)
+                cmd="hbctl__subcmd__help__subcmd__tag__subcmd__list"
                 ;;
-            hbx__subcmd__item,create)
-                cmd="hbx__subcmd__item__subcmd__create"
+            hbctl__subcmd__item,create)
+                cmd="hbctl__subcmd__item__subcmd__create"
                 ;;
-            hbx__subcmd__item,dedup)
-                cmd="hbx__subcmd__item__subcmd__dedup"
+            hbctl__subcmd__item,dedup)
+                cmd="hbctl__subcmd__item__subcmd__dedup"
                 ;;
-            hbx__subcmd__item,delete)
-                cmd="hbx__subcmd__item__subcmd__delete"
+            hbctl__subcmd__item,delete)
+                cmd="hbctl__subcmd__item__subcmd__delete"
                 ;;
-            hbx__subcmd__item,get)
-                cmd="hbx__subcmd__item__subcmd__get"
+            hbctl__subcmd__item,get)
+                cmd="hbctl__subcmd__item__subcmd__get"
                 ;;
-            hbx__subcmd__item,help)
-                cmd="hbx__subcmd__item__subcmd__help"
+            hbctl__subcmd__item,help)
+                cmd="hbctl__subcmd__item__subcmd__help"
                 ;;
-            hbx__subcmd__item,import)
-                cmd="hbx__subcmd__item__subcmd__import"
+            hbctl__subcmd__item,import)
+                cmd="hbctl__subcmd__item__subcmd__import"
                 ;;
-            hbx__subcmd__item,list)
-                cmd="hbx__subcmd__item__subcmd__list"
+            hbctl__subcmd__item,list)
+                cmd="hbctl__subcmd__item__subcmd__list"
                 ;;
-            hbx__subcmd__item,update)
-                cmd="hbx__subcmd__item__subcmd__update"
+            hbctl__subcmd__item,update)
+                cmd="hbctl__subcmd__item__subcmd__update"
                 ;;
-            hbx__subcmd__item,upsert)
-                cmd="hbx__subcmd__item__subcmd__upsert"
+            hbctl__subcmd__item,upsert)
+                cmd="hbctl__subcmd__item__subcmd__upsert"
                 ;;
-            hbx__subcmd__item__subcmd__help,create)
-                cmd="hbx__subcmd__item__subcmd__help__subcmd__create"
+            hbctl__subcmd__item__subcmd__help,create)
+                cmd="hbctl__subcmd__item__subcmd__help__subcmd__create"
                 ;;
-            hbx__subcmd__item__subcmd__help,dedup)
-                cmd="hbx__subcmd__item__subcmd__help__subcmd__dedup"
+            hbctl__subcmd__item__subcmd__help,dedup)
+                cmd="hbctl__subcmd__item__subcmd__help__subcmd__dedup"
                 ;;
-            hbx__subcmd__item__subcmd__help,delete)
-                cmd="hbx__subcmd__item__subcmd__help__subcmd__delete"
+            hbctl__subcmd__item__subcmd__help,delete)
+                cmd="hbctl__subcmd__item__subcmd__help__subcmd__delete"
                 ;;
-            hbx__subcmd__item__subcmd__help,get)
-                cmd="hbx__subcmd__item__subcmd__help__subcmd__get"
+            hbctl__subcmd__item__subcmd__help,get)
+                cmd="hbctl__subcmd__item__subcmd__help__subcmd__get"
                 ;;
-            hbx__subcmd__item__subcmd__help,help)
-                cmd="hbx__subcmd__item__subcmd__help__subcmd__help"
+            hbctl__subcmd__item__subcmd__help,help)
+                cmd="hbctl__subcmd__item__subcmd__help__subcmd__help"
                 ;;
-            hbx__subcmd__item__subcmd__help,import)
-                cmd="hbx__subcmd__item__subcmd__help__subcmd__import"
+            hbctl__subcmd__item__subcmd__help,import)
+                cmd="hbctl__subcmd__item__subcmd__help__subcmd__import"
                 ;;
-            hbx__subcmd__item__subcmd__help,list)
-                cmd="hbx__subcmd__item__subcmd__help__subcmd__list"
+            hbctl__subcmd__item__subcmd__help,list)
+                cmd="hbctl__subcmd__item__subcmd__help__subcmd__list"
                 ;;
-            hbx__subcmd__item__subcmd__help,update)
-                cmd="hbx__subcmd__item__subcmd__help__subcmd__update"
+            hbctl__subcmd__item__subcmd__help,update)
+                cmd="hbctl__subcmd__item__subcmd__help__subcmd__update"
                 ;;
-            hbx__subcmd__item__subcmd__help,upsert)
-                cmd="hbx__subcmd__item__subcmd__help__subcmd__upsert"
+            hbctl__subcmd__item__subcmd__help,upsert)
+                cmd="hbctl__subcmd__item__subcmd__help__subcmd__upsert"
                 ;;
-            hbx__subcmd__tag,create)
-                cmd="hbx__subcmd__tag__subcmd__create"
+            hbctl__subcmd__tag,create)
+                cmd="hbctl__subcmd__tag__subcmd__create"
                 ;;
-            hbx__subcmd__tag,help)
-                cmd="hbx__subcmd__tag__subcmd__help"
+            hbctl__subcmd__tag,help)
+                cmd="hbctl__subcmd__tag__subcmd__help"
                 ;;
-            hbx__subcmd__tag,list)
-                cmd="hbx__subcmd__tag__subcmd__list"
+            hbctl__subcmd__tag,list)
+                cmd="hbctl__subcmd__tag__subcmd__list"
                 ;;
-            hbx__subcmd__tag__subcmd__help,create)
-                cmd="hbx__subcmd__tag__subcmd__help__subcmd__create"
+            hbctl__subcmd__tag__subcmd__help,create)
+                cmd="hbctl__subcmd__tag__subcmd__help__subcmd__create"
                 ;;
-            hbx__subcmd__tag__subcmd__help,help)
-                cmd="hbx__subcmd__tag__subcmd__help__subcmd__help"
+            hbctl__subcmd__tag__subcmd__help,help)
+                cmd="hbctl__subcmd__tag__subcmd__help__subcmd__help"
                 ;;
-            hbx__subcmd__tag__subcmd__help,list)
-                cmd="hbx__subcmd__tag__subcmd__help__subcmd__list"
+            hbctl__subcmd__tag__subcmd__help,list)
+                cmd="hbctl__subcmd__tag__subcmd__help__subcmd__list"
                 ;;
             *)
                 ;;
@@ -325,7 +325,7 @@ _hbx() {
     done
 
     case "${cmd}" in
-        hbx)
+        hbctl)
             opts="-q -C -h -V --url --api-key --output --json --select --dry-run --quiet --config --help --version auth item attachment search field tag entity-types entity-type export completions man update self-update help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 1 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -363,7 +363,7 @@ _hbx() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
-        hbx__subcmd__attachment)
+        hbctl__subcmd__attachment)
             opts="-q -C -h --url --api-key --output --json --select --dry-run --quiet --config --help upload list download delete help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 2 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -401,7 +401,7 @@ _hbx() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
-        hbx__subcmd__attachment__subcmd__delete)
+        hbctl__subcmd__attachment__subcmd__delete)
             opts="-q -C -h --url --api-key --output --json --select --dry-run --quiet --config --help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -439,7 +439,7 @@ _hbx() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
-        hbx__subcmd__attachment__subcmd__download)
+        hbctl__subcmd__attachment__subcmd__download)
             opts="-q -C -h --all --mime --ext --out --overwrite --url --api-key --output --json --select --dry-run --quiet --config --help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -489,7 +489,7 @@ _hbx() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
-        hbx__subcmd__attachment__subcmd__help)
+        hbctl__subcmd__attachment__subcmd__help)
             opts="upload list download delete help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -503,7 +503,7 @@ _hbx() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
-        hbx__subcmd__attachment__subcmd__help__subcmd__delete)
+        hbctl__subcmd__attachment__subcmd__help__subcmd__delete)
             opts=""
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -517,7 +517,7 @@ _hbx() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
-        hbx__subcmd__attachment__subcmd__help__subcmd__download)
+        hbctl__subcmd__attachment__subcmd__help__subcmd__download)
             opts=""
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -531,7 +531,7 @@ _hbx() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
-        hbx__subcmd__attachment__subcmd__help__subcmd__help)
+        hbctl__subcmd__attachment__subcmd__help__subcmd__help)
             opts=""
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -545,7 +545,7 @@ _hbx() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
-        hbx__subcmd__attachment__subcmd__help__subcmd__list)
+        hbctl__subcmd__attachment__subcmd__help__subcmd__list)
             opts=""
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -559,7 +559,7 @@ _hbx() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
-        hbx__subcmd__attachment__subcmd__help__subcmd__upload)
+        hbctl__subcmd__attachment__subcmd__help__subcmd__upload)
             opts=""
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -573,7 +573,7 @@ _hbx() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
-        hbx__subcmd__attachment__subcmd__list)
+        hbctl__subcmd__attachment__subcmd__list)
             opts="-q -C -h --url --api-key --output --json --select --dry-run --quiet --config --help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -611,7 +611,7 @@ _hbx() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
-        hbx__subcmd__attachment__subcmd__upload)
+        hbctl__subcmd__attachment__subcmd__upload)
             opts="-q -C -h --skip-existing --overwrite --force --url --api-key --output --json --select --dry-run --quiet --config --help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -649,7 +649,7 @@ _hbx() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
-        hbx__subcmd__auth)
+        hbctl__subcmd__auth)
             opts="-q -C -h --url --api-key --output --json --select --dry-run --quiet --config --help login status logout refresh help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 2 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -687,7 +687,7 @@ _hbx() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
-        hbx__subcmd__auth__subcmd__help)
+        hbctl__subcmd__auth__subcmd__help)
             opts="login status logout refresh help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -701,7 +701,7 @@ _hbx() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
-        hbx__subcmd__auth__subcmd__help__subcmd__help)
+        hbctl__subcmd__auth__subcmd__help__subcmd__help)
             opts=""
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -715,7 +715,7 @@ _hbx() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
-        hbx__subcmd__auth__subcmd__help__subcmd__login)
+        hbctl__subcmd__auth__subcmd__help__subcmd__login)
             opts=""
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -729,7 +729,7 @@ _hbx() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
-        hbx__subcmd__auth__subcmd__help__subcmd__logout)
+        hbctl__subcmd__auth__subcmd__help__subcmd__logout)
             opts=""
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -743,7 +743,7 @@ _hbx() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
-        hbx__subcmd__auth__subcmd__help__subcmd__refresh)
+        hbctl__subcmd__auth__subcmd__help__subcmd__refresh)
             opts=""
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -757,7 +757,7 @@ _hbx() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
-        hbx__subcmd__auth__subcmd__help__subcmd__status)
+        hbctl__subcmd__auth__subcmd__help__subcmd__status)
             opts=""
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -771,7 +771,7 @@ _hbx() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
-        hbx__subcmd__auth__subcmd__login)
+        hbctl__subcmd__auth__subcmd__login)
             opts="-u -q -C -h --with-token --username --password-stdin --insecure-storage --url --api-key --output --json --select --dry-run --quiet --config --help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -817,7 +817,7 @@ _hbx() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
-        hbx__subcmd__auth__subcmd__logout)
+        hbctl__subcmd__auth__subcmd__logout)
             opts="-q -C -h --insecure-storage --url --api-key --output --json --select --dry-run --quiet --config --help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -855,7 +855,7 @@ _hbx() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
-        hbx__subcmd__auth__subcmd__refresh)
+        hbctl__subcmd__auth__subcmd__refresh)
             opts="-q -C -h --insecure-storage --url --api-key --output --json --select --dry-run --quiet --config --help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -893,7 +893,7 @@ _hbx() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
-        hbx__subcmd__auth__subcmd__status)
+        hbctl__subcmd__auth__subcmd__status)
             opts="-q -C -h --url --api-key --output --json --select --dry-run --quiet --config --help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -931,7 +931,7 @@ _hbx() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
-        hbx__subcmd__completions)
+        hbctl__subcmd__completions)
             opts="-q -C -h --url --api-key --output --json --select --dry-run --quiet --config --help bash elvish fish powershell zsh"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 2 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -969,7 +969,7 @@ _hbx() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
-        hbx__subcmd__entity__subcmd__types)
+        hbctl__subcmd__entity__subcmd__types)
             opts="-q -C -h --url --api-key --output --json --select --dry-run --quiet --config --help list help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 2 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -1007,7 +1007,7 @@ _hbx() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
-        hbx__subcmd__entity__subcmd__types__subcmd__help)
+        hbctl__subcmd__entity__subcmd__types__subcmd__help)
             opts="list help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -1021,7 +1021,7 @@ _hbx() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
-        hbx__subcmd__entity__subcmd__types__subcmd__help__subcmd__help)
+        hbctl__subcmd__entity__subcmd__types__subcmd__help__subcmd__help)
             opts=""
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -1035,7 +1035,7 @@ _hbx() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
-        hbx__subcmd__entity__subcmd__types__subcmd__help__subcmd__list)
+        hbctl__subcmd__entity__subcmd__types__subcmd__help__subcmd__list)
             opts=""
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -1049,7 +1049,7 @@ _hbx() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
-        hbx__subcmd__entity__subcmd__types__subcmd__list)
+        hbctl__subcmd__entity__subcmd__types__subcmd__list)
             opts="-q -C -h --url --api-key --output --json --select --dry-run --quiet --config --help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -1087,7 +1087,7 @@ _hbx() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
-        hbx__subcmd__export)
+        hbctl__subcmd__export)
             opts="-q -C -h --tag --has-field --field --sort --format --url --api-key --output --json --select --dry-run --quiet --config --help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 2 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -1145,7 +1145,7 @@ _hbx() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
-        hbx__subcmd__field)
+        hbctl__subcmd__field)
             opts="-q -C -h --url --api-key --output --json --select --dry-run --quiet --config --help get set help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 2 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -1183,7 +1183,7 @@ _hbx() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
-        hbx__subcmd__field__subcmd__get)
+        hbctl__subcmd__field__subcmd__get)
             opts="-q -C -h --url --api-key --output --json --select --dry-run --quiet --config --help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -1221,7 +1221,7 @@ _hbx() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
-        hbx__subcmd__field__subcmd__help)
+        hbctl__subcmd__field__subcmd__help)
             opts="get set help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -1235,7 +1235,7 @@ _hbx() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
-        hbx__subcmd__field__subcmd__help__subcmd__get)
+        hbctl__subcmd__field__subcmd__help__subcmd__get)
             opts=""
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -1249,7 +1249,7 @@ _hbx() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
-        hbx__subcmd__field__subcmd__help__subcmd__help)
+        hbctl__subcmd__field__subcmd__help__subcmd__help)
             opts=""
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -1263,7 +1263,7 @@ _hbx() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
-        hbx__subcmd__field__subcmd__help__subcmd__set)
+        hbctl__subcmd__field__subcmd__help__subcmd__set)
             opts=""
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -1277,7 +1277,7 @@ _hbx() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
-        hbx__subcmd__field__subcmd__set)
+        hbctl__subcmd__field__subcmd__set)
             opts="-q -C -h --type --url --api-key --output --json --select --dry-run --quiet --config --help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -1319,7 +1319,7 @@ _hbx() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
-        hbx__subcmd__help)
+        hbctl__subcmd__help)
             opts="auth item attachment search field tag entity-types export completions man update help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 2 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -1333,7 +1333,7 @@ _hbx() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
-        hbx__subcmd__help__subcmd__attachment)
+        hbctl__subcmd__help__subcmd__attachment)
             opts="upload list download delete"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -1347,7 +1347,7 @@ _hbx() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
-        hbx__subcmd__help__subcmd__attachment__subcmd__delete)
+        hbctl__subcmd__help__subcmd__attachment__subcmd__delete)
             opts=""
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -1361,7 +1361,7 @@ _hbx() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
-        hbx__subcmd__help__subcmd__attachment__subcmd__download)
+        hbctl__subcmd__help__subcmd__attachment__subcmd__download)
             opts=""
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -1375,7 +1375,7 @@ _hbx() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
-        hbx__subcmd__help__subcmd__attachment__subcmd__list)
+        hbctl__subcmd__help__subcmd__attachment__subcmd__list)
             opts=""
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -1389,7 +1389,7 @@ _hbx() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
-        hbx__subcmd__help__subcmd__attachment__subcmd__upload)
+        hbctl__subcmd__help__subcmd__attachment__subcmd__upload)
             opts=""
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -1403,7 +1403,7 @@ _hbx() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
-        hbx__subcmd__help__subcmd__auth)
+        hbctl__subcmd__help__subcmd__auth)
             opts="login status logout refresh"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -1417,7 +1417,7 @@ _hbx() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
-        hbx__subcmd__help__subcmd__auth__subcmd__login)
+        hbctl__subcmd__help__subcmd__auth__subcmd__login)
             opts=""
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -1431,7 +1431,7 @@ _hbx() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
-        hbx__subcmd__help__subcmd__auth__subcmd__logout)
+        hbctl__subcmd__help__subcmd__auth__subcmd__logout)
             opts=""
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -1445,7 +1445,7 @@ _hbx() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
-        hbx__subcmd__help__subcmd__auth__subcmd__refresh)
+        hbctl__subcmd__help__subcmd__auth__subcmd__refresh)
             opts=""
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -1459,7 +1459,7 @@ _hbx() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
-        hbx__subcmd__help__subcmd__auth__subcmd__status)
+        hbctl__subcmd__help__subcmd__auth__subcmd__status)
             opts=""
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -1473,7 +1473,7 @@ _hbx() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
-        hbx__subcmd__help__subcmd__completions)
+        hbctl__subcmd__help__subcmd__completions)
             opts=""
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -1487,7 +1487,7 @@ _hbx() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
-        hbx__subcmd__help__subcmd__entity__subcmd__types)
+        hbctl__subcmd__help__subcmd__entity__subcmd__types)
             opts="list"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -1501,7 +1501,7 @@ _hbx() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
-        hbx__subcmd__help__subcmd__entity__subcmd__types__subcmd__list)
+        hbctl__subcmd__help__subcmd__entity__subcmd__types__subcmd__list)
             opts=""
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -1515,7 +1515,7 @@ _hbx() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
-        hbx__subcmd__help__subcmd__export)
+        hbctl__subcmd__help__subcmd__export)
             opts=""
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -1529,7 +1529,7 @@ _hbx() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
-        hbx__subcmd__help__subcmd__field)
+        hbctl__subcmd__help__subcmd__field)
             opts="get set"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -1543,7 +1543,7 @@ _hbx() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
-        hbx__subcmd__help__subcmd__field__subcmd__get)
+        hbctl__subcmd__help__subcmd__field__subcmd__get)
             opts=""
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -1557,7 +1557,7 @@ _hbx() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
-        hbx__subcmd__help__subcmd__field__subcmd__set)
+        hbctl__subcmd__help__subcmd__field__subcmd__set)
             opts=""
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -1571,7 +1571,7 @@ _hbx() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
-        hbx__subcmd__help__subcmd__help)
+        hbctl__subcmd__help__subcmd__help)
             opts=""
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -1585,7 +1585,7 @@ _hbx() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
-        hbx__subcmd__help__subcmd__item)
+        hbctl__subcmd__help__subcmd__item)
             opts="list get create update upsert delete import dedup"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -1599,7 +1599,7 @@ _hbx() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
-        hbx__subcmd__help__subcmd__item__subcmd__create)
+        hbctl__subcmd__help__subcmd__item__subcmd__create)
             opts=""
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -1613,7 +1613,7 @@ _hbx() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
-        hbx__subcmd__help__subcmd__item__subcmd__dedup)
+        hbctl__subcmd__help__subcmd__item__subcmd__dedup)
             opts=""
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -1627,7 +1627,7 @@ _hbx() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
-        hbx__subcmd__help__subcmd__item__subcmd__delete)
+        hbctl__subcmd__help__subcmd__item__subcmd__delete)
             opts=""
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -1641,7 +1641,7 @@ _hbx() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
-        hbx__subcmd__help__subcmd__item__subcmd__get)
+        hbctl__subcmd__help__subcmd__item__subcmd__get)
             opts=""
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -1655,7 +1655,7 @@ _hbx() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
-        hbx__subcmd__help__subcmd__item__subcmd__import)
+        hbctl__subcmd__help__subcmd__item__subcmd__import)
             opts=""
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -1669,7 +1669,7 @@ _hbx() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
-        hbx__subcmd__help__subcmd__item__subcmd__list)
+        hbctl__subcmd__help__subcmd__item__subcmd__list)
             opts=""
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -1683,7 +1683,7 @@ _hbx() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
-        hbx__subcmd__help__subcmd__item__subcmd__update)
+        hbctl__subcmd__help__subcmd__item__subcmd__update)
             opts=""
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -1697,7 +1697,7 @@ _hbx() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
-        hbx__subcmd__help__subcmd__item__subcmd__upsert)
+        hbctl__subcmd__help__subcmd__item__subcmd__upsert)
             opts=""
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -1711,7 +1711,7 @@ _hbx() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
-        hbx__subcmd__help__subcmd__man)
+        hbctl__subcmd__help__subcmd__man)
             opts=""
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -1725,7 +1725,7 @@ _hbx() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
-        hbx__subcmd__help__subcmd__search)
+        hbctl__subcmd__help__subcmd__search)
             opts=""
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -1739,7 +1739,7 @@ _hbx() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
-        hbx__subcmd__help__subcmd__tag)
+        hbctl__subcmd__help__subcmd__tag)
             opts="list create"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -1753,7 +1753,7 @@ _hbx() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
-        hbx__subcmd__help__subcmd__tag__subcmd__create)
+        hbctl__subcmd__help__subcmd__tag__subcmd__create)
             opts=""
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -1767,7 +1767,7 @@ _hbx() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
-        hbx__subcmd__help__subcmd__tag__subcmd__list)
+        hbctl__subcmd__help__subcmd__tag__subcmd__list)
             opts=""
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -1781,7 +1781,7 @@ _hbx() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
-        hbx__subcmd__help__subcmd__update)
+        hbctl__subcmd__help__subcmd__update)
             opts=""
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -1795,7 +1795,7 @@ _hbx() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
-        hbx__subcmd__item)
+        hbctl__subcmd__item)
             opts="-q -C -h --url --api-key --output --json --select --dry-run --quiet --config --help list get create update upsert delete import dedup help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 2 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -1833,7 +1833,7 @@ _hbx() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
-        hbx__subcmd__item__subcmd__create)
+        hbctl__subcmd__item__subcmd__create)
             opts="-q -C -h --name --description --type --tag --manufacturer --model --notes --quantity --purchase-price --purchase-date --purchase-from --field --field-type --from-json --url --api-key --output --json --select --dry-run --quiet --config --help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -1927,7 +1927,7 @@ _hbx() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
-        hbx__subcmd__item__subcmd__dedup)
+        hbctl__subcmd__item__subcmd__dedup)
             opts="-q -C -h --threshold --delete --merge --url --api-key --output --json --select --dry-run --quiet --config --help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -1969,7 +1969,7 @@ _hbx() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
-        hbx__subcmd__item__subcmd__delete)
+        hbctl__subcmd__item__subcmd__delete)
             opts="-q -C -h --force --url --api-key --output --json --select --dry-run --quiet --config --help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -2007,7 +2007,7 @@ _hbx() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
-        hbx__subcmd__item__subcmd__get)
+        hbctl__subcmd__item__subcmd__get)
             opts="-q -C -h --url --api-key --output --json --select --dry-run --quiet --config --help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -2045,7 +2045,7 @@ _hbx() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
-        hbx__subcmd__item__subcmd__help)
+        hbctl__subcmd__item__subcmd__help)
             opts="list get create update upsert delete import dedup help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -2059,7 +2059,7 @@ _hbx() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
-        hbx__subcmd__item__subcmd__help__subcmd__create)
+        hbctl__subcmd__item__subcmd__help__subcmd__create)
             opts=""
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -2073,7 +2073,7 @@ _hbx() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
-        hbx__subcmd__item__subcmd__help__subcmd__dedup)
+        hbctl__subcmd__item__subcmd__help__subcmd__dedup)
             opts=""
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -2087,7 +2087,7 @@ _hbx() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
-        hbx__subcmd__item__subcmd__help__subcmd__delete)
+        hbctl__subcmd__item__subcmd__help__subcmd__delete)
             opts=""
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -2101,7 +2101,7 @@ _hbx() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
-        hbx__subcmd__item__subcmd__help__subcmd__get)
+        hbctl__subcmd__item__subcmd__help__subcmd__get)
             opts=""
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -2115,7 +2115,7 @@ _hbx() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
-        hbx__subcmd__item__subcmd__help__subcmd__help)
+        hbctl__subcmd__item__subcmd__help__subcmd__help)
             opts=""
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -2129,7 +2129,7 @@ _hbx() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
-        hbx__subcmd__item__subcmd__help__subcmd__import)
+        hbctl__subcmd__item__subcmd__help__subcmd__import)
             opts=""
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -2143,7 +2143,7 @@ _hbx() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
-        hbx__subcmd__item__subcmd__help__subcmd__list)
+        hbctl__subcmd__item__subcmd__help__subcmd__list)
             opts=""
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -2157,7 +2157,7 @@ _hbx() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
-        hbx__subcmd__item__subcmd__help__subcmd__update)
+        hbctl__subcmd__item__subcmd__help__subcmd__update)
             opts=""
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -2171,7 +2171,7 @@ _hbx() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
-        hbx__subcmd__item__subcmd__help__subcmd__upsert)
+        hbctl__subcmd__item__subcmd__help__subcmd__upsert)
             opts=""
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -2185,7 +2185,7 @@ _hbx() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
-        hbx__subcmd__item__subcmd__import)
+        hbctl__subcmd__item__subcmd__import)
             opts="-q -C -h --format --skip-existing --update-existing --url --api-key --output --json --select --dry-run --quiet --config --help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -2227,7 +2227,7 @@ _hbx() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
-        hbx__subcmd__item__subcmd__list)
+        hbctl__subcmd__item__subcmd__list)
             opts="-q -C -h --tag --type --has-field --page-size --all --url --api-key --output --json --select --dry-run --quiet --config --help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -2281,7 +2281,7 @@ _hbx() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
-        hbx__subcmd__item__subcmd__update)
+        hbctl__subcmd__item__subcmd__update)
             opts="-q -C -h --name --description --type --tag --manufacturer --model --quantity --purchase-price --purchase-date --purchase-from --notes --field --field-type --from-json --url --api-key --output --json --select --dry-run --quiet --config --help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -2375,7 +2375,7 @@ _hbx() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
-        hbx__subcmd__item__subcmd__upsert)
+        hbctl__subcmd__item__subcmd__upsert)
             opts="-q -C -h --name --description --type --tag --manufacturer --model --notes --quantity --purchase-price --purchase-date --purchase-from --field --field-type --url --api-key --output --json --select --dry-run --quiet --config --help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -2465,7 +2465,7 @@ _hbx() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
-        hbx__subcmd__man)
+        hbctl__subcmd__man)
             opts="-q -C -h --url --api-key --output --json --select --dry-run --quiet --config --help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 2 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -2503,7 +2503,7 @@ _hbx() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
-        hbx__subcmd__search)
+        hbctl__subcmd__search)
             opts="-q -C -h --tag --model --serial --manufacturer --url --api-key --output --json --select --dry-run --quiet --config --help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 2 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -2557,7 +2557,7 @@ _hbx() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
-        hbx__subcmd__tag)
+        hbctl__subcmd__tag)
             opts="-q -C -h --url --api-key --output --json --select --dry-run --quiet --config --help list create help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 2 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -2595,7 +2595,7 @@ _hbx() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
-        hbx__subcmd__tag__subcmd__create)
+        hbctl__subcmd__tag__subcmd__create)
             opts="-q -C -h --url --api-key --output --json --select --dry-run --quiet --config --help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -2633,7 +2633,7 @@ _hbx() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
-        hbx__subcmd__tag__subcmd__help)
+        hbctl__subcmd__tag__subcmd__help)
             opts="list create help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -2647,7 +2647,7 @@ _hbx() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
-        hbx__subcmd__tag__subcmd__help__subcmd__create)
+        hbctl__subcmd__tag__subcmd__help__subcmd__create)
             opts=""
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -2661,7 +2661,7 @@ _hbx() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
-        hbx__subcmd__tag__subcmd__help__subcmd__help)
+        hbctl__subcmd__tag__subcmd__help__subcmd__help)
             opts=""
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -2675,7 +2675,7 @@ _hbx() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
-        hbx__subcmd__tag__subcmd__help__subcmd__list)
+        hbctl__subcmd__tag__subcmd__help__subcmd__list)
             opts=""
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -2689,7 +2689,7 @@ _hbx() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
-        hbx__subcmd__tag__subcmd__list)
+        hbctl__subcmd__tag__subcmd__list)
             opts="-q -C -h --url --api-key --output --json --select --dry-run --quiet --config --help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -2727,7 +2727,7 @@ _hbx() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
-        hbx__subcmd__update)
+        hbctl__subcmd__update)
             opts="-y -q -C -h --check --yes --version --url --api-key --output --json --select --dry-run --quiet --config --help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 2 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -2773,7 +2773,7 @@ _hbx() {
 }
 
 if [[ "${BASH_VERSINFO[0]}" -eq 4 && "${BASH_VERSINFO[1]}" -ge 4 || "${BASH_VERSINFO[0]}" -gt 4 ]]; then
-    complete -F _hbx -o nosort -o bashdefault -o default hbx
+    complete -F _hbctl -o nosort -o bashdefault -o default hbctl
 else
-    complete -F _hbx -o bashdefault -o default hbx
+    complete -F _hbctl -o bashdefault -o default hbctl
 fi

@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 use url::Url;
 
 use crate::auth_store::{AutoSecretStore, CredentialBackend, SecretStore};
-use crate::error::{HbxError, Result};
+use crate::error::{HbctlError, Result};
 
 pub const DEFAULT_TIMEOUT_SECS: u64 = 30;
 pub const DEFAULT_DOWNLOAD_TIMEOUT_SECS: u64 = 120;
@@ -25,14 +25,14 @@ pub enum OutputFormat {
 }
 
 impl std::str::FromStr for OutputFormat {
-    type Err = HbxError;
+    type Err = HbctlError;
 
     fn from_str(s: &str) -> Result<Self> {
         match s.trim().to_ascii_lowercase().as_str() {
             "table" => Ok(Self::Table),
             "json" => Ok(Self::Json),
             "plain" => Ok(Self::Plain),
-            other => Err(HbxError::Config(format!(
+            other => Err(HbctlError::Config(format!(
                 "invalid output format '{other}' (expected table, json, or plain)"
             ))),
         }
@@ -70,7 +70,7 @@ impl std::fmt::Display for CredentialSource {
     }
 }
 
-/// On-disk TOML configuration representation (`.hbx.toml` or `~/.config/hbx/config.toml`).
+/// On-disk TOML configuration representation (`.hbctl.toml` or `~/.config/hbctl/config.toml`).
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ConfigFile {
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -94,10 +94,10 @@ pub struct ConfigFile {
 impl ConfigFile {
     pub fn load_from_path(path: &Path) -> Result<Self> {
         let content = fs::read_to_string(path).map_err(|e| {
-            HbxError::Config(format!("failed to read config '{}': {e}", path.display()))
+            HbctlError::Config(format!("failed to read config '{}': {e}", path.display()))
         })?;
         toml::from_str(&content).map_err(|e| {
-            HbxError::Config(format!("failed to parse TOML '{}': {e}", path.display()))
+            HbctlError::Config(format!("failed to parse TOML '{}': {e}", path.display()))
         })
     }
 
@@ -106,7 +106,7 @@ impl ConfigFile {
             fs::create_dir_all(parent)?;
         }
         let text = toml::to_string_pretty(self)
-            .map_err(|e| HbxError::Config(format!("failed to serialize TOML: {e}")))?;
+            .map_err(|e| HbctlError::Config(format!("failed to serialize TOML: {e}")))?;
         fs::write(path, text)?;
         Ok(())
     }
@@ -123,7 +123,7 @@ pub struct CliConfigOverrides {
 }
 
 /// Fully resolved runtime configuration after layering:
-/// CLI flags > env / `.env` > `.hbx.toml` > `~/.config/hbx/config.toml` & stored auth > defaults.
+/// CLI flags > env / `.env` > `.hbctl.toml` > `~/.config/hbctl/config.toml` & stored auth > defaults.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AppConfig {
     pub base_url: Option<String>,
@@ -139,8 +139,8 @@ pub struct AppConfig {
 }
 
 impl AppConfig {
-    /// Load configuration using the current process environment, `.env`, cwd `.hbx.toml`,
-    /// `~/.config/hbx/config.toml`, and OS keyring / `0600` credentials file fallback.
+    /// Load configuration using the current process environment, `.env`, cwd `.hbctl.toml`,
+    /// `~/.config/hbctl/config.toml`, and OS keyring / `0600` credentials file fallback.
     pub fn load(overrides: &CliConfigOverrides) -> Result<Self> {
         // Auto-load local .env without overriding already-set environment variables.
         let _ = dotenvy::dotenv();
@@ -191,7 +191,7 @@ impl AppConfig {
                 &mut api_key_source,
             );
         } else {
-            // Tier 4: User global ~/.config/hbx/config.toml
+            // Tier 4: User global ~/.config/hbctl/config.toml
             if let Some(user_path) = user_config_path {
                 if user_path.is_file() {
                     let user_cfg = ConfigFile::load_from_path(user_path)?;
@@ -205,8 +205,8 @@ impl AppConfig {
                 }
             }
 
-            // Tier 3: Project-local .hbx.toml
-            let local_path = cwd.join(".hbx.toml");
+            // Tier 3: Project-local .hbctl.toml
+            let local_path = cwd.join(".hbctl.toml");
             if local_path.is_file() {
                 let local_cfg = ConfigFile::load_from_path(&local_path)?;
                 apply_config_layer(
@@ -220,7 +220,7 @@ impl AppConfig {
         }
 
         // Tier 2: Environment variables (and .env already loaded into env)
-        if let Some(env_url) = env_non_empty(env_vars, "HBX_URL")
+        if let Some(env_url) = env_non_empty(env_vars, "HBCTL_URL")
             .or_else(|| env_non_empty(env_vars, "HOMEBOX_URL"))
             .or_else(|| env_non_empty(env_vars, "HOMEBOX_IP").map(|ip| expand_homebox_ip(&ip)))
         {
@@ -228,14 +228,14 @@ impl AppConfig {
             url_source = Some(CredentialSource::Env);
         }
 
-        if let Some(env_key) = env_non_empty(env_vars, "HBX_API_KEY")
+        if let Some(env_key) = env_non_empty(env_vars, "HBCTL_API_KEY")
             .or_else(|| env_non_empty(env_vars, "HOMEBOX_API_KEY"))
         {
             merged.api_key = Some(env_key);
             api_key_source = Some(CredentialSource::Env);
         }
 
-        if let Some(env_output) = env_non_empty(env_vars, "HBX_OUTPUT") {
+        if let Some(env_output) = env_non_empty(env_vars, "HBCTL_OUTPUT") {
             merged.output = Some(env_output.parse()?);
         }
 
@@ -260,8 +260,8 @@ impl AppConfig {
             None => None,
         };
 
-        // Fallback to stored `hbx auth` credentials (OS keyring or 0600 file store)
-        // when no higher-precedence API key (CLI / env / .hbx.toml / config.toml) is set.
+        // Fallback to stored `hbctl auth` credentials (OS keyring or 0600 file store)
+        // when no higher-precedence API key (CLI / env / .hbctl.toml / config.toml) is set.
         if merged.api_key.is_none() {
             if let (Some(url), Some(store)) = (base_url.as_deref(), secret_store) {
                 if let Ok(Some((token, backend))) = store.get_token(url) {
@@ -291,11 +291,11 @@ impl AppConfig {
     }
 
     pub fn require_base_url(&self) -> Result<&str> {
-        self.base_url.as_deref().ok_or(HbxError::MissingUrl)
+        self.base_url.as_deref().ok_or(HbctlError::MissingUrl)
     }
 
     pub fn require_api_key(&self) -> Result<&str> {
-        self.api_key.as_deref().ok_or(HbxError::MissingApiKey)
+        self.api_key.as_deref().ok_or(HbctlError::MissingApiKey)
     }
 }
 
@@ -346,18 +346,18 @@ fn env_non_empty(env_vars: &HashMap<String, String>, key: &str) -> Option<String
         .map(ToOwned::to_owned)
 }
 
-/// Default path for user-global config: `~/.config/hbx/config.toml` (or XDG equivalent).
+/// Default path for user-global config: `~/.config/hbctl/config.toml` (or XDG equivalent).
 pub fn default_user_config_path() -> Option<PathBuf> {
     if let Ok(xdg) = std::env::var("XDG_CONFIG_HOME") {
         let trimmed = xdg.trim();
         if !trimmed.is_empty() {
-            return Some(PathBuf::from(trimmed).join("hbx").join("config.toml"));
+            return Some(PathBuf::from(trimmed).join("hbctl").join("config.toml"));
         }
     }
     BaseDirs::new().map(|dirs| {
         dirs.home_dir()
             .join(".config")
-            .join("hbx")
+            .join("hbctl")
             .join("config.toml")
     })
 }
@@ -379,7 +379,7 @@ pub fn expand_homebox_ip(ip: &str) -> String {
 pub fn normalize_base_url(raw: &str) -> Result<String> {
     let trimmed = raw.trim();
     if trimmed.is_empty() {
-        return Err(HbxError::MissingUrl);
+        return Err(HbctlError::MissingUrl);
     }
 
     let with_scheme = if trimmed.starts_with("http://") || trimmed.starts_with("https://") {
@@ -388,13 +388,13 @@ pub fn normalize_base_url(raw: &str) -> Result<String> {
         format!("http://{trimmed}")
     };
 
-    let parsed = Url::parse(&with_scheme).map_err(|e| HbxError::InvalidUrl {
+    let parsed = Url::parse(&with_scheme).map_err(|e| HbctlError::InvalidUrl {
         url: trimmed.to_string(),
         reason: e.to_string(),
     })?;
 
     if parsed.host_str().is_none() {
-        return Err(HbxError::InvalidUrl {
+        return Err(HbctlError::InvalidUrl {
             url: trimmed.to_string(),
             reason: "missing host".to_string(),
         });
@@ -525,7 +525,7 @@ download_timeout_secs = 240
         let local_dir = dir.path().join("project");
         fs::create_dir_all(&local_dir).unwrap();
         fs::write(
-            local_dir.join(".hbx.toml"),
+            local_dir.join(".hbctl.toml"),
             r#"
 url = "http://local.local:7745"
 api_key = "hb_local"
@@ -553,7 +553,7 @@ api_key = "hb_local"
         assert_eq!(cfg.timeout_secs, 45);
         assert_eq!(cfg.download_timeout_secs, 240);
 
-        // 2. Project-local .hbx.toml overrides user config
+        // 2. Project-local .hbctl.toml overrides user config
         let cfg = AppConfig::resolve(
             &CliConfigOverrides::default(),
             &HashMap::new(),
@@ -569,7 +569,7 @@ api_key = "hb_local"
         assert_eq!(cfg.api_key_source, Some(CredentialSource::LocalConfig));
         assert_eq!(cfg.output, OutputFormat::Plain);
 
-        // 3. Env HOMEBOX_IP < HOMEBOX_URL < HBX_URL
+        // 3. Env HOMEBOX_IP < HOMEBOX_URL < HBCTL_URL
         let mut env = HashMap::new();
         env.insert("HOMEBOX_IP".into(), "192.168.1.99".into());
         env.insert("HOMEBOX_API_KEY".into(), "hb_env_homebox".into());
@@ -600,8 +600,8 @@ api_key = "hb_local"
             Some("http://env-homebox:7745/api/v1")
         );
 
-        env.insert("HBX_URL".into(), "http://env-hbx:7745/api/v1/".into());
-        env.insert("HBX_API_KEY".into(), "hb_env_hbx".into());
+        env.insert("HBCTL_URL".into(), "http://env-hbctl:7745/api/v1/".into());
+        env.insert("HBCTL_API_KEY".into(), "hb_env_hbctl".into());
         let cfg = AppConfig::resolve(
             &CliConfigOverrides::default(),
             &env,
@@ -609,8 +609,11 @@ api_key = "hb_local"
             Some(&user_cfg),
         )
         .unwrap();
-        assert_eq!(cfg.base_url.as_deref(), Some("http://env-hbx:7745/api/v1"));
-        assert_eq!(cfg.api_key.as_deref(), Some("hb_env_hbx"));
+        assert_eq!(
+            cfg.base_url.as_deref(),
+            Some("http://env-hbctl:7745/api/v1")
+        );
+        assert_eq!(cfg.api_key.as_deref(), Some("hb_env_hbctl"));
 
         // 4. CLI flags override everything
         let overrides = CliConfigOverrides {

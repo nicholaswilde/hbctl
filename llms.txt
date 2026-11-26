@@ -1,4 +1,4 @@
-# hbx
+# hbctl
 
 > Fast, agent-friendly Rust CLI client for remote Homebox v0.26+ REST APIs.
 

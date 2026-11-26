@@ -4,7 +4,7 @@ use clap::ValueEnum;
 use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::{Map, Value};
 
-use crate::error::{HbxError, Result};
+use crate::error::{HbctlError, Result};
 
 /// Deserializes `null` or omitted JSON values into `T::default()` (Go nil-slice tolerance).
 pub fn deserialize_null_default<'de, D, T>(deserializer: D) -> std::result::Result<T, D::Error>
@@ -146,7 +146,7 @@ impl CustomField {
             }),
             FieldValueType::Number => {
                 let num: f64 = trimmed.parse().map_err(|_| {
-                    HbxError::InvalidInput(format!(
+                    HbctlError::InvalidInput(format!(
                         "invalid number '{raw_value}' for field '{name}'"
                     ))
                 })?;
@@ -164,7 +164,7 @@ impl CustomField {
             }
             FieldValueType::Boolean => {
                 let b = parse_bool_loose(trimmed).ok_or_else(|| {
-                    HbxError::InvalidInput(format!(
+                    HbctlError::InvalidInput(format!(
                         "invalid boolean '{raw_value}' for field '{name}' (expected true/false)"
                     ))
                 })?;
@@ -227,13 +227,13 @@ impl CustomField {
     /// Parse a `KEY=VALUE` pair using the given field type.
     pub fn parse_key_value(spec: &str, kind: FieldValueType) -> Result<Self> {
         let (key, val) = spec.split_once('=').ok_or_else(|| {
-            HbxError::InvalidInput(format!(
+            HbctlError::InvalidInput(format!(
                 "invalid --field '{spec}': expected KEY=VALUE format"
             ))
         })?;
         let key = key.trim();
         if key.is_empty() {
-            return Err(HbxError::InvalidInput(format!(
+            return Err(HbctlError::InvalidInput(format!(
                 "invalid --field '{spec}': key cannot be empty"
             )));
         }

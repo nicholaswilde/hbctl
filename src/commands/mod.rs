@@ -13,7 +13,7 @@ use std::io::{self, Read, Write};
 use crate::cli::{Cli, Commands};
 use crate::client::models::Entity;
 use crate::config::{AppConfig, OutputFormat};
-use crate::error::{HbxError, Result};
+use crate::error::{HbctlError, Result};
 use crate::output::{
     write_compact_json, write_quiet_ids, write_selected_table, write_table_or_plain, OutputContext,
 };
@@ -53,8 +53,9 @@ pub fn read_file_or_stdin(path: &str) -> Result<String> {
         io::stdin().read_to_string(&mut buf)?;
         Ok(buf)
     } else {
-        fs::read_to_string(path)
-            .map_err(|e| HbxError::InvalidInput(format!("failed to read input file '{path}': {e}")))
+        fs::read_to_string(path).map_err(|e| {
+            HbctlError::InvalidInput(format!("failed to read input file '{path}': {e}"))
+        })
     }
 }
 

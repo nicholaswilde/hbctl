@@ -12,7 +12,7 @@ use crate::cli::{
 use crate::client::models::Attachment;
 use crate::client::{DryRunRequest, HomeboxClient};
 use crate::config::{AppConfig, OutputFormat};
-use crate::error::{HbxError, Result};
+use crate::error::{HbctlError, Result};
 use crate::output::{
     write_compact_json, write_dry_run, write_quiet_ids, write_selected_table, write_table_or_plain,
     OutputContext,
@@ -56,7 +56,7 @@ fn handle_upload(
     // Validate files and enforce the >500KB image guard before touching the server
     for path in &args.files {
         let meta = fs::metadata(path).map_err(|e| {
-            HbxError::InvalidInput(format!("cannot read file '{}': {e}", path.display()))
+            HbctlError::InvalidInput(format!("cannot read file '{}': {e}", path.display()))
         })?;
         let mime = mime_guess::from_path(path).first_or_octet_stream();
         if mime.type_() == "image" && meta.len() > MAX_IMAGE_SIZE_BYTES {
@@ -69,7 +69,7 @@ fn handle_upload(
                     MAX_IMAGE_SIZE_BYTES
                 )?;
             } else {
-                return Err(HbxError::ImageTooLarge {
+                return Err(HbctlError::ImageTooLarge {
                     path: path.display().to_string(),
                     size_bytes: meta.len(),
                     max_bytes: MAX_IMAGE_SIZE_BYTES,
@@ -113,7 +113,7 @@ fn handle_upload(
             .file_name()
             .and_then(|n| n.to_str())
             .ok_or_else(|| {
-                HbxError::InvalidInput(format!("invalid file path '{}'", path.display()))
+                HbctlError::InvalidInput(format!("invalid file path '{}'", path.display()))
             })?
             .to_string();
 
@@ -228,7 +228,7 @@ fn handle_download(
     err: &mut dyn Write,
 ) -> Result<()> {
     if args.attachment_id.is_none() && !args.all {
-        return Err(HbxError::InvalidInput(
+        return Err(HbctlError::InvalidInput(
             "specify an <ATTACHMENT_ID> or pass --all".to_string(),
         ));
     }
@@ -241,7 +241,7 @@ fn handle_download(
             .attachments
             .iter()
             .find(|a| a.id == *att_id)
-            .ok_or_else(|| HbxError::NotFound {
+            .ok_or_else(|| HbctlError::NotFound {
                 kind: "attachment".to_string(),
                 query: att_id.clone(),
             })?;

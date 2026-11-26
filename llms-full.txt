@@ -1,4 +1,4 @@
-# hbx
+# hbctl
 
 > Fast, agent-friendly Rust CLI client for remote Homebox v0.26+ REST APIs.
 
@@ -11,4 +11,4 @@
 - Tag & entity-type management (`tag list|create`, `entity-types`)
 - Filtered export (`export`) in `json`, `csv`, and `markdown`
 - Compact JSON (`--json`), `--select` field projection, `--dry-run` (redacted `Authorization`), `--quiet` ID output
-- Layered config: CLI > env/`.env` (`HBX_URL`, `HOMEBOX_URL`, `HOMEBOX_IP`, `HBX_API_KEY`, `HOMEBOX_API_KEY`) > `.hbx.toml` > `~/.config/hbx/config.toml` > defaults
+- Layered config: CLI > env/`.env` (`HBCTL_URL`, `HOMEBOX_URL`, `HOMEBOX_IP`, `HBCTL_API_KEY`, `HOMEBOX_API_KEY`) > `.hbctl.toml` > `~/.config/hbctl/config.toml` > defaults

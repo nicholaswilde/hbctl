@@ -8,7 +8,7 @@ use crate::client::models::FieldValueType;
 use crate::config::{CliConfigOverrides, OutputFormat};
 
 #[derive(Parser, Debug, Clone)]
-#[command(name = "hbx")]
+#[command(name = "hbctl")]
 #[command(
     author,
     version = env!("PROJECT_VERSION"),
@@ -16,15 +16,15 @@ use crate::config::{CliConfigOverrides, OutputFormat};
     long_about = None
 )]
 pub struct Cli {
-    /// Homebox base URL (env: HBX_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)
+    /// Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)
     #[arg(long, global = true)]
     pub url: Option<String>,
 
-    /// Homebox API key or Bearer token (env: HBX_API_KEY > HOMEBOX_API_KEY)
+    /// Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)
     #[arg(long, global = true)]
     pub api_key: Option<String>,
 
-    /// Output format (table, json, plain) [env: HBX_OUTPUT]
+    /// Output format (table, json, plain) [env: HBCTL_OUTPUT]
     #[arg(long, global = true, value_enum)]
     pub output: Option<OutputFormat>,
 
@@ -101,7 +101,7 @@ pub enum Commands {
     /// Generate UNIX roff man page
     Man,
 
-    /// Check for and install the latest hbx release from GitHub
+    /// Check for and install the latest hbctl release from GitHub
     #[command(visible_alias = "self-update")]
     Update {
         /// Check for available updates without installing
@@ -704,7 +704,7 @@ mod tests {
     #[test]
     fn test_cli_parse_global_and_subcommands() {
         let cli = Cli::try_parse_from([
-            "hbx",
+            "hbctl",
             "--url",
             "http://127.0.0.1:7745",
             "--api-key",
@@ -737,11 +737,11 @@ mod tests {
 
     #[test]
     fn test_cli_parse_entity_types_and_export() {
-        let cli = Cli::try_parse_from(["hbx", "entity-types"]).unwrap();
+        let cli = Cli::try_parse_from(["hbctl", "entity-types"]).unwrap();
         assert!(matches!(cli.command, Commands::EntityTypes(_)));
 
         let cli = Cli::try_parse_from([
-            "hbx",
+            "hbctl",
             "export",
             "--tag",
             "electronics",

@@ -1,22 +1,22 @@
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
-.TH hbx 1  "hbx v0.1.0-dirty" 
+.TH hbctl 1  "hbctl v0.1.1-1-g0c97912-dirty" 
 .SH NAME
-hbx \- Fast, agent\-friendly Rust CLI for remote Homebox v0.26+ instances
+hbctl \- Fast, agent\-friendly Rust CLI for remote Homebox v0.26+ instances
 .SH SYNOPSIS
-\fBhbx\fR [\fB\-\-url\fR] [\fB\-\-api\-key\fR] [\fB\-\-output\fR] [\fB\-\-json\fR] [\fB\-\-select\fR] [\fB\-\-dry\-run\fR] [\fB\-q\fR|\fB\-\-quiet\fR] [\fB\-C\fR|\fB\-\-config\fR] [\fB\-h\fR|\fB\-\-help\fR] [\fB\-V\fR|\fB\-\-version\fR] <\fIsubcommands\fR>
+\fBhbctl\fR [\fB\-\-url\fR] [\fB\-\-api\-key\fR] [\fB\-\-output\fR] [\fB\-\-json\fR] [\fB\-\-select\fR] [\fB\-\-dry\-run\fR] [\fB\-q\fR|\fB\-\-quiet\fR] [\fB\-C\fR|\fB\-\-config\fR] [\fB\-h\fR|\fB\-\-help\fR] [\fB\-V\fR|\fB\-\-version\fR] <\fIsubcommands\fR>
 .SH DESCRIPTION
 Fast, agent\-friendly Rust CLI for remote Homebox v0.26+ instances
 .SH OPTIONS
 .TP
 \fB\-\-url\fR \fI<URL>\fR
-Homebox base URL (env: HBX_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)
+Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)
 .TP
 \fB\-\-api\-key\fR \fI<API_KEY>\fR
-Homebox API key or Bearer token (env: HBX_API_KEY > HOMEBOX_API_KEY)
+Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)
 .TP
 \fB\-\-output\fR \fI<OUTPUT>\fR
-Output format (table, json, plain) [env: HBX_OUTPUT]
+Output format (table, json, plain) [env: HBCTL_OUTPUT]
 .br
 
 .br
@@ -52,42 +52,42 @@ Print help
 Print version
 .SH SUBCOMMANDS
 .TP
-hbx\-auth(1)
+hbctl\-auth(1)
 Authenticate with a remote Homebox instance (login, status, logout, refresh)
 .TP
-hbx\-item(1)
+hbctl\-item(1)
 Manage inventory items (/api/v1/entities)
 .TP
-hbx\-attachment(1)
+hbctl\-attachment(1)
 Manage item attachments (/api/v1/entities/{id}/attachments)
 .TP
-hbx\-search(1)
+hbctl\-search(1)
 Full\-text and structured item search
 .TP
-hbx\-field(1)
+hbctl\-field(1)
 Get or set typed custom fields on an item
 .TP
-hbx\-tag(1)
+hbctl\-tag(1)
 Manage tags (/api/v1/tags)
 .TP
-hbx\-entity\-types(1)
+hbctl\-entity\-types(1)
 List Homebox entity types (/api/v1/entity\-types)
 .TP
-hbx\-export(1)
+hbctl\-export(1)
 Export filtered items to JSON, CSV, or Markdown
 .TP
-hbx\-completions(1)
+hbctl\-completions(1)
 Generate shell completion scripts
 .TP
-hbx\-man(1)
+hbctl\-man(1)
 Generate UNIX roff man page
 .TP
-hbx\-update(1)
-Check for and install the latest hbx release from GitHub
+hbctl\-update(1)
+Check for and install the latest hbctl release from GitHub
 .TP
-hbx\-help(1)
+hbctl\-help(1)
 Print this message or the help of the given subcommand(s)
 .SH VERSION
-vv0.1.0\-dirty
+vv0.1.1\-1\-g0c97912\-dirty
 .SH AUTHORS
 Nicholas Wilde

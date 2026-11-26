@@ -11,7 +11,7 @@ use crate::config::{
     default_user_config_path, normalize_base_url, redact_auth_header, AppConfig, ConfigFile,
     OutputFormat,
 };
-use crate::error::{HbxError, Result};
+use crate::error::{HbctlError, Result};
 use crate::output::{
     write_compact_json, write_dry_run, write_quiet_ids, write_table_or_plain, OutputContext,
 };
@@ -53,7 +53,7 @@ fn resolve_config_target_path(explicit: Option<&PathBuf>) -> Result<PathBuf> {
         return Ok(p.clone());
     }
     default_user_config_path().ok_or_else(|| {
-        HbxError::Config("unable to determine ~/.config/hbx/config.toml path".into())
+        HbctlError::Config("unable to determine ~/.config/hbctl/config.toml path".into())
     })
 }
 
@@ -86,13 +86,13 @@ fn handle_login(
             let raw = prompt_line("Homebox URL (e.g. http://192.168.1.50:7745): ", err)?;
             normalize_base_url(&raw)?
         }
-        None => return Err(HbxError::MissingUrl),
+        None => return Err(HbctlError::MissingUrl),
     };
 
     let (token, token_type, expires_at, user_name, user_email) = if args.with_token {
         let raw_token = read_stdin_trimmed()?;
         if raw_token.is_empty() {
-            return Err(HbxError::InvalidInput(
+            return Err(HbctlError::InvalidInput(
                 "no token provided on stdin for --with-token".to_string(),
             ));
         }
@@ -122,7 +122,7 @@ fn handle_login(
             Some(u) if !u.trim().is_empty() => u.trim().to_string(),
             _ if io::stdin().is_terminal() => prompt_line("Homebox email/username: ", err)?,
             _ => {
-                return Err(HbxError::InvalidInput(
+                return Err(HbctlError::InvalidInput(
                     "--username is required with --password-stdin".to_string(),
                 ));
             }
@@ -136,7 +136,7 @@ fn handle_login(
             rpassword::prompt_password("Password: ")?
         };
         if password.is_empty() {
-            return Err(HbxError::InvalidInput("password cannot be empty".into()));
+            return Err(HbctlError::InvalidInput("password cannot be empty".into()));
         }
 
         if dry_run {
@@ -208,7 +208,7 @@ fn handle_login(
         } else {
             let raw_token = rpassword::prompt_password("Homebox API key (hb_...): ")?;
             if raw_token.trim().is_empty() {
-                return Err(HbxError::InvalidInput("API key cannot be empty".into()));
+                return Err(HbctlError::InvalidInput("API key cannot be empty".into()));
             }
             if dry_run {
                 let preview = HomeboxClient::build_dry_run(&base_url, "GET", "users/self", None);
@@ -231,7 +231,7 @@ fn handle_login(
             )
         }
     } else {
-        return Err(HbxError::InvalidInput(
+        return Err(HbctlError::InvalidInput(
             "non-interactive login requires --with-token or --username <EMAIL> --password-stdin"
                 .to_string(),
         ));

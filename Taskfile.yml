@@ -73,17 +73,17 @@ tasks:
     desc: Generate shell completions for bash, zsh, fish, powershell, and elvish
     cmds:
       - mkdir -p completions
-      - cargo run -- completions bash > completions/hbx.bash
-      - cargo run -- completions zsh > completions/_hbx
-      - cargo run -- completions fish > completions/hbx.fish
-      - cargo run -- completions powershell > completions/_hbx.ps1
-      - cargo run -- completions elvish > completions/hbx.elv
+      - cargo run -- completions bash > completions/hbctl.bash
+      - cargo run -- completions zsh > completions/_hbctl
+      - cargo run -- completions fish > completions/hbctl.fish
+      - cargo run -- completions powershell > completions/_hbctl.ps1
+      - cargo run -- completions elvish > completions/hbctl.elv
 
   man:
-    desc: Generate UNIX roff man page (assets/hbx.1)
+    desc: Generate UNIX roff man page (assets/hbctl.1)
     cmds:
       - mkdir -p assets
-      - cargo run -- man > assets/hbx.1
+      - cargo run -- man > assets/hbctl.1
 
   run:
     desc: Run the project (requires arguments or env vars, runs help by default)

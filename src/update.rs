@@ -8,11 +8,11 @@ use crate::config::OutputFormat;
 use crate::output::{write_compact_json, OutputContext};
 
 pub const REPO_OWNER: &str = "nicholaswilde";
-pub const REPO_NAME: &str = "hbx";
-pub const BIN_NAME: &str = "hbx";
+pub const REPO_NAME: &str = "hbctl";
+pub const BIN_NAME: &str = "hbctl";
 pub const CURRENT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
-/// Options for the `hbx update` (`self-update`) command.
+/// Options for the `hbctl update` (`self-update`) command.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct SelfUpdateOptions {
     pub check: bool,
@@ -109,7 +109,7 @@ fn build_updater(
         .bin_name(BIN_NAME)
         .current_version(CURRENT_VERSION)
         .target(target)
-        .bin_path_in_archive("hbx-{{ version }}-{{ target }}/{{ bin }}")
+        .bin_path_in_archive("hbctl-{{ version }}-{{ target }}/{{ bin }}")
         .asset_matcher(move |assets| select_release_asset(assets, &matcher_target))
         .update_strategy(UpdateStrategy::Latest)
         .show_download_progress(!opts.check && !silent)
@@ -125,7 +125,7 @@ fn build_updater(
     Ok(builder.build()?)
 }
 
-/// Check for or install an `hbx` release from GitHub.
+/// Check for or install an `hbctl` release from GitHub.
 pub fn run_self_update(
     opts: SelfUpdateOptions,
     ctx: &OutputContext,
@@ -181,7 +181,7 @@ pub fn run_self_update(
                 "Update available: v{CURRENT_VERSION} -> v{latest_ver}"
             )?;
         } else if strip_v_prefix(latest_ver) == strip_v_prefix(CURRENT_VERSION) {
-            writeln!(out_writer, "hbx is up to date (v{CURRENT_VERSION}).")?;
+            writeln!(out_writer, "hbctl is up to date (v{CURRENT_VERSION}).")?;
         } else {
             writeln!(
                 out_writer,
@@ -212,7 +212,7 @@ pub fn run_self_update(
             } else {
                 writeln!(
                     out_writer,
-                    "hbx is already up to date (v{CURRENT_VERSION})."
+                    "hbctl is already up to date (v{CURRENT_VERSION})."
                 )?;
             }
         }
@@ -230,7 +230,7 @@ pub fn run_self_update(
             } else {
                 writeln!(
                     out_writer,
-                    "Successfully updated hbx from v{CURRENT_VERSION} to v{ver}."
+                    "Successfully updated hbctl from v{CURRENT_VERSION} to v{ver}."
                 )?;
             }
         }
@@ -255,7 +255,7 @@ pub fn run_self_update(
             writeln!(out_writer, "Update cancelled.")?;
         }
         Err(err) => {
-            return Err(anyhow::Error::from(err).context("Failed to self-update hbx"));
+            return Err(anyhow::Error::from(err).context("Failed to self-update hbctl"));
         }
     }
 
@@ -347,19 +347,19 @@ mod tests {
     #[test]
     fn test_select_release_asset_skips_sha256_and_deb() {
         let assets = vec![
-            mock_asset("hbx-0.1.0-x86_64-unknown-linux-musl.tar.gz.sha256"),
-            mock_asset("hbx-0.1.0-x86_64-unknown-linux-musl.tar.gz"),
-            mock_asset("hbx-0.1.0-aarch64-unknown-linux-musl.tar.gz"),
-            mock_asset("hbx-0.1.0-x86_64-pc-windows-msvc.zip.sha256"),
-            mock_asset("hbx-0.1.0-x86_64-pc-windows-msvc.zip"),
-            mock_asset("hbx_0.1.0-1_amd64.deb"),
+            mock_asset("hbctl-0.1.0-x86_64-unknown-linux-musl.tar.gz.sha256"),
+            mock_asset("hbctl-0.1.0-x86_64-unknown-linux-musl.tar.gz"),
+            mock_asset("hbctl-0.1.0-aarch64-unknown-linux-musl.tar.gz"),
+            mock_asset("hbctl-0.1.0-x86_64-pc-windows-msvc.zip.sha256"),
+            mock_asset("hbctl-0.1.0-x86_64-pc-windows-msvc.zip"),
+            mock_asset("hbctl_0.1.0-1_amd64.deb"),
         ];
 
         let linux = select_release_asset(&assets, "x86_64-unknown-linux-musl").unwrap();
-        assert_eq!(linux.name(), "hbx-0.1.0-x86_64-unknown-linux-musl.tar.gz");
+        assert_eq!(linux.name(), "hbctl-0.1.0-x86_64-unknown-linux-musl.tar.gz");
 
         let win = select_release_asset(&assets, "x86_64-pc-windows-msvc").unwrap();
-        assert_eq!(win.name(), "hbx-0.1.0-x86_64-pc-windows-msvc.zip");
+        assert_eq!(win.name(), "hbctl-0.1.0-x86_64-pc-windows-msvc.zip");
 
         assert!(select_release_asset(&assets, "aarch64-apple-darwin").is_none());
     }
@@ -399,7 +399,7 @@ mod tests {
     fn test_cli_update_and_self_update_parsing() {
         use crate::cli::{Cli, Commands, Parser};
 
-        let cli = Cli::try_parse_from(["hbx", "update"]).unwrap();
+        let cli = Cli::try_parse_from(["hbctl", "update"]).unwrap();
         assert!(matches!(
             cli.command,
             Commands::Update {
@@ -410,7 +410,8 @@ mod tests {
         ));
 
         let cli_flags =
-            Cli::try_parse_from(["hbx", "update", "--check", "-y", "--version", "0.2.0"]).unwrap();
+            Cli::try_parse_from(["hbctl", "update", "--check", "-y", "--version", "0.2.0"])
+                .unwrap();
         assert!(matches!(
             cli_flags.command,
             Commands::Update {
@@ -420,7 +421,7 @@ mod tests {
             } if v == "0.2.0"
         ));
 
-        let cli_alias = Cli::try_parse_from(["hbx", "self-update", "--yes"]).unwrap();
+        let cli_alias = Cli::try_parse_from(["hbctl", "self-update", "--yes"]).unwrap();
         assert!(matches!(
             cli_alias.command,
             Commands::Update {

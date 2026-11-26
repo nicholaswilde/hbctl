@@ -5,7 +5,7 @@ description: Generates clean GitHub release summary based on git logs using scri
 
 # /release-summary [range]
 
-Generates a clean, categorized GitHub release summary for `hbx` based on git logs.
+Generates a clean, categorized GitHub release summary for `hbctl` based on git logs.
 
 ## Description
 

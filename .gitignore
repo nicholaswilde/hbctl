@@ -31,7 +31,7 @@ config.yaml
 config.yml
 config.toml
 config.json
-.hbx.toml
+.hbctl.toml
 settings.json
 **/settings.json
 mcp_config.json

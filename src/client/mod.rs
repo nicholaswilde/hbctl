@@ -21,7 +21,7 @@ use crate::config::{
     normalize_auth_header, normalize_base_url, redact_auth_header, redact_secret, AppConfig,
     DEFAULT_DOWNLOAD_TIMEOUT_SECS, DEFAULT_TIMEOUT_SECS,
 };
-use crate::error::{HbxError, Result};
+use crate::error::{HbctlError, Result};
 
 /// Redacted preview of a mutating request emitted during `--dry-run`.
 #[derive(Debug, Clone, Serialize)]
@@ -136,12 +136,12 @@ impl HomeboxClient {
         let text = resp.text()?;
         if !status.is_success() {
             let safe_msg = redact_secret(&text, &self.raw_secret);
-            return Err(HbxError::Http {
+            return Err(HbctlError::Http {
                 status: status.as_u16(),
                 message: safe_msg,
             });
         }
-        serde_json::from_str(&text).map_err(HbxError::from)
+        serde_json::from_str(&text).map_err(HbctlError::from)
     }
 
     fn handle_empty_response(&self, resp: Response) -> Result<()> {
@@ -149,7 +149,7 @@ impl HomeboxClient {
         if !status.is_success() {
             let text = resp.text().unwrap_or_default();
             let safe_msg = redact_secret(&text, &self.raw_secret);
-            return Err(HbxError::Http {
+            return Err(HbctlError::Http {
                 status: status.as_u16(),
                 message: safe_msg,
             });
@@ -380,7 +380,7 @@ impl HomeboxClient {
             .file_name()
             .and_then(|n| n.to_str())
             .ok_or_else(|| {
-                HbxError::InvalidInput(format!("invalid file path '{}'", file_path.display()))
+                HbctlError::InvalidInput(format!("invalid file path '{}'", file_path.display()))
             })?
             .to_string();
 
@@ -390,7 +390,7 @@ impl HomeboxClient {
         let file_part = multipart::Part::bytes(bytes)
             .file_name(basename.clone())
             .mime_str(mime.essence_str())
-            .map_err(|e| HbxError::InvalidInput(format!("invalid MIME type: {e}")))?;
+            .map_err(|e| HbctlError::InvalidInput(format!("invalid MIME type: {e}")))?;
 
         let form = multipart::Form::new()
             .part("file", file_part)
@@ -416,7 +416,7 @@ impl HomeboxClient {
         let text = resp.text()?;
         if !status.is_success() {
             let safe_msg = redact_secret(&text, &self.raw_secret);
-            return Err(HbxError::Http {
+            return Err(HbctlError::Http {
                 status: status.as_u16(),
                 message: safe_msg,
             });
@@ -432,7 +432,7 @@ impl HomeboxClient {
                 return Ok(last);
             }
         }
-        serde_json::from_str::<Attachment>(&text).map_err(HbxError::from)
+        serde_json::from_str::<Attachment>(&text).map_err(HbctlError::from)
     }
 
     /// Stream an attachment directly to disk using `download_timeout_secs`.
@@ -458,7 +458,7 @@ impl HomeboxClient {
         if !status.is_success() {
             let text = resp.text().unwrap_or_default();
             let safe_msg = redact_secret(&text, &self.raw_secret);
-            return Err(HbxError::Http {
+            return Err(HbctlError::Http {
                 status: status.as_u16(),
                 message: safe_msg,
             });
@@ -508,12 +508,12 @@ impl HomeboxClient {
         let text = resp.text()?;
         if !status.is_success() {
             let safe = redact_secret(&text, password);
-            return Err(HbxError::Http {
+            return Err(HbctlError::Http {
                 status: status.as_u16(),
                 message: safe,
             });
         }
-        serde_json::from_str(&text).map_err(HbxError::from)
+        serde_json::from_str(&text).map_err(HbctlError::from)
     }
 
     /// Fetch the authenticated user's profile (`GET /api/v1/users/self`).

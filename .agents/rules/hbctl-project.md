@@ -1,4 +1,4 @@
-# HBX Project Rules
+# HBCTL Project Rules
 
 - **Pure-Rust HTTP**: Keep `reqwest` on `default-features = false` with `blocking`, `json`, `multipart`, `rustls-tls` for clean `cross` multi-arch builds without OpenSSL/tokio.
 - **Stream Separation**: Write data strictly to `stdout`; diagnostics, warnings, and errors strictly to `stderr`.

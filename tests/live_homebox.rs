@@ -11,9 +11,9 @@ use testcontainers::core::{IntoContainerPort, WaitFor};
 use testcontainers::runners::SyncRunner;
 use testcontainers::{GenericImage, ImageExt};
 
-use hbx::client::models::{CreateEntityRequest, CustomField, EntityPatch, FieldValueType};
-use hbx::client::resolve::Resolver;
-use hbx::client::{HomeboxClient, ListEntitiesQuery};
+use hbctl::client::models::{CreateEntityRequest, CustomField, EntityPatch, FieldValueType};
+use hbctl::client::resolve::Resolver;
+use hbctl::client::{HomeboxClient, ListEntitiesQuery};
 
 #[test]
 #[ignore = "requires Docker and pulls ghcr.io/sysadminsmedia/homebox:latest"]
@@ -22,7 +22,7 @@ fn test_live_homebox_end_to_end() {
         .duration_since(UNIX_EPOCH)
         .expect("system clock")
         .as_nanos();
-    let pepper = format!("hbx-live-pepper-{nanos:0>32}");
+    let pepper = format!("hbctl-live-pepper-{nanos:0>32}");
 
     let container = GenericImage::new("ghcr.io/sysadminsmedia/homebox", "latest")
         .with_exposed_port(7745.tcp())
@@ -39,14 +39,14 @@ fn test_live_homebox_end_to_end() {
     let base_url = format!("http://127.0.0.1:{host_port}");
 
     let http = Client::new();
-    let email = format!("hbx-test-{nanos}@example.com");
+    let email = format!("hbctl-test-{nanos}@example.com");
     let password = "TestPassword123!";
 
     // 1. Register test user
     let reg = http
         .post(format!("{base_url}/api/v1/users/register"))
         .json(&json!({
-            "name": "HBX Test User",
+            "name": "HBCTL Test User",
             "email": email,
             "password": password
         }))
@@ -82,7 +82,7 @@ fn test_live_homebox_end_to_end() {
         .resolve_entity_type_id("item")
         .expect("resolve Item entity type");
     let tag_id = resolver
-        .resolve_tag_id("hbx-live-tag", true)
+        .resolve_tag_id("hbctl-live-tag", true)
         .expect("auto-create tag");
     assert!(!tag_id.is_empty());
 
@@ -90,7 +90,7 @@ fn test_live_homebox_end_to_end() {
     //    verifying POST -> follow-up PUT persistence on real Homebox v0.27+
     let req = CreateEntityRequest {
         name: "Live Test ESP32".to_string(),
-        description: Some("Created by hbx live container test".to_string()),
+        description: Some("Created by hbctl live container test".to_string()),
         quantity: Some(2),
         entity_type_id: Some(item_type_id),
         tag_ids: vec![tag_id.clone()],

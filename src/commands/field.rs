@@ -6,7 +6,7 @@ use crate::cli::{FieldArgs, FieldCommands};
 use crate::client::models::{CustomField, EntityPatch};
 use crate::client::HomeboxClient;
 use crate::config::{AppConfig, OutputFormat};
-use crate::error::{HbxError, Result};
+use crate::error::{HbctlError, Result};
 use crate::output::{
     write_compact_json, write_dry_run, write_quiet_ids, write_table_or_plain, OutputContext,
 };
@@ -64,7 +64,7 @@ pub fn handle(
                 );
             }
 
-            Err(HbxError::NotFound {
+            Err(HbctlError::NotFound {
                 kind: "field".to_string(),
                 query: key.clone(),
             })

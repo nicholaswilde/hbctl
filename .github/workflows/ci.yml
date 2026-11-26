@@ -78,7 +78,7 @@ jobs:
         echo "TARGET_FLAGS=--target ${{ matrix.target }}" >> $GITHUB_ENV
         echo "TARGET_DIR=./target/${{ matrix.target }}" >> $GITHUB_ENV
 
-    - name: Build hbx
+    - name: Build hbctl
       run: ${{ env.CARGO }} build --verbose --workspace ${{ env.TARGET_FLAGS }}
 
     - name: Run tests

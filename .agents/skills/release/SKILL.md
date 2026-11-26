@@ -5,7 +5,7 @@ description: Automates versioning, tagging, and deployment using scripts/release
 
 # /release [patch|minor|major|<version>]
 
-Automates the versioning, tagging, and deployment process for `hbx`.
+Automates the versioning, tagging, and deployment process for `hbctl`.
 
 ## Description
 

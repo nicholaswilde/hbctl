@@ -17,7 +17,7 @@ use crate::client::{DryRunRequest, HomeboxClient, ListEntitiesQuery};
 use crate::commands::{read_file_or_stdin, render_entities, render_entity};
 use crate::config::{AppConfig, OutputFormat};
 use crate::dedup;
-use crate::error::{HbxError, Result};
+use crate::error::{HbctlError, Result};
 use crate::output::{
     write_compact_json, write_dry_run, write_quiet_ids, write_table_or_plain, OutputContext,
 };
@@ -104,7 +104,7 @@ fn parse_from_json_value(mut val: Value) -> Result<ParsedItemInput> {
 
     let obj = val
         .as_object()
-        .ok_or_else(|| HbxError::InvalidInput("item JSON must be an object".to_string()))?;
+        .ok_or_else(|| HbctlError::InvalidInput("item JSON must be an object".to_string()))?;
 
     input.name = json_str(obj, &["name"]);
     input.description = json_str(obj, &["description"]);
@@ -249,7 +249,7 @@ fn handle_create(
         .name
         .filter(|s| !s.trim().is_empty())
         .ok_or_else(|| {
-            HbxError::InvalidInput(
+            HbctlError::InvalidInput(
                 "item name is required (pass --name or provide in --from-json)".into(),
             )
         })?;
@@ -594,7 +594,7 @@ fn parse_json_import(raw: &str) -> Result<Vec<ParsedItemInput>> {
             }
         }
         _ => {
-            return Err(HbxError::InvalidInput(
+            return Err(HbctlError::InvalidInput(
                 "JSON import must be an array, object, or {\"items\": [...]}".to_string(),
             ))
         }
@@ -625,7 +625,7 @@ fn parse_csv_import(raw: &str) -> Result<Vec<ParsedItemInput>> {
                 "description" => item.description = Some(val.to_string()),
                 "quantity" => {
                     item.quantity = Some(val.parse::<i64>().map_err(|_| {
-                        HbxError::InvalidInput(format!("invalid CSV quantity '{val}'"))
+                        HbctlError::InvalidInput(format!("invalid CSV quantity '{val}'"))
                     })?);
                 }
                 "type" | "entitytype" | "entity_type" | "entitytypeid" => {
@@ -641,7 +641,7 @@ fn parse_csv_import(raw: &str) -> Result<Vec<ParsedItemInput>> {
                 }
                 "purchaseprice" | "purchase_price" => {
                     item.purchase_price = Some(val.parse::<f64>().map_err(|_| {
-                        HbxError::InvalidInput(format!("invalid CSV purchasePrice '{val}'"))
+                        HbctlError::InvalidInput(format!("invalid CSV purchasePrice '{val}'"))
                     })?);
                 }
                 "purchasedate" | "purchase_date" => item.purchase_date = Some(val.to_string()),

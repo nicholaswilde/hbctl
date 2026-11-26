@@ -1,15 +1,15 @@
 use thiserror::Error;
 
-/// Domain error type for `hbx`.
+/// Domain error type for `hbctl`.
 #[derive(Debug, Error)]
-pub enum HbxError {
+pub enum HbctlError {
     #[error(
-        "Homebox URL is not configured (set --url, HBX_URL, HOMEBOX_URL, HOMEBOX_IP, or config file)"
+        "Homebox URL is not configured (set --url, HBCTL_URL, HOMEBOX_URL, HOMEBOX_IP, or config file)"
     )]
     MissingUrl,
 
     #[error(
-        "Homebox API key is not configured (set --api-key, HBX_API_KEY, HOMEBOX_API_KEY, or config file)"
+        "Homebox API key is not configured (set --api-key, HBCTL_API_KEY, HOMEBOX_API_KEY, or config file)"
     )]
     MissingApiKey,
 
@@ -50,4 +50,4 @@ pub enum HbxError {
     },
 }
 
-pub type Result<T> = std::result::Result<T, HbxError>;
+pub type Result<T> = std::result::Result<T, HbctlError>;

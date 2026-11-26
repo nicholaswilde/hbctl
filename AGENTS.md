@@ -1,6 +1,6 @@
 # AGENTS.md
 
-Conventions and architecture for AI agents working on `hbx`.
+Conventions and architecture for AI agents working on `hbctl`.
 
 ---
 
@@ -27,28 +27,28 @@ Conventions and architecture for AI agents working on `hbx`.
 <!-- sensitive-information-protection-begin -->
 ## Sensitive Information & Secret Protection
 
-NEVER commit or stage `.env`, `.hbx.toml`, API keys (`hb_*`), Bearer tokens, or credentials. Always redact `Authorization` as `Bearer ***`.
+NEVER commit or stage `.env`, `.hbctl.toml`, API keys (`hb_*`), Bearer tokens, or credentials. Always redact `Authorization` as `Bearer ***`.
 <!-- sensitive-information-protection-end -->
 
 ---
 
 ## 1. Project Overview & Architecture
 
-**`hbx`**: Rust CLI client for remote Homebox v0.26+ REST API.
+**`hbctl`**: Rust CLI client for remote Homebox v0.26+ REST API.
 
 ### Modules
 
-- `src/main.rs` — thin binary entrypoint delegating to `hbx::run()`
+- `src/main.rs` — thin binary entrypoint delegating to `hbctl::run()`
 - `src/lib.rs` — public exports and top-level dispatch
 - `src/auth_store.rs` — OS keyring (`keyring`) + `0600` file fallback credential storage
 - `src/cli.rs` — `clap` derive CLI parser, global flags, subcommands, completions/man
-- `src/config.rs` — layered config (`CLI > env/.env > .hbx.toml > ~/.config/hbx/config.toml & stored auth > defaults`)
-- `src/error.rs` — typed `HbxError` (`thiserror`)
+- `src/config.rs` — layered config (`CLI > env/.env > .hbctl.toml > ~/.config/hbctl/config.toml & stored auth > defaults`)
+- `src/error.rs` — typed `HbctlError` (`thiserror`)
 - `src/client/` — `mod.rs` (HTTP client, URL/auth normalization, redaction, `GET -> Merge -> PUT`, follow-up `PUT`, streaming downloads), `models.rs` (Homebox v0.26+ serde types with Go-`null` tolerance), `resolve.rs` (tag/entity-type resolution)
 - `src/commands/` — `mod.rs`, `auth.rs`, `item.rs`, `attachment.rs`, `search.rs`, `field.rs`, `tag.rs`, `entity_type.rs`, `export.rs`
 - `src/dedup.rs` — two-pass exact + Jaccard duplicate detector and keeper selector
 - `src/output.rs` — table, compact JSON (`--select`), plain, CSV, Markdown renderers (`stdout` data / `stderr` diagnostics)
-- `src/update.rs` — GitHub release self-updater (`hbx update` / `hbx self-update`)
+- `src/update.rs` — GitHub release self-updater (`hbctl update` / `hbctl self-update`)
 
 ---
 
