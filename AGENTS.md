@@ -40,11 +40,12 @@ NEVER commit or stage `.env`, `.hbx.toml`, API keys (`hb_*`), Bearer tokens, or 
 
 - `src/main.rs` — thin binary entrypoint delegating to `hbx::run()`
 - `src/lib.rs` — public exports and top-level dispatch
+- `src/auth_store.rs` — OS keyring (`keyring`) + `0600` file fallback credential storage
 - `src/cli.rs` — `clap` derive CLI parser, global flags, subcommands, completions/man
-- `src/config.rs` — layered config (`CLI > env/.env > .hbx.toml > ~/.config/hbx/config.toml > defaults`)
+- `src/config.rs` — layered config (`CLI > env/.env > .hbx.toml > ~/.config/hbx/config.toml & stored auth > defaults`)
 - `src/error.rs` — typed `HbxError` (`thiserror`)
 - `src/client/` — `mod.rs` (HTTP client, URL/auth normalization, redaction, `GET -> Merge -> PUT`, follow-up `PUT`, streaming downloads), `models.rs` (Homebox v0.26+ serde types with Go-`null` tolerance), `resolve.rs` (tag/entity-type resolution)
-- `src/commands/` — `mod.rs`, `item.rs`, `attachment.rs`, `search.rs`, `field.rs`, `tag.rs`, `entity_type.rs`, `export.rs`
+- `src/commands/` — `mod.rs`, `auth.rs`, `item.rs`, `attachment.rs`, `search.rs`, `field.rs`, `tag.rs`, `entity_type.rs`, `export.rs`
 - `src/dedup.rs` — two-pass exact + Jaccard duplicate detector and keeper selector
 - `src/output.rs` — table, compact JSON (`--select`), plain, CSV, Markdown renderers (`stdout` data / `stderr` diagnostics)
 

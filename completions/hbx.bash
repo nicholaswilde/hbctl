@@ -19,6 +19,9 @@ _hbx() {
             hbx,attachment)
                 cmd="hbx__subcmd__attachment"
                 ;;
+            hbx,auth)
+                cmd="hbx__subcmd__auth"
+                ;;
             hbx,completions)
                 cmd="hbx__subcmd__completions"
                 ;;
@@ -79,6 +82,36 @@ _hbx() {
             hbx__subcmd__attachment__subcmd__help,upload)
                 cmd="hbx__subcmd__attachment__subcmd__help__subcmd__upload"
                 ;;
+            hbx__subcmd__auth,help)
+                cmd="hbx__subcmd__auth__subcmd__help"
+                ;;
+            hbx__subcmd__auth,login)
+                cmd="hbx__subcmd__auth__subcmd__login"
+                ;;
+            hbx__subcmd__auth,logout)
+                cmd="hbx__subcmd__auth__subcmd__logout"
+                ;;
+            hbx__subcmd__auth,refresh)
+                cmd="hbx__subcmd__auth__subcmd__refresh"
+                ;;
+            hbx__subcmd__auth,status)
+                cmd="hbx__subcmd__auth__subcmd__status"
+                ;;
+            hbx__subcmd__auth__subcmd__help,help)
+                cmd="hbx__subcmd__auth__subcmd__help__subcmd__help"
+                ;;
+            hbx__subcmd__auth__subcmd__help,login)
+                cmd="hbx__subcmd__auth__subcmd__help__subcmd__login"
+                ;;
+            hbx__subcmd__auth__subcmd__help,logout)
+                cmd="hbx__subcmd__auth__subcmd__help__subcmd__logout"
+                ;;
+            hbx__subcmd__auth__subcmd__help,refresh)
+                cmd="hbx__subcmd__auth__subcmd__help__subcmd__refresh"
+                ;;
+            hbx__subcmd__auth__subcmd__help,status)
+                cmd="hbx__subcmd__auth__subcmd__help__subcmd__status"
+                ;;
             hbx__subcmd__entity__subcmd__types,help)
                 cmd="hbx__subcmd__entity__subcmd__types__subcmd__help"
                 ;;
@@ -111,6 +144,9 @@ _hbx() {
                 ;;
             hbx__subcmd__help,attachment)
                 cmd="hbx__subcmd__help__subcmd__attachment"
+                ;;
+            hbx__subcmd__help,auth)
+                cmd="hbx__subcmd__help__subcmd__auth"
                 ;;
             hbx__subcmd__help,completions)
                 cmd="hbx__subcmd__help__subcmd__completions"
@@ -150,6 +186,18 @@ _hbx() {
                 ;;
             hbx__subcmd__help__subcmd__attachment,upload)
                 cmd="hbx__subcmd__help__subcmd__attachment__subcmd__upload"
+                ;;
+            hbx__subcmd__help__subcmd__auth,login)
+                cmd="hbx__subcmd__help__subcmd__auth__subcmd__login"
+                ;;
+            hbx__subcmd__help__subcmd__auth,logout)
+                cmd="hbx__subcmd__help__subcmd__auth__subcmd__logout"
+                ;;
+            hbx__subcmd__help__subcmd__auth,refresh)
+                cmd="hbx__subcmd__help__subcmd__auth__subcmd__refresh"
+                ;;
+            hbx__subcmd__help__subcmd__auth,status)
+                cmd="hbx__subcmd__help__subcmd__auth__subcmd__status"
                 ;;
             hbx__subcmd__help__subcmd__entity__subcmd__types,list)
                 cmd="hbx__subcmd__help__subcmd__entity__subcmd__types__subcmd__list"
@@ -269,7 +317,7 @@ _hbx() {
 
     case "${cmd}" in
         hbx)
-            opts="-q -C -h -V --url --api-key --output --json --select --dry-run --quiet --config --help --version item attachment search field tag entity-types entity-type export completions man help"
+            opts="-q -C -h -V --url --api-key --output --json --select --dry-run --quiet --config --help --version auth item attachment search field tag entity-types entity-type export completions man help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 1 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
@@ -556,6 +604,288 @@ _hbx() {
             ;;
         hbx__subcmd__attachment__subcmd__upload)
             opts="-q -C -h --skip-existing --overwrite --force --url --api-key --output --json --select --dry-run --quiet --config --help"
+            if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
+                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+                return 0
+            fi
+            case "${prev}" in
+                --url)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --api-key)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --output)
+                    COMPREPLY=($(compgen -W "table json plain" -- "${cur}"))
+                    return 0
+                    ;;
+                --select)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --config)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                -C)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                *)
+                    COMPREPLY=()
+                    ;;
+            esac
+            COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+            return 0
+            ;;
+        hbx__subcmd__auth)
+            opts="-q -C -h --url --api-key --output --json --select --dry-run --quiet --config --help login status logout refresh help"
+            if [[ ${cur} == -* || ${COMP_CWORD} -eq 2 ]] ; then
+                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+                return 0
+            fi
+            case "${prev}" in
+                --url)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --api-key)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --output)
+                    COMPREPLY=($(compgen -W "table json plain" -- "${cur}"))
+                    return 0
+                    ;;
+                --select)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --config)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                -C)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                *)
+                    COMPREPLY=()
+                    ;;
+            esac
+            COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+            return 0
+            ;;
+        hbx__subcmd__auth__subcmd__help)
+            opts="login status logout refresh help"
+            if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
+                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+                return 0
+            fi
+            case "${prev}" in
+                *)
+                    COMPREPLY=()
+                    ;;
+            esac
+            COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+            return 0
+            ;;
+        hbx__subcmd__auth__subcmd__help__subcmd__help)
+            opts=""
+            if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
+                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+                return 0
+            fi
+            case "${prev}" in
+                *)
+                    COMPREPLY=()
+                    ;;
+            esac
+            COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+            return 0
+            ;;
+        hbx__subcmd__auth__subcmd__help__subcmd__login)
+            opts=""
+            if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
+                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+                return 0
+            fi
+            case "${prev}" in
+                *)
+                    COMPREPLY=()
+                    ;;
+            esac
+            COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+            return 0
+            ;;
+        hbx__subcmd__auth__subcmd__help__subcmd__logout)
+            opts=""
+            if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
+                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+                return 0
+            fi
+            case "${prev}" in
+                *)
+                    COMPREPLY=()
+                    ;;
+            esac
+            COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+            return 0
+            ;;
+        hbx__subcmd__auth__subcmd__help__subcmd__refresh)
+            opts=""
+            if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
+                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+                return 0
+            fi
+            case "${prev}" in
+                *)
+                    COMPREPLY=()
+                    ;;
+            esac
+            COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+            return 0
+            ;;
+        hbx__subcmd__auth__subcmd__help__subcmd__status)
+            opts=""
+            if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
+                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+                return 0
+            fi
+            case "${prev}" in
+                *)
+                    COMPREPLY=()
+                    ;;
+            esac
+            COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+            return 0
+            ;;
+        hbx__subcmd__auth__subcmd__login)
+            opts="-u -q -C -h --with-token --username --password-stdin --insecure-storage --url --api-key --output --json --select --dry-run --quiet --config --help"
+            if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
+                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+                return 0
+            fi
+            case "${prev}" in
+                --username)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                -u)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --url)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --api-key)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --output)
+                    COMPREPLY=($(compgen -W "table json plain" -- "${cur}"))
+                    return 0
+                    ;;
+                --select)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --config)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                -C)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                *)
+                    COMPREPLY=()
+                    ;;
+            esac
+            COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+            return 0
+            ;;
+        hbx__subcmd__auth__subcmd__logout)
+            opts="-q -C -h --insecure-storage --url --api-key --output --json --select --dry-run --quiet --config --help"
+            if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
+                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+                return 0
+            fi
+            case "${prev}" in
+                --url)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --api-key)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --output)
+                    COMPREPLY=($(compgen -W "table json plain" -- "${cur}"))
+                    return 0
+                    ;;
+                --select)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --config)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                -C)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                *)
+                    COMPREPLY=()
+                    ;;
+            esac
+            COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+            return 0
+            ;;
+        hbx__subcmd__auth__subcmd__refresh)
+            opts="-q -C -h --insecure-storage --url --api-key --output --json --select --dry-run --quiet --config --help"
+            if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
+                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+                return 0
+            fi
+            case "${prev}" in
+                --url)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --api-key)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --output)
+                    COMPREPLY=($(compgen -W "table json plain" -- "${cur}"))
+                    return 0
+                    ;;
+                --select)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --config)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                -C)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                *)
+                    COMPREPLY=()
+                    ;;
+            esac
+            COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+            return 0
+            ;;
+        hbx__subcmd__auth__subcmd__status)
+            opts="-q -C -h --url --api-key --output --json --select --dry-run --quiet --config --help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
@@ -981,7 +1311,7 @@ _hbx() {
             return 0
             ;;
         hbx__subcmd__help)
-            opts="item attachment search field tag entity-types export completions man help"
+            opts="auth item attachment search field tag entity-types export completions man help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 2 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
@@ -1051,6 +1381,76 @@ _hbx() {
             return 0
             ;;
         hbx__subcmd__help__subcmd__attachment__subcmd__upload)
+            opts=""
+            if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
+                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+                return 0
+            fi
+            case "${prev}" in
+                *)
+                    COMPREPLY=()
+                    ;;
+            esac
+            COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+            return 0
+            ;;
+        hbx__subcmd__help__subcmd__auth)
+            opts="login status logout refresh"
+            if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
+                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+                return 0
+            fi
+            case "${prev}" in
+                *)
+                    COMPREPLY=()
+                    ;;
+            esac
+            COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+            return 0
+            ;;
+        hbx__subcmd__help__subcmd__auth__subcmd__login)
+            opts=""
+            if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
+                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+                return 0
+            fi
+            case "${prev}" in
+                *)
+                    COMPREPLY=()
+                    ;;
+            esac
+            COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+            return 0
+            ;;
+        hbx__subcmd__help__subcmd__auth__subcmd__logout)
+            opts=""
+            if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
+                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+                return 0
+            fi
+            case "${prev}" in
+                *)
+                    COMPREPLY=()
+                    ;;
+            esac
+            COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+            return 0
+            ;;
+        hbx__subcmd__help__subcmd__auth__subcmd__refresh)
+            opts=""
+            if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
+                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+                return 0
+            fi
+            case "${prev}" in
+                *)
+                    COMPREPLY=()
+                    ;;
+            esac
+            COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+            return 0
+            ;;
+        hbx__subcmd__help__subcmd__auth__subcmd__status)
             opts=""
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )

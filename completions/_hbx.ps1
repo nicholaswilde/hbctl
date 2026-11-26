@@ -35,6 +35,7 @@ Register-ArgumentCompleter -Native -CommandName 'hbx' -ScriptBlock {
             [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
             [CompletionResult]::new('-V', '-V ', [CompletionResultType]::ParameterName, 'Print version')
             [CompletionResult]::new('--version', '--version', [CompletionResultType]::ParameterName, 'Print version')
+            [CompletionResult]::new('auth', 'auth', [CompletionResultType]::ParameterValue, 'Authenticate with a remote Homebox instance (login, status, logout, refresh)')
             [CompletionResult]::new('item', 'item', [CompletionResultType]::ParameterValue, 'Manage inventory items (/api/v1/entities)')
             [CompletionResult]::new('attachment', 'attachment', [CompletionResultType]::ParameterValue, 'Manage item attachments (/api/v1/entities/{id}/attachments)')
             [CompletionResult]::new('search', 'search', [CompletionResultType]::ParameterValue, 'Full-text and structured item search')
@@ -46,6 +47,116 @@ Register-ArgumentCompleter -Native -CommandName 'hbx' -ScriptBlock {
             [CompletionResult]::new('completions', 'completions', [CompletionResultType]::ParameterValue, 'Generate shell completion scripts')
             [CompletionResult]::new('man', 'man', [CompletionResultType]::ParameterValue, 'Generate UNIX roff man page')
             [CompletionResult]::new('help', 'help', [CompletionResultType]::ParameterValue, 'Print this message or the help of the given subcommand(s)')
+            break
+        }
+        'hbx;auth' {
+            [CompletionResult]::new('--url', '--url', [CompletionResultType]::ParameterName, 'Homebox base URL (env: HBX_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)')
+            [CompletionResult]::new('--api-key', '--api-key', [CompletionResultType]::ParameterName, 'Homebox API key or Bearer token (env: HBX_API_KEY > HOMEBOX_API_KEY)')
+            [CompletionResult]::new('--output', '--output', [CompletionResultType]::ParameterName, 'Output format (table, json, plain) [env: HBX_OUTPUT]')
+            [CompletionResult]::new('--select', '--select', [CompletionResultType]::ParameterName, 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)')
+            [CompletionResult]::new('-C', '-C ', [CompletionResultType]::ParameterName, 'Path to explicit TOML configuration file')
+            [CompletionResult]::new('--config', '--config', [CompletionResultType]::ParameterName, 'Path to explicit TOML configuration file')
+            [CompletionResult]::new('--json', '--json', [CompletionResultType]::ParameterName, 'Shorthand for --output json (emits compact JSON)')
+            [CompletionResult]::new('--dry-run', '--dry-run', [CompletionResultType]::ParameterName, 'Preview mutating requests without hitting the server (redacts Authorization)')
+            [CompletionResult]::new('-q', '-q', [CompletionResultType]::ParameterName, 'Output only created/affected IDs for shell piping')
+            [CompletionResult]::new('--quiet', '--quiet', [CompletionResultType]::ParameterName, 'Output only created/affected IDs for shell piping')
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('login', 'login', [CompletionResultType]::ParameterValue, 'Authenticate with Homebox via API key (--with-token) or email/password')
+            [CompletionResult]::new('status', 'status', [CompletionResultType]::ParameterValue, 'Check authentication status and validate the active session')
+            [CompletionResult]::new('logout', 'logout', [CompletionResultType]::ParameterValue, 'Remove stored credentials from OS keyring and local fallback store')
+            [CompletionResult]::new('refresh', 'refresh', [CompletionResultType]::ParameterValue, 'Refresh an active JWT session token')
+            [CompletionResult]::new('help', 'help', [CompletionResultType]::ParameterValue, 'Print this message or the help of the given subcommand(s)')
+            break
+        }
+        'hbx;auth;login' {
+            [CompletionResult]::new('-u', '-u', [CompletionResultType]::ParameterName, 'Email or username for password login (POST /api/v1/users/login)')
+            [CompletionResult]::new('--username', '--username', [CompletionResultType]::ParameterName, 'Email or username for password login (POST /api/v1/users/login)')
+            [CompletionResult]::new('--url', '--url', [CompletionResultType]::ParameterName, 'Homebox base URL (env: HBX_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)')
+            [CompletionResult]::new('--api-key', '--api-key', [CompletionResultType]::ParameterName, 'Homebox API key or Bearer token (env: HBX_API_KEY > HOMEBOX_API_KEY)')
+            [CompletionResult]::new('--output', '--output', [CompletionResultType]::ParameterName, 'Output format (table, json, plain) [env: HBX_OUTPUT]')
+            [CompletionResult]::new('--select', '--select', [CompletionResultType]::ParameterName, 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)')
+            [CompletionResult]::new('-C', '-C ', [CompletionResultType]::ParameterName, 'Path to explicit TOML configuration file')
+            [CompletionResult]::new('--config', '--config', [CompletionResultType]::ParameterName, 'Path to explicit TOML configuration file')
+            [CompletionResult]::new('--with-token', '--with-token', [CompletionResultType]::ParameterName, 'Read a Homebox API key (hb_...) or Bearer token from stdin')
+            [CompletionResult]::new('--password-stdin', '--password-stdin', [CompletionResultType]::ParameterName, 'Read login password from stdin instead of prompting interactively')
+            [CompletionResult]::new('--insecure-storage', '--insecure-storage', [CompletionResultType]::ParameterName, 'Store token in 0600 local file store instead of OS keyring')
+            [CompletionResult]::new('--json', '--json', [CompletionResultType]::ParameterName, 'Shorthand for --output json (emits compact JSON)')
+            [CompletionResult]::new('--dry-run', '--dry-run', [CompletionResultType]::ParameterName, 'Preview mutating requests without hitting the server (redacts Authorization)')
+            [CompletionResult]::new('-q', '-q', [CompletionResultType]::ParameterName, 'Output only created/affected IDs for shell piping')
+            [CompletionResult]::new('--quiet', '--quiet', [CompletionResultType]::ParameterName, 'Output only created/affected IDs for shell piping')
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'hbx;auth;status' {
+            [CompletionResult]::new('--url', '--url', [CompletionResultType]::ParameterName, 'Homebox base URL (env: HBX_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)')
+            [CompletionResult]::new('--api-key', '--api-key', [CompletionResultType]::ParameterName, 'Homebox API key or Bearer token (env: HBX_API_KEY > HOMEBOX_API_KEY)')
+            [CompletionResult]::new('--output', '--output', [CompletionResultType]::ParameterName, 'Output format (table, json, plain) [env: HBX_OUTPUT]')
+            [CompletionResult]::new('--select', '--select', [CompletionResultType]::ParameterName, 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)')
+            [CompletionResult]::new('-C', '-C ', [CompletionResultType]::ParameterName, 'Path to explicit TOML configuration file')
+            [CompletionResult]::new('--config', '--config', [CompletionResultType]::ParameterName, 'Path to explicit TOML configuration file')
+            [CompletionResult]::new('--json', '--json', [CompletionResultType]::ParameterName, 'Shorthand for --output json (emits compact JSON)')
+            [CompletionResult]::new('--dry-run', '--dry-run', [CompletionResultType]::ParameterName, 'Preview mutating requests without hitting the server (redacts Authorization)')
+            [CompletionResult]::new('-q', '-q', [CompletionResultType]::ParameterName, 'Output only created/affected IDs for shell piping')
+            [CompletionResult]::new('--quiet', '--quiet', [CompletionResultType]::ParameterName, 'Output only created/affected IDs for shell piping')
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'hbx;auth;logout' {
+            [CompletionResult]::new('--url', '--url', [CompletionResultType]::ParameterName, 'Homebox base URL (env: HBX_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)')
+            [CompletionResult]::new('--api-key', '--api-key', [CompletionResultType]::ParameterName, 'Homebox API key or Bearer token (env: HBX_API_KEY > HOMEBOX_API_KEY)')
+            [CompletionResult]::new('--output', '--output', [CompletionResultType]::ParameterName, 'Output format (table, json, plain) [env: HBX_OUTPUT]')
+            [CompletionResult]::new('--select', '--select', [CompletionResultType]::ParameterName, 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)')
+            [CompletionResult]::new('-C', '-C ', [CompletionResultType]::ParameterName, 'Path to explicit TOML configuration file')
+            [CompletionResult]::new('--config', '--config', [CompletionResultType]::ParameterName, 'Path to explicit TOML configuration file')
+            [CompletionResult]::new('--insecure-storage', '--insecure-storage', [CompletionResultType]::ParameterName, 'Skip OS keyring and only clear local 0600 fallback store')
+            [CompletionResult]::new('--json', '--json', [CompletionResultType]::ParameterName, 'Shorthand for --output json (emits compact JSON)')
+            [CompletionResult]::new('--dry-run', '--dry-run', [CompletionResultType]::ParameterName, 'Preview mutating requests without hitting the server (redacts Authorization)')
+            [CompletionResult]::new('-q', '-q', [CompletionResultType]::ParameterName, 'Output only created/affected IDs for shell piping')
+            [CompletionResult]::new('--quiet', '--quiet', [CompletionResultType]::ParameterName, 'Output only created/affected IDs for shell piping')
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'hbx;auth;refresh' {
+            [CompletionResult]::new('--url', '--url', [CompletionResultType]::ParameterName, 'Homebox base URL (env: HBX_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)')
+            [CompletionResult]::new('--api-key', '--api-key', [CompletionResultType]::ParameterName, 'Homebox API key or Bearer token (env: HBX_API_KEY > HOMEBOX_API_KEY)')
+            [CompletionResult]::new('--output', '--output', [CompletionResultType]::ParameterName, 'Output format (table, json, plain) [env: HBX_OUTPUT]')
+            [CompletionResult]::new('--select', '--select', [CompletionResultType]::ParameterName, 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)')
+            [CompletionResult]::new('-C', '-C ', [CompletionResultType]::ParameterName, 'Path to explicit TOML configuration file')
+            [CompletionResult]::new('--config', '--config', [CompletionResultType]::ParameterName, 'Path to explicit TOML configuration file')
+            [CompletionResult]::new('--insecure-storage', '--insecure-storage', [CompletionResultType]::ParameterName, 'Store refreshed token in 0600 local file store instead of OS keyring')
+            [CompletionResult]::new('--json', '--json', [CompletionResultType]::ParameterName, 'Shorthand for --output json (emits compact JSON)')
+            [CompletionResult]::new('--dry-run', '--dry-run', [CompletionResultType]::ParameterName, 'Preview mutating requests without hitting the server (redacts Authorization)')
+            [CompletionResult]::new('-q', '-q', [CompletionResultType]::ParameterName, 'Output only created/affected IDs for shell piping')
+            [CompletionResult]::new('--quiet', '--quiet', [CompletionResultType]::ParameterName, 'Output only created/affected IDs for shell piping')
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'hbx;auth;help' {
+            [CompletionResult]::new('login', 'login', [CompletionResultType]::ParameterValue, 'Authenticate with Homebox via API key (--with-token) or email/password')
+            [CompletionResult]::new('status', 'status', [CompletionResultType]::ParameterValue, 'Check authentication status and validate the active session')
+            [CompletionResult]::new('logout', 'logout', [CompletionResultType]::ParameterValue, 'Remove stored credentials from OS keyring and local fallback store')
+            [CompletionResult]::new('refresh', 'refresh', [CompletionResultType]::ParameterValue, 'Refresh an active JWT session token')
+            [CompletionResult]::new('help', 'help', [CompletionResultType]::ParameterValue, 'Print this message or the help of the given subcommand(s)')
+            break
+        }
+        'hbx;auth;help;login' {
+            break
+        }
+        'hbx;auth;help;status' {
+            break
+        }
+        'hbx;auth;help;logout' {
+            break
+        }
+        'hbx;auth;help;refresh' {
+            break
+        }
+        'hbx;auth;help;help' {
             break
         }
         'hbx;item' {
@@ -678,6 +789,7 @@ Register-ArgumentCompleter -Native -CommandName 'hbx' -ScriptBlock {
             break
         }
         'hbx;help' {
+            [CompletionResult]::new('auth', 'auth', [CompletionResultType]::ParameterValue, 'Authenticate with a remote Homebox instance (login, status, logout, refresh)')
             [CompletionResult]::new('item', 'item', [CompletionResultType]::ParameterValue, 'Manage inventory items (/api/v1/entities)')
             [CompletionResult]::new('attachment', 'attachment', [CompletionResultType]::ParameterValue, 'Manage item attachments (/api/v1/entities/{id}/attachments)')
             [CompletionResult]::new('search', 'search', [CompletionResultType]::ParameterValue, 'Full-text and structured item search')
@@ -688,6 +800,25 @@ Register-ArgumentCompleter -Native -CommandName 'hbx' -ScriptBlock {
             [CompletionResult]::new('completions', 'completions', [CompletionResultType]::ParameterValue, 'Generate shell completion scripts')
             [CompletionResult]::new('man', 'man', [CompletionResultType]::ParameterValue, 'Generate UNIX roff man page')
             [CompletionResult]::new('help', 'help', [CompletionResultType]::ParameterValue, 'Print this message or the help of the given subcommand(s)')
+            break
+        }
+        'hbx;help;auth' {
+            [CompletionResult]::new('login', 'login', [CompletionResultType]::ParameterValue, 'Authenticate with Homebox via API key (--with-token) or email/password')
+            [CompletionResult]::new('status', 'status', [CompletionResultType]::ParameterValue, 'Check authentication status and validate the active session')
+            [CompletionResult]::new('logout', 'logout', [CompletionResultType]::ParameterValue, 'Remove stored credentials from OS keyring and local fallback store')
+            [CompletionResult]::new('refresh', 'refresh', [CompletionResultType]::ParameterValue, 'Refresh an active JWT session token')
+            break
+        }
+        'hbx;help;auth;login' {
+            break
+        }
+        'hbx;help;auth;status' {
+            break
+        }
+        'hbx;help;auth;logout' {
+            break
+        }
+        'hbx;help;auth;refresh' {
             break
         }
         'hbx;help;item' {

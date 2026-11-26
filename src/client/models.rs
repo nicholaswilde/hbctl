@@ -221,6 +221,54 @@ fn parse_bool_loose(s: &str) -> Option<bool> {
     }
 }
 
+/// Homebox auth login / refresh response (`/api/v1/users/login`, `/api/v1/users/refresh`).
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+pub struct LoginResponse {
+    pub token: String,
+
+    #[serde(rename = "expiresAt", default, skip_serializing_if = "Option::is_none")]
+    pub expires_at: Option<String>,
+}
+
+/// Authenticated Homebox user profile (`/api/v1/users/self`).
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+pub struct UserProfile {
+    #[serde(default)]
+    pub id: String,
+
+    #[serde(default)]
+    pub name: String,
+
+    #[serde(default)]
+    pub email: String,
+
+    #[serde(rename = "groupId", default, skip_serializing_if = "Option::is_none")]
+    pub group_id: Option<String>,
+
+    #[serde(rename = "groupName", default, skip_serializing_if = "Option::is_none")]
+    pub group_name: Option<String>,
+
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// Homebox `/api/v1/users/self` may wrap the profile under `{"item": {...}}` or return it flat.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(untagged)]
+pub enum UserSelfResponse {
+    Wrapped { item: UserProfile },
+    Flat(UserProfile),
+}
+
+impl UserSelfResponse {
+    pub fn into_profile(self) -> UserProfile {
+        match self {
+            Self::Wrapped { item } => item,
+            Self::Flat(profile) => profile,
+        }
+    }
+}
+
 /// Homebox tag (`/api/v1/tags`).
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct Tag {

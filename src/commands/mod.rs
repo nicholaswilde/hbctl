@@ -1,4 +1,5 @@
 pub mod attachment;
+pub mod auth;
 pub mod entity_type;
 pub mod export;
 pub mod field;
@@ -25,6 +26,15 @@ pub fn dispatch(
     err: &mut dyn Write,
 ) -> Result<()> {
     match &cli.command {
+        Commands::Auth(args) => auth::handle(
+            args,
+            cli.dry_run,
+            cli.config.as_ref(),
+            config,
+            ctx,
+            out,
+            err,
+        ),
         Commands::Item(args) => item::handle(args, cli.dry_run, config, ctx, out, err),
         Commands::Attachment(args) => attachment::handle(args, cli.dry_run, config, ctx, out, err),
         Commands::Search(args) => search::handle(args, config, ctx, out, err),

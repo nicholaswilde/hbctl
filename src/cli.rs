@@ -66,6 +66,9 @@ impl Cli {
 
 #[derive(Subcommand, Debug, Clone)]
 pub enum Commands {
+    /// Authenticate with a remote Homebox instance (login, status, logout, refresh)
+    Auth(AuthArgs),
+
     /// Manage inventory items (/api/v1/entities)
     Item(ItemArgs),
 
@@ -97,6 +100,61 @@ pub enum Commands {
 
     /// Generate UNIX roff man page
     Man,
+}
+
+// -----------------------------------------------------------------------------
+// Auth
+// -----------------------------------------------------------------------------
+
+#[derive(Args, Debug, Clone)]
+pub struct AuthArgs {
+    #[command(subcommand)]
+    pub command: AuthCommands,
+}
+
+#[derive(Subcommand, Debug, Clone)]
+pub enum AuthCommands {
+    /// Authenticate with Homebox via API key (--with-token) or email/password
+    Login(AuthLoginArgs),
+    /// Check authentication status and validate the active session
+    Status,
+    /// Remove stored credentials from OS keyring and local fallback store
+    Logout(AuthLogoutArgs),
+    /// Refresh an active JWT session token
+    Refresh(AuthRefreshArgs),
+}
+
+#[derive(Args, Debug, Clone)]
+pub struct AuthLoginArgs {
+    /// Read a Homebox API key (hb_...) or Bearer token from stdin
+    #[arg(long, conflicts_with_all = ["username", "password_stdin"])]
+    pub with_token: bool,
+
+    /// Email or username for password login (POST /api/v1/users/login)
+    #[arg(short = 'u', long)]
+    pub username: Option<String>,
+
+    /// Read login password from stdin instead of prompting interactively
+    #[arg(long)]
+    pub password_stdin: bool,
+
+    /// Store token in 0600 local file store instead of OS keyring
+    #[arg(long)]
+    pub insecure_storage: bool,
+}
+
+#[derive(Args, Debug, Clone)]
+pub struct AuthLogoutArgs {
+    /// Skip OS keyring and only clear local 0600 fallback store
+    #[arg(long)]
+    pub insecure_storage: bool,
+}
+
+#[derive(Args, Debug, Clone)]
+pub struct AuthRefreshArgs {
+    /// Store refreshed token in 0600 local file store instead of OS keyring
+    #[arg(long)]
+    pub insecure_storage: bool,
 }
 
 // -----------------------------------------------------------------------------

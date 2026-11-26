@@ -13,8 +13,14 @@
 # url = "http://192.168.1.50:7745"
 
 # Homebox API key (hb_...) or Bearer token.
+# Prefer `hbx auth login` (stores secret in OS keyring with 0600 file fallback) or env vars.
 # CLI: --api-key <KEY> | Env: HBX_API_KEY > HOMEBOX_API_KEY
 # api_key = "hb_..."
+
+# Non-secret authentication metadata managed automatically by `hbx auth login` / `refresh`:
+# token_type = "api_key"          # "api_key" or "jwt"
+# expires_at = "2027-01-01T00:00:00Z"
+# credential_backend = "keyring"  # "keyring" or "file"
 
 # Default output format: "table", "json", or "plain".
 # CLI: --output <table|json|plain> (--json) | Env: HBX_OUTPUT

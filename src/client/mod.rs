@@ -15,7 +15,7 @@ use serde_json::{json, Value};
 
 use crate::client::models::{
     merge_entity_patch, upsert_custom_fields, Attachment, CreateEntityRequest, Entity, EntityPatch,
-    EntityType, ListResponse, Tag,
+    EntityType, ListResponse, LoginResponse, Tag, UserProfile, UserSelfResponse,
 };
 use crate::config::{
     normalize_auth_header, normalize_base_url, redact_auth_header, redact_secret, AppConfig,
@@ -468,5 +468,74 @@ impl HomeboxClient {
             .header(AUTHORIZATION, &self.auth_header)
             .send()?;
         self.handle_empty_response(resp)
+    }
+
+    // -------------------------------------------------------------------------
+    // Authentication (`/api/v1/users/login`, `/users/self`, `/users/refresh`)
+    // -------------------------------------------------------------------------
+
+    /// Authenticate with email/username and password via `POST /api/v1/users/login`.
+    pub fn login(
+        base_url: &str,
+        username: &str,
+        password: &str,
+        timeout_secs: u64,
+    ) -> Result<LoginResponse> {
+        let normalized = normalize_base_url(base_url)?;
+        let http = Client::builder()
+            .timeout(Duration::from_secs(timeout_secs.max(1)))
+            .build()?;
+
+        let resp = http
+            .post(format!("{normalized}/users/login"))
+            .header(CONTENT_TYPE, "application/json")
+            .json(&json!({
+                "username": username,
+                "password": password,
+                "stayLoggedIn": true,
+            }))
+            .send()?;
+
+        let status = resp.status();
+        let text = resp.text()?;
+        if !status.is_success() {
+            let safe = redact_secret(&text, password);
+            return Err(HbxError::Http {
+                status: status.as_u16(),
+                message: safe,
+            });
+        }
+        serde_json::from_str(&text).map_err(HbxError::from)
+    }
+
+    /// Fetch the authenticated user's profile (`GET /api/v1/users/self`).
+    pub fn get_current_user(&self) -> Result<UserProfile> {
+        let resp = self
+            .http
+            .get(self.endpoint("users/self"))
+            .header(AUTHORIZATION, &self.auth_header)
+            .send()?;
+        let parsed: UserSelfResponse = self.handle_response(resp)?;
+        Ok(parsed.into_profile())
+    }
+
+    /// Refresh an active JWT session (`GET /api/v1/users/refresh`, falling back to `POST` on 405).
+    pub fn refresh_token(&self) -> Result<LoginResponse> {
+        let resp = self
+            .http
+            .get(self.endpoint("users/refresh"))
+            .header(AUTHORIZATION, &self.auth_header)
+            .send()?;
+
+        if resp.status().as_u16() == 405 {
+            let post_resp = self
+                .http
+                .post(self.endpoint("users/refresh"))
+                .header(AUTHORIZATION, &self.auth_header)
+                .send()?;
+            return self.handle_response(post_resp);
+        }
+
+        self.handle_response(resp)
     }
 }

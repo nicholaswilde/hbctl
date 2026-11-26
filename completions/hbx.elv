@@ -32,6 +32,7 @@ set edit:completion:arg-completer[hbx] = {|@words|
             cand --help 'Print help'
             cand -V 'Print version'
             cand --version 'Print version'
+            cand auth 'Authenticate with a remote Homebox instance (login, status, logout, refresh)'
             cand item 'Manage inventory items (/api/v1/entities)'
             cand attachment 'Manage item attachments (/api/v1/entities/{id}/attachments)'
             cand search 'Full-text and structured item search'
@@ -43,6 +44,105 @@ set edit:completion:arg-completer[hbx] = {|@words|
             cand completions 'Generate shell completion scripts'
             cand man 'Generate UNIX roff man page'
             cand help 'Print this message or the help of the given subcommand(s)'
+        }
+        &'hbx;auth'= {
+            cand --url 'Homebox base URL (env: HBX_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
+            cand --api-key 'Homebox API key or Bearer token (env: HBX_API_KEY > HOMEBOX_API_KEY)'
+            cand --output 'Output format (table, json, plain) [env: HBX_OUTPUT]'
+            cand --select 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)'
+            cand -C 'Path to explicit TOML configuration file'
+            cand --config 'Path to explicit TOML configuration file'
+            cand --json 'Shorthand for --output json (emits compact JSON)'
+            cand --dry-run 'Preview mutating requests without hitting the server (redacts Authorization)'
+            cand -q 'Output only created/affected IDs for shell piping'
+            cand --quiet 'Output only created/affected IDs for shell piping'
+            cand -h 'Print help'
+            cand --help 'Print help'
+            cand login 'Authenticate with Homebox via API key (--with-token) or email/password'
+            cand status 'Check authentication status and validate the active session'
+            cand logout 'Remove stored credentials from OS keyring and local fallback store'
+            cand refresh 'Refresh an active JWT session token'
+            cand help 'Print this message or the help of the given subcommand(s)'
+        }
+        &'hbx;auth;login'= {
+            cand -u 'Email or username for password login (POST /api/v1/users/login)'
+            cand --username 'Email or username for password login (POST /api/v1/users/login)'
+            cand --url 'Homebox base URL (env: HBX_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
+            cand --api-key 'Homebox API key or Bearer token (env: HBX_API_KEY > HOMEBOX_API_KEY)'
+            cand --output 'Output format (table, json, plain) [env: HBX_OUTPUT]'
+            cand --select 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)'
+            cand -C 'Path to explicit TOML configuration file'
+            cand --config 'Path to explicit TOML configuration file'
+            cand --with-token 'Read a Homebox API key (hb_...) or Bearer token from stdin'
+            cand --password-stdin 'Read login password from stdin instead of prompting interactively'
+            cand --insecure-storage 'Store token in 0600 local file store instead of OS keyring'
+            cand --json 'Shorthand for --output json (emits compact JSON)'
+            cand --dry-run 'Preview mutating requests without hitting the server (redacts Authorization)'
+            cand -q 'Output only created/affected IDs for shell piping'
+            cand --quiet 'Output only created/affected IDs for shell piping'
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'hbx;auth;status'= {
+            cand --url 'Homebox base URL (env: HBX_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
+            cand --api-key 'Homebox API key or Bearer token (env: HBX_API_KEY > HOMEBOX_API_KEY)'
+            cand --output 'Output format (table, json, plain) [env: HBX_OUTPUT]'
+            cand --select 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)'
+            cand -C 'Path to explicit TOML configuration file'
+            cand --config 'Path to explicit TOML configuration file'
+            cand --json 'Shorthand for --output json (emits compact JSON)'
+            cand --dry-run 'Preview mutating requests without hitting the server (redacts Authorization)'
+            cand -q 'Output only created/affected IDs for shell piping'
+            cand --quiet 'Output only created/affected IDs for shell piping'
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'hbx;auth;logout'= {
+            cand --url 'Homebox base URL (env: HBX_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
+            cand --api-key 'Homebox API key or Bearer token (env: HBX_API_KEY > HOMEBOX_API_KEY)'
+            cand --output 'Output format (table, json, plain) [env: HBX_OUTPUT]'
+            cand --select 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)'
+            cand -C 'Path to explicit TOML configuration file'
+            cand --config 'Path to explicit TOML configuration file'
+            cand --insecure-storage 'Skip OS keyring and only clear local 0600 fallback store'
+            cand --json 'Shorthand for --output json (emits compact JSON)'
+            cand --dry-run 'Preview mutating requests without hitting the server (redacts Authorization)'
+            cand -q 'Output only created/affected IDs for shell piping'
+            cand --quiet 'Output only created/affected IDs for shell piping'
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'hbx;auth;refresh'= {
+            cand --url 'Homebox base URL (env: HBX_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
+            cand --api-key 'Homebox API key or Bearer token (env: HBX_API_KEY > HOMEBOX_API_KEY)'
+            cand --output 'Output format (table, json, plain) [env: HBX_OUTPUT]'
+            cand --select 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)'
+            cand -C 'Path to explicit TOML configuration file'
+            cand --config 'Path to explicit TOML configuration file'
+            cand --insecure-storage 'Store refreshed token in 0600 local file store instead of OS keyring'
+            cand --json 'Shorthand for --output json (emits compact JSON)'
+            cand --dry-run 'Preview mutating requests without hitting the server (redacts Authorization)'
+            cand -q 'Output only created/affected IDs for shell piping'
+            cand --quiet 'Output only created/affected IDs for shell piping'
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'hbx;auth;help'= {
+            cand login 'Authenticate with Homebox via API key (--with-token) or email/password'
+            cand status 'Check authentication status and validate the active session'
+            cand logout 'Remove stored credentials from OS keyring and local fallback store'
+            cand refresh 'Refresh an active JWT session token'
+            cand help 'Print this message or the help of the given subcommand(s)'
+        }
+        &'hbx;auth;help;login'= {
+        }
+        &'hbx;auth;help;status'= {
+        }
+        &'hbx;auth;help;logout'= {
+        }
+        &'hbx;auth;help;refresh'= {
+        }
+        &'hbx;auth;help;help'= {
         }
         &'hbx;item'= {
             cand --url 'Homebox base URL (env: HBX_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
@@ -616,6 +716,7 @@ set edit:completion:arg-completer[hbx] = {|@words|
             cand --help 'Print help'
         }
         &'hbx;help'= {
+            cand auth 'Authenticate with a remote Homebox instance (login, status, logout, refresh)'
             cand item 'Manage inventory items (/api/v1/entities)'
             cand attachment 'Manage item attachments (/api/v1/entities/{id}/attachments)'
             cand search 'Full-text and structured item search'
@@ -626,6 +727,20 @@ set edit:completion:arg-completer[hbx] = {|@words|
             cand completions 'Generate shell completion scripts'
             cand man 'Generate UNIX roff man page'
             cand help 'Print this message or the help of the given subcommand(s)'
+        }
+        &'hbx;help;auth'= {
+            cand login 'Authenticate with Homebox via API key (--with-token) or email/password'
+            cand status 'Check authentication status and validate the active session'
+            cand logout 'Remove stored credentials from OS keyring and local fallback store'
+            cand refresh 'Refresh an active JWT session token'
+        }
+        &'hbx;help;auth;login'= {
+        }
+        &'hbx;help;auth;status'= {
+        }
+        &'hbx;help;auth;logout'= {
+        }
+        &'hbx;help;auth;refresh'= {
         }
         &'hbx;help;item'= {
             cand list 'List inventory items'

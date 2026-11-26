@@ -1,3 +1,4 @@
+pub mod auth_store;
 pub mod cli;
 pub mod client;
 pub mod commands;

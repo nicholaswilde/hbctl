@@ -36,6 +36,7 @@ complete -c hbx -n "__fish_hbx_needs_command" -l dry-run -d 'Preview mutating re
 complete -c hbx -n "__fish_hbx_needs_command" -s q -l quiet -d 'Output only created/affected IDs for shell piping'
 complete -c hbx -n "__fish_hbx_needs_command" -s h -l help -d 'Print help'
 complete -c hbx -n "__fish_hbx_needs_command" -s V -l version -d 'Print version'
+complete -c hbx -n "__fish_hbx_needs_command" -f -a "auth" -d 'Authenticate with a remote Homebox instance (login, status, logout, refresh)'
 complete -c hbx -n "__fish_hbx_needs_command" -f -a "item" -d 'Manage inventory items (/api/v1/entities)'
 complete -c hbx -n "__fish_hbx_needs_command" -f -a "attachment" -d 'Manage item attachments (/api/v1/entities/{id}/attachments)'
 complete -c hbx -n "__fish_hbx_needs_command" -f -a "search" -d 'Full-text and structured item search'
@@ -47,6 +48,77 @@ complete -c hbx -n "__fish_hbx_needs_command" -f -a "export" -d 'Export filtered
 complete -c hbx -n "__fish_hbx_needs_command" -f -a "completions" -d 'Generate shell completion scripts'
 complete -c hbx -n "__fish_hbx_needs_command" -f -a "man" -d 'Generate UNIX roff man page'
 complete -c hbx -n "__fish_hbx_needs_command" -f -a "help" -d 'Print this message or the help of the given subcommand(s)'
+complete -c hbx -n "__fish_hbx_using_subcommand auth; and not __fish_seen_subcommand_from login status logout refresh help" -l url -d 'Homebox base URL (env: HBX_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)' -r
+complete -c hbx -n "__fish_hbx_using_subcommand auth; and not __fish_seen_subcommand_from login status logout refresh help" -l api-key -d 'Homebox API key or Bearer token (env: HBX_API_KEY > HOMEBOX_API_KEY)' -r
+complete -c hbx -n "__fish_hbx_using_subcommand auth; and not __fish_seen_subcommand_from login status logout refresh help" -l output -d 'Output format (table, json, plain) [env: HBX_OUTPUT]' -r -f -a "table\t''
+json\t''
+plain\t''"
+complete -c hbx -n "__fish_hbx_using_subcommand auth; and not __fish_seen_subcommand_from login status logout refresh help" -l select -d 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)' -r
+complete -c hbx -n "__fish_hbx_using_subcommand auth; and not __fish_seen_subcommand_from login status logout refresh help" -s C -l config -d 'Path to explicit TOML configuration file' -r -F
+complete -c hbx -n "__fish_hbx_using_subcommand auth; and not __fish_seen_subcommand_from login status logout refresh help" -l json -d 'Shorthand for --output json (emits compact JSON)'
+complete -c hbx -n "__fish_hbx_using_subcommand auth; and not __fish_seen_subcommand_from login status logout refresh help" -l dry-run -d 'Preview mutating requests without hitting the server (redacts Authorization)'
+complete -c hbx -n "__fish_hbx_using_subcommand auth; and not __fish_seen_subcommand_from login status logout refresh help" -s q -l quiet -d 'Output only created/affected IDs for shell piping'
+complete -c hbx -n "__fish_hbx_using_subcommand auth; and not __fish_seen_subcommand_from login status logout refresh help" -s h -l help -d 'Print help'
+complete -c hbx -n "__fish_hbx_using_subcommand auth; and not __fish_seen_subcommand_from login status logout refresh help" -f -a "login" -d 'Authenticate with Homebox via API key (--with-token) or email/password'
+complete -c hbx -n "__fish_hbx_using_subcommand auth; and not __fish_seen_subcommand_from login status logout refresh help" -f -a "status" -d 'Check authentication status and validate the active session'
+complete -c hbx -n "__fish_hbx_using_subcommand auth; and not __fish_seen_subcommand_from login status logout refresh help" -f -a "logout" -d 'Remove stored credentials from OS keyring and local fallback store'
+complete -c hbx -n "__fish_hbx_using_subcommand auth; and not __fish_seen_subcommand_from login status logout refresh help" -f -a "refresh" -d 'Refresh an active JWT session token'
+complete -c hbx -n "__fish_hbx_using_subcommand auth; and not __fish_seen_subcommand_from login status logout refresh help" -f -a "help" -d 'Print this message or the help of the given subcommand(s)'
+complete -c hbx -n "__fish_hbx_using_subcommand auth; and __fish_seen_subcommand_from login" -s u -l username -d 'Email or username for password login (POST /api/v1/users/login)' -r
+complete -c hbx -n "__fish_hbx_using_subcommand auth; and __fish_seen_subcommand_from login" -l url -d 'Homebox base URL (env: HBX_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)' -r
+complete -c hbx -n "__fish_hbx_using_subcommand auth; and __fish_seen_subcommand_from login" -l api-key -d 'Homebox API key or Bearer token (env: HBX_API_KEY > HOMEBOX_API_KEY)' -r
+complete -c hbx -n "__fish_hbx_using_subcommand auth; and __fish_seen_subcommand_from login" -l output -d 'Output format (table, json, plain) [env: HBX_OUTPUT]' -r -f -a "table\t''
+json\t''
+plain\t''"
+complete -c hbx -n "__fish_hbx_using_subcommand auth; and __fish_seen_subcommand_from login" -l select -d 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)' -r
+complete -c hbx -n "__fish_hbx_using_subcommand auth; and __fish_seen_subcommand_from login" -s C -l config -d 'Path to explicit TOML configuration file' -r -F
+complete -c hbx -n "__fish_hbx_using_subcommand auth; and __fish_seen_subcommand_from login" -l with-token -d 'Read a Homebox API key (hb_...) or Bearer token from stdin'
+complete -c hbx -n "__fish_hbx_using_subcommand auth; and __fish_seen_subcommand_from login" -l password-stdin -d 'Read login password from stdin instead of prompting interactively'
+complete -c hbx -n "__fish_hbx_using_subcommand auth; and __fish_seen_subcommand_from login" -l insecure-storage -d 'Store token in 0600 local file store instead of OS keyring'
+complete -c hbx -n "__fish_hbx_using_subcommand auth; and __fish_seen_subcommand_from login" -l json -d 'Shorthand for --output json (emits compact JSON)'
+complete -c hbx -n "__fish_hbx_using_subcommand auth; and __fish_seen_subcommand_from login" -l dry-run -d 'Preview mutating requests without hitting the server (redacts Authorization)'
+complete -c hbx -n "__fish_hbx_using_subcommand auth; and __fish_seen_subcommand_from login" -s q -l quiet -d 'Output only created/affected IDs for shell piping'
+complete -c hbx -n "__fish_hbx_using_subcommand auth; and __fish_seen_subcommand_from login" -s h -l help -d 'Print help'
+complete -c hbx -n "__fish_hbx_using_subcommand auth; and __fish_seen_subcommand_from status" -l url -d 'Homebox base URL (env: HBX_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)' -r
+complete -c hbx -n "__fish_hbx_using_subcommand auth; and __fish_seen_subcommand_from status" -l api-key -d 'Homebox API key or Bearer token (env: HBX_API_KEY > HOMEBOX_API_KEY)' -r
+complete -c hbx -n "__fish_hbx_using_subcommand auth; and __fish_seen_subcommand_from status" -l output -d 'Output format (table, json, plain) [env: HBX_OUTPUT]' -r -f -a "table\t''
+json\t''
+plain\t''"
+complete -c hbx -n "__fish_hbx_using_subcommand auth; and __fish_seen_subcommand_from status" -l select -d 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)' -r
+complete -c hbx -n "__fish_hbx_using_subcommand auth; and __fish_seen_subcommand_from status" -s C -l config -d 'Path to explicit TOML configuration file' -r -F
+complete -c hbx -n "__fish_hbx_using_subcommand auth; and __fish_seen_subcommand_from status" -l json -d 'Shorthand for --output json (emits compact JSON)'
+complete -c hbx -n "__fish_hbx_using_subcommand auth; and __fish_seen_subcommand_from status" -l dry-run -d 'Preview mutating requests without hitting the server (redacts Authorization)'
+complete -c hbx -n "__fish_hbx_using_subcommand auth; and __fish_seen_subcommand_from status" -s q -l quiet -d 'Output only created/affected IDs for shell piping'
+complete -c hbx -n "__fish_hbx_using_subcommand auth; and __fish_seen_subcommand_from status" -s h -l help -d 'Print help'
+complete -c hbx -n "__fish_hbx_using_subcommand auth; and __fish_seen_subcommand_from logout" -l url -d 'Homebox base URL (env: HBX_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)' -r
+complete -c hbx -n "__fish_hbx_using_subcommand auth; and __fish_seen_subcommand_from logout" -l api-key -d 'Homebox API key or Bearer token (env: HBX_API_KEY > HOMEBOX_API_KEY)' -r
+complete -c hbx -n "__fish_hbx_using_subcommand auth; and __fish_seen_subcommand_from logout" -l output -d 'Output format (table, json, plain) [env: HBX_OUTPUT]' -r -f -a "table\t''
+json\t''
+plain\t''"
+complete -c hbx -n "__fish_hbx_using_subcommand auth; and __fish_seen_subcommand_from logout" -l select -d 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)' -r
+complete -c hbx -n "__fish_hbx_using_subcommand auth; and __fish_seen_subcommand_from logout" -s C -l config -d 'Path to explicit TOML configuration file' -r -F
+complete -c hbx -n "__fish_hbx_using_subcommand auth; and __fish_seen_subcommand_from logout" -l insecure-storage -d 'Skip OS keyring and only clear local 0600 fallback store'
+complete -c hbx -n "__fish_hbx_using_subcommand auth; and __fish_seen_subcommand_from logout" -l json -d 'Shorthand for --output json (emits compact JSON)'
+complete -c hbx -n "__fish_hbx_using_subcommand auth; and __fish_seen_subcommand_from logout" -l dry-run -d 'Preview mutating requests without hitting the server (redacts Authorization)'
+complete -c hbx -n "__fish_hbx_using_subcommand auth; and __fish_seen_subcommand_from logout" -s q -l quiet -d 'Output only created/affected IDs for shell piping'
+complete -c hbx -n "__fish_hbx_using_subcommand auth; and __fish_seen_subcommand_from logout" -s h -l help -d 'Print help'
+complete -c hbx -n "__fish_hbx_using_subcommand auth; and __fish_seen_subcommand_from refresh" -l url -d 'Homebox base URL (env: HBX_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)' -r
+complete -c hbx -n "__fish_hbx_using_subcommand auth; and __fish_seen_subcommand_from refresh" -l api-key -d 'Homebox API key or Bearer token (env: HBX_API_KEY > HOMEBOX_API_KEY)' -r
+complete -c hbx -n "__fish_hbx_using_subcommand auth; and __fish_seen_subcommand_from refresh" -l output -d 'Output format (table, json, plain) [env: HBX_OUTPUT]' -r -f -a "table\t''
+json\t''
+plain\t''"
+complete -c hbx -n "__fish_hbx_using_subcommand auth; and __fish_seen_subcommand_from refresh" -l select -d 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)' -r
+complete -c hbx -n "__fish_hbx_using_subcommand auth; and __fish_seen_subcommand_from refresh" -s C -l config -d 'Path to explicit TOML configuration file' -r -F
+complete -c hbx -n "__fish_hbx_using_subcommand auth; and __fish_seen_subcommand_from refresh" -l insecure-storage -d 'Store refreshed token in 0600 local file store instead of OS keyring'
+complete -c hbx -n "__fish_hbx_using_subcommand auth; and __fish_seen_subcommand_from refresh" -l json -d 'Shorthand for --output json (emits compact JSON)'
+complete -c hbx -n "__fish_hbx_using_subcommand auth; and __fish_seen_subcommand_from refresh" -l dry-run -d 'Preview mutating requests without hitting the server (redacts Authorization)'
+complete -c hbx -n "__fish_hbx_using_subcommand auth; and __fish_seen_subcommand_from refresh" -s q -l quiet -d 'Output only created/affected IDs for shell piping'
+complete -c hbx -n "__fish_hbx_using_subcommand auth; and __fish_seen_subcommand_from refresh" -s h -l help -d 'Print help'
+complete -c hbx -n "__fish_hbx_using_subcommand auth; and __fish_seen_subcommand_from help" -f -a "login" -d 'Authenticate with Homebox via API key (--with-token) or email/password'
+complete -c hbx -n "__fish_hbx_using_subcommand auth; and __fish_seen_subcommand_from help" -f -a "status" -d 'Check authentication status and validate the active session'
+complete -c hbx -n "__fish_hbx_using_subcommand auth; and __fish_seen_subcommand_from help" -f -a "logout" -d 'Remove stored credentials from OS keyring and local fallback store'
+complete -c hbx -n "__fish_hbx_using_subcommand auth; and __fish_seen_subcommand_from help" -f -a "refresh" -d 'Refresh an active JWT session token'
+complete -c hbx -n "__fish_hbx_using_subcommand auth; and __fish_seen_subcommand_from help" -f -a "help" -d 'Print this message or the help of the given subcommand(s)'
 complete -c hbx -n "__fish_hbx_using_subcommand item; and not __fish_seen_subcommand_from list get create update upsert delete import dedup help" -l url -d 'Homebox base URL (env: HBX_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)' -r
 complete -c hbx -n "__fish_hbx_using_subcommand item; and not __fish_seen_subcommand_from list get create update upsert delete import dedup help" -l api-key -d 'Homebox API key or Bearer token (env: HBX_API_KEY > HOMEBOX_API_KEY)' -r
 complete -c hbx -n "__fish_hbx_using_subcommand item; and not __fish_seen_subcommand_from list get create update upsert delete import dedup help" -l output -d 'Output format (table, json, plain) [env: HBX_OUTPUT]' -r -f -a "table\t''
@@ -486,16 +558,21 @@ complete -c hbx -n "__fish_hbx_using_subcommand man" -l json -d 'Shorthand for -
 complete -c hbx -n "__fish_hbx_using_subcommand man" -l dry-run -d 'Preview mutating requests without hitting the server (redacts Authorization)'
 complete -c hbx -n "__fish_hbx_using_subcommand man" -s q -l quiet -d 'Output only created/affected IDs for shell piping'
 complete -c hbx -n "__fish_hbx_using_subcommand man" -s h -l help -d 'Print help'
-complete -c hbx -n "__fish_hbx_using_subcommand help; and not __fish_seen_subcommand_from item attachment search field tag entity-types export completions man help" -f -a "item" -d 'Manage inventory items (/api/v1/entities)'
-complete -c hbx -n "__fish_hbx_using_subcommand help; and not __fish_seen_subcommand_from item attachment search field tag entity-types export completions man help" -f -a "attachment" -d 'Manage item attachments (/api/v1/entities/{id}/attachments)'
-complete -c hbx -n "__fish_hbx_using_subcommand help; and not __fish_seen_subcommand_from item attachment search field tag entity-types export completions man help" -f -a "search" -d 'Full-text and structured item search'
-complete -c hbx -n "__fish_hbx_using_subcommand help; and not __fish_seen_subcommand_from item attachment search field tag entity-types export completions man help" -f -a "field" -d 'Get or set typed custom fields on an item'
-complete -c hbx -n "__fish_hbx_using_subcommand help; and not __fish_seen_subcommand_from item attachment search field tag entity-types export completions man help" -f -a "tag" -d 'Manage tags (/api/v1/tags)'
-complete -c hbx -n "__fish_hbx_using_subcommand help; and not __fish_seen_subcommand_from item attachment search field tag entity-types export completions man help" -f -a "entity-types" -d 'List Homebox entity types (/api/v1/entity-types)'
-complete -c hbx -n "__fish_hbx_using_subcommand help; and not __fish_seen_subcommand_from item attachment search field tag entity-types export completions man help" -f -a "export" -d 'Export filtered items to JSON, CSV, or Markdown'
-complete -c hbx -n "__fish_hbx_using_subcommand help; and not __fish_seen_subcommand_from item attachment search field tag entity-types export completions man help" -f -a "completions" -d 'Generate shell completion scripts'
-complete -c hbx -n "__fish_hbx_using_subcommand help; and not __fish_seen_subcommand_from item attachment search field tag entity-types export completions man help" -f -a "man" -d 'Generate UNIX roff man page'
-complete -c hbx -n "__fish_hbx_using_subcommand help; and not __fish_seen_subcommand_from item attachment search field tag entity-types export completions man help" -f -a "help" -d 'Print this message or the help of the given subcommand(s)'
+complete -c hbx -n "__fish_hbx_using_subcommand help; and not __fish_seen_subcommand_from auth item attachment search field tag entity-types export completions man help" -f -a "auth" -d 'Authenticate with a remote Homebox instance (login, status, logout, refresh)'
+complete -c hbx -n "__fish_hbx_using_subcommand help; and not __fish_seen_subcommand_from auth item attachment search field tag entity-types export completions man help" -f -a "item" -d 'Manage inventory items (/api/v1/entities)'
+complete -c hbx -n "__fish_hbx_using_subcommand help; and not __fish_seen_subcommand_from auth item attachment search field tag entity-types export completions man help" -f -a "attachment" -d 'Manage item attachments (/api/v1/entities/{id}/attachments)'
+complete -c hbx -n "__fish_hbx_using_subcommand help; and not __fish_seen_subcommand_from auth item attachment search field tag entity-types export completions man help" -f -a "search" -d 'Full-text and structured item search'
+complete -c hbx -n "__fish_hbx_using_subcommand help; and not __fish_seen_subcommand_from auth item attachment search field tag entity-types export completions man help" -f -a "field" -d 'Get or set typed custom fields on an item'
+complete -c hbx -n "__fish_hbx_using_subcommand help; and not __fish_seen_subcommand_from auth item attachment search field tag entity-types export completions man help" -f -a "tag" -d 'Manage tags (/api/v1/tags)'
+complete -c hbx -n "__fish_hbx_using_subcommand help; and not __fish_seen_subcommand_from auth item attachment search field tag entity-types export completions man help" -f -a "entity-types" -d 'List Homebox entity types (/api/v1/entity-types)'
+complete -c hbx -n "__fish_hbx_using_subcommand help; and not __fish_seen_subcommand_from auth item attachment search field tag entity-types export completions man help" -f -a "export" -d 'Export filtered items to JSON, CSV, or Markdown'
+complete -c hbx -n "__fish_hbx_using_subcommand help; and not __fish_seen_subcommand_from auth item attachment search field tag entity-types export completions man help" -f -a "completions" -d 'Generate shell completion scripts'
+complete -c hbx -n "__fish_hbx_using_subcommand help; and not __fish_seen_subcommand_from auth item attachment search field tag entity-types export completions man help" -f -a "man" -d 'Generate UNIX roff man page'
+complete -c hbx -n "__fish_hbx_using_subcommand help; and not __fish_seen_subcommand_from auth item attachment search field tag entity-types export completions man help" -f -a "help" -d 'Print this message or the help of the given subcommand(s)'
+complete -c hbx -n "__fish_hbx_using_subcommand help; and __fish_seen_subcommand_from auth" -f -a "login" -d 'Authenticate with Homebox via API key (--with-token) or email/password'
+complete -c hbx -n "__fish_hbx_using_subcommand help; and __fish_seen_subcommand_from auth" -f -a "status" -d 'Check authentication status and validate the active session'
+complete -c hbx -n "__fish_hbx_using_subcommand help; and __fish_seen_subcommand_from auth" -f -a "logout" -d 'Remove stored credentials from OS keyring and local fallback store'
+complete -c hbx -n "__fish_hbx_using_subcommand help; and __fish_seen_subcommand_from auth" -f -a "refresh" -d 'Refresh an active JWT session token'
 complete -c hbx -n "__fish_hbx_using_subcommand help; and __fish_seen_subcommand_from item" -f -a "list" -d 'List inventory items'
 complete -c hbx -n "__fish_hbx_using_subcommand help; and __fish_seen_subcommand_from item" -f -a "get" -d 'Fetch a single item by ID'
 complete -c hbx -n "__fish_hbx_using_subcommand help; and __fish_seen_subcommand_from item" -f -a "create" -d 'Create a new item (auto-persists custom fields via follow-up PUT)'

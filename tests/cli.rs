@@ -42,6 +42,7 @@ fn hbx(server_url: &str) -> Command {
         "XDG_CONFIG_HOME",
         std::env::temp_dir().join("hbx-test-empty-xdg"),
     )
+    .env("HBX_INSECURE_STORAGE", "1")
     .arg("--url")
     .arg(server_url)
     .arg("--api-key")
@@ -1586,4 +1587,285 @@ fn test_field_tag_entity_types_export_config_completions_and_error_redaction() {
         .assert()
         .success()
         .stdout(predicate::str::contains(".TH hbx"));
+}
+
+#[test]
+fn test_auth_login_status_refresh_logout_precedence_and_redaction() {
+    if !can_execute_binary() {
+        return;
+    }
+    let mut server = Server::new();
+    let xdg_dir = tempdir().unwrap();
+
+    let base_cmd = || {
+        let mut cmd = Command::new(env!("CARGO_BIN_EXE_hbx"));
+        for var in [
+            "HBX_URL",
+            "HBX_API_KEY",
+            "HBX_OUTPUT",
+            "HBX_CONFIG",
+            "HOMEBOX_URL",
+            "HOMEBOX_IP",
+            "HOMEBOX_API_KEY",
+        ] {
+            cmd.env_remove(var);
+        }
+        cmd.env("XDG_CONFIG_HOME", xdg_dir.path())
+            .env("HBX_INSECURE_STORAGE", "1");
+        cmd
+    };
+
+    // 1. Dry-run previews redact secrets & password without hitting server
+    base_cmd()
+        .args([
+            "--url",
+            "http://127.0.0.1:1",
+            "auth",
+            "login",
+            "--with-token",
+            "--dry-run",
+        ])
+        .write_stdin("hb_secret_never_print\n")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Authorization: Bearer ***"))
+        .stdout(predicate::str::contains("hb_secret_never_print").not());
+
+    base_cmd()
+        .args([
+            "--url",
+            "http://127.0.0.1:1",
+            "--json",
+            "auth",
+            "login",
+            "--username",
+            "nick@example.com",
+            "--password-stdin",
+            "--dry-run",
+        ])
+        .write_stdin("MySuperSecretPass123!\n")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"password\":\"***\""))
+        .stdout(predicate::str::contains("MySuperSecretPass123!").not());
+
+    // 2. auth login --with-token persists metadata in config.toml (no plaintext api_key)
+    //    and secret in 0600 credentials.json
+    let self_apikey = server
+        .mock("GET", "/api/v1/users/self")
+        .match_header("authorization", "Bearer hb_live_api_key_42")
+        .with_status(200)
+        .with_body(
+            json!({
+                "item": {
+                    "id": "usr-1",
+                    "name": "Nicholas",
+                    "email": "nick@example.com"
+                }
+            })
+            .to_string(),
+        )
+        .expect(2)
+        .create();
+
+    let login_out = base_cmd()
+        .args([
+            "--url",
+            &server.url(),
+            "--json",
+            "auth",
+            "login",
+            "--with-token",
+            "--insecure-storage",
+        ])
+        .write_stdin("hb_live_api_key_42\n")
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+
+    let login_str = String::from_utf8(login_out).unwrap();
+    assert!(!login_str.contains("hb_live_api_key_42"));
+    let login_json: Value = serde_json::from_str(&login_str).unwrap();
+    assert_eq!(login_json["authenticated"], true);
+    assert_eq!(login_json["token_type"], "api_key");
+    assert_eq!(login_json["source"], "file");
+    assert_eq!(login_json["authorization"], "Bearer ***");
+    assert_eq!(login_json["email"], "nick@example.com");
+
+    // Ensure config.toml does NOT contain plaintext secret
+    let cfg_contents = fs::read_to_string(xdg_dir.path().join("hbx/config.toml")).unwrap();
+    assert!(!cfg_contents.contains("hb_live_api_key_42"));
+    assert!(cfg_contents.contains("token_type = \"api_key\""));
+
+    // 3. auth status works WITHOUT --url or --api-key (loads stored metadata + secret)
+    let status_out = base_cmd()
+        .args(["--json", "auth", "status"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let status_json: Value = serde_json::from_slice(&status_out).unwrap();
+    assert_eq!(status_json["authenticated"], true);
+    assert_eq!(status_json["source"], "credentials_file");
+    assert_eq!(status_json["token_type"], "api_key");
+    assert_eq!(status_json["authorization"], "Bearer ***");
+    self_apikey.assert();
+
+    // Subsequent API command uses stored credentials automatically
+    let tags_mock = server
+        .mock("GET", "/api/v1/tags")
+        .match_header("authorization", "Bearer hb_live_api_key_42")
+        .with_status(200)
+        .with_body(fixture("tags.json"))
+        .create();
+    base_cmd()
+        .args(["-q", "tag", "list"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("tag-elec"));
+    tags_mock.assert();
+
+    // 4. Precedence: HOMEBOX_API_KEY env overrides stored credentials
+    let self_env = server
+        .mock("GET", "/api/v1/users/self")
+        .match_header("authorization", "Bearer hb_env_override_key")
+        .with_status(200)
+        .with_body(
+            json!({"id": "usr-1", "name": "EnvUser", "email": "env@example.com"}).to_string(),
+        )
+        .create();
+
+    let env_status = base_cmd()
+        .env("HOMEBOX_API_KEY", "hb_env_override_key")
+        .args(["--json", "auth", "status"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let env_json: Value = serde_json::from_slice(&env_status).unwrap();
+    assert_eq!(env_json["source"], "env");
+    assert_eq!(env_json["user"], "EnvUser");
+    self_env.assert();
+
+    // 5. Email + password login (POST /api/v1/users/login) + JWT refresh (GET /api/v1/users/refresh)
+    let pwd_login = server
+        .mock("POST", "/api/v1/users/login")
+        .match_body(Matcher::AllOf(vec![
+            Matcher::Regex("\"username\":\"nick@example.com\"".into()),
+            Matcher::Regex("\"stayLoggedIn\":true".into()),
+        ]))
+        .with_status(200)
+        .with_body(
+            json!({
+                "token": "Bearer eyJ_initial_jwt",
+                "expiresAt": "2026-12-01T00:00:00Z"
+            })
+            .to_string(),
+        )
+        .create();
+    let self_jwt = server
+        .mock("GET", "/api/v1/users/self")
+        .match_header("authorization", "Bearer eyJ_initial_jwt")
+        .with_status(200)
+        .with_body(
+            json!({"id": "usr-1", "name": "Nicholas", "email": "nick@example.com"}).to_string(),
+        )
+        .create();
+
+    let jwt_out = base_cmd()
+        .args([
+            "--url",
+            &server.url(),
+            "--json",
+            "auth",
+            "login",
+            "--username",
+            "nick@example.com",
+            "--password-stdin",
+            "--insecure-storage",
+        ])
+        .write_stdin("CorrectHorseBatteryStaple\n")
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let jwt_str = String::from_utf8(jwt_out).unwrap();
+    assert!(!jwt_str.contains("eyJ_initial_jwt"));
+    assert!(!jwt_str.contains("CorrectHorseBatteryStaple"));
+    let jwt_json: Value = serde_json::from_str(&jwt_str).unwrap();
+    assert_eq!(jwt_json["token_type"], "jwt");
+    assert_eq!(jwt_json["expires_at"], "2026-12-01T00:00:00Z");
+    pwd_login.assert();
+    self_jwt.assert();
+
+    // Refresh dry-run
+    base_cmd()
+        .args(["auth", "refresh", "--dry-run"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("GET"))
+        .stdout(predicate::str::contains("/api/v1/users/refresh"))
+        .stdout(predicate::str::contains("Bearer ***"));
+
+    // Refresh live (GET returns 405 -> falls back to POST)
+    let refresh_405 = server
+        .mock("GET", "/api/v1/users/refresh")
+        .match_header("authorization", "Bearer eyJ_initial_jwt")
+        .with_status(405)
+        .create();
+    let refresh_post = server
+        .mock("POST", "/api/v1/users/refresh")
+        .match_header("authorization", "Bearer eyJ_initial_jwt")
+        .with_status(200)
+        .with_body(
+            json!({
+                "token": "Bearer eyJ_refreshed_jwt",
+                "expiresAt": "2027-01-01T00:00:00Z"
+            })
+            .to_string(),
+        )
+        .create();
+
+    let ref_out = base_cmd()
+        .args(["--json", "auth", "refresh", "--insecure-storage"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let ref_str = String::from_utf8(ref_out).unwrap();
+    assert!(!ref_str.contains("eyJ_refreshed_jwt"));
+    let ref_json: Value = serde_json::from_str(&ref_str).unwrap();
+    assert_eq!(ref_json["expires_at"], "2027-01-01T00:00:00Z");
+    refresh_405.assert();
+    refresh_post.assert();
+
+    // 6. auth logout (--dry-run then real) clears credentials; subsequent status fails
+    base_cmd()
+        .args(["auth", "logout", "--dry-run"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("[dry-run] logout"));
+
+    let logout_out = base_cmd()
+        .args(["--json", "auth", "logout", "--insecure-storage"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let logout_json: Value = serde_json::from_slice(&logout_out).unwrap();
+    assert_eq!(logout_json["logged_out"], true);
+    assert_eq!(logout_json["removed_secret"], true);
+
+    base_cmd()
+        .args(["auth", "status"])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("API key is not configured"));
 }

@@ -36,6 +36,15 @@ cargo install --git https://github.com/nicholaswilde/hbx
 ### :gear:&nbsp; Usage
 
 ```bash
+# Authenticate (API key via stdin, stored in OS keyring with 0600 file fallback)
+echo "$HOMEBOX_API_KEY" | hbx auth login --url http://192.168.1.50:7745 --with-token
+
+# Or authenticate with email & password
+hbx auth login --url http://192.168.1.50:7745 --username you@example.com
+
+# Check active session status (redacted Bearer ***)
+hbx auth status
+
 # List items with compact JSON and field projection
 hbx item list --tag electronics --json --select id,name,quantity
 
@@ -67,7 +76,7 @@ Layered precedence (highest to lowest):
 1. CLI flags (`--url`, `--api-key`, `--output`, `--config`)
 2. Environment variables / local `.env` (`HBX_URL` > `HOMEBOX_URL` > `HOMEBOX_IP`, `HBX_API_KEY` > `HOMEBOX_API_KEY`, `HBX_OUTPUT`)
 3. Project-local `.hbx.toml`
-4. User global `~/.config/hbx/config.toml`
+4. User global `~/.config/hbx/config.toml` + stored `hbx auth` credentials (OS keyring with automatic `0600` `~/.config/hbx/credentials.json` fallback)
 5. Built-in defaults (`output = "table"`, `timeout_secs = 30`, `download_timeout_secs = 120`)
 
 See [`assets/config.example.toml`](../assets/config.example.toml).

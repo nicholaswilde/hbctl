@@ -7,6 +7,7 @@ use directories::BaseDirs;
 use serde::{Deserialize, Serialize};
 use url::Url;
 
+use crate::auth_store::{AutoSecretStore, CredentialBackend, SecretStore};
 use crate::error::{HbxError, Result};
 
 pub const DEFAULT_TIMEOUT_SECS: u64 = 30;
@@ -38,14 +39,56 @@ impl std::str::FromStr for OutputFormat {
     }
 }
 
+/// Origin of a resolved credential or URL value.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum CredentialSource {
+    CliFlag,
+    Env,
+    LocalConfig,
+    UserConfig,
+    Keyring,
+    CredentialsFile,
+}
+
+impl CredentialSource {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::CliFlag => "cli_flag",
+            Self::Env => "env",
+            Self::LocalConfig => "local_config",
+            Self::UserConfig => "user_config",
+            Self::Keyring => "keyring",
+            Self::CredentialsFile => "credentials_file",
+        }
+    }
+}
+
+impl std::fmt::Display for CredentialSource {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
 /// On-disk TOML configuration representation (`.hbx.toml` or `~/.config/hbx/config.toml`).
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ConfigFile {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub url: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub api_key: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub output: Option<OutputFormat>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub timeout_secs: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub download_timeout_secs: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub token_type: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub expires_at: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub credential_backend: Option<String>,
 }
 
 impl ConfigFile {
@@ -56,6 +99,16 @@ impl ConfigFile {
         toml::from_str(&content).map_err(|e| {
             HbxError::Config(format!("failed to parse TOML '{}': {e}", path.display()))
         })
+    }
+
+    pub fn save_to_path(&self, path: &Path) -> Result<()> {
+        if let Some(parent) = path.parent() {
+            fs::create_dir_all(parent)?;
+        }
+        let text = toml::to_string_pretty(self)
+            .map_err(|e| HbxError::Config(format!("failed to serialize TOML: {e}")))?;
+        fs::write(path, text)?;
+        Ok(())
     }
 }
 
@@ -70,11 +123,16 @@ pub struct CliConfigOverrides {
 }
 
 /// Fully resolved runtime configuration after layering:
-/// CLI flags > env / `.env` > `.hbx.toml` > `~/.config/hbx/config.toml` > defaults.
+/// CLI flags > env / `.env` > `.hbx.toml` > `~/.config/hbx/config.toml` & stored auth > defaults.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AppConfig {
     pub base_url: Option<String>,
     pub api_key: Option<String>,
+    pub url_source: Option<CredentialSource>,
+    pub api_key_source: Option<CredentialSource>,
+    pub token_type: Option<String>,
+    pub expires_at: Option<String>,
+    pub credential_backend: Option<String>,
     pub output: OutputFormat,
     pub timeout_secs: u64,
     pub download_timeout_secs: u64,
@@ -82,7 +140,7 @@ pub struct AppConfig {
 
 impl AppConfig {
     /// Load configuration using the current process environment, `.env`, cwd `.hbx.toml`,
-    /// and user global `~/.config/hbx/config.toml`.
+    /// `~/.config/hbx/config.toml`, and OS keyring / `0600` credentials file fallback.
     pub fn load(overrides: &CliConfigOverrides) -> Result<Self> {
         // Auto-load local .env without overriding already-set environment variables.
         let _ = dotenvy::dotenv();
@@ -90,29 +148,60 @@ impl AppConfig {
         let env_vars: HashMap<String, String> = std::env::vars().collect();
         let cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
         let user_cfg = default_user_config_path();
+        let store = AutoSecretStore::from_defaults(false).ok();
 
-        Self::resolve(overrides, &env_vars, &cwd, user_cfg.as_deref())
+        Self::resolve_with_store(
+            overrides,
+            &env_vars,
+            &cwd,
+            user_cfg.as_deref(),
+            store.as_ref().map(|s| s as &dyn SecretStore),
+        )
     }
 
-    /// Deterministic resolver for layered configuration precedence.
+    /// Deterministic resolver without external keyring/file store (for pure unit tests).
     pub fn resolve(
         overrides: &CliConfigOverrides,
         env_vars: &HashMap<String, String>,
         cwd: &Path,
         user_config_path: Option<&Path>,
     ) -> Result<Self> {
-        // Start with defaults
+        Self::resolve_with_store(overrides, env_vars, cwd, user_config_path, None)
+    }
+
+    /// Deterministic resolver for full layered configuration precedence including `SecretStore`.
+    pub fn resolve_with_store(
+        overrides: &CliConfigOverrides,
+        env_vars: &HashMap<String, String>,
+        cwd: &Path,
+        user_config_path: Option<&Path>,
+        secret_store: Option<&dyn SecretStore>,
+    ) -> Result<Self> {
         let mut merged = ConfigFile::default();
+        let mut url_source = None;
+        let mut api_key_source = None;
 
         if let Some(explicit_path) = &overrides.config_path {
             let explicit = ConfigFile::load_from_path(explicit_path)?;
-            apply_config_layer(&mut merged, explicit);
+            apply_config_layer(
+                &mut merged,
+                explicit,
+                CredentialSource::LocalConfig,
+                &mut url_source,
+                &mut api_key_source,
+            );
         } else {
             // Tier 4: User global ~/.config/hbx/config.toml
             if let Some(user_path) = user_config_path {
                 if user_path.is_file() {
                     let user_cfg = ConfigFile::load_from_path(user_path)?;
-                    apply_config_layer(&mut merged, user_cfg);
+                    apply_config_layer(
+                        &mut merged,
+                        user_cfg,
+                        CredentialSource::UserConfig,
+                        &mut url_source,
+                        &mut api_key_source,
+                    );
                 }
             }
 
@@ -120,7 +209,13 @@ impl AppConfig {
             let local_path = cwd.join(".hbx.toml");
             if local_path.is_file() {
                 let local_cfg = ConfigFile::load_from_path(&local_path)?;
-                apply_config_layer(&mut merged, local_cfg);
+                apply_config_layer(
+                    &mut merged,
+                    local_cfg,
+                    CredentialSource::LocalConfig,
+                    &mut url_source,
+                    &mut api_key_source,
+                );
             }
         }
 
@@ -130,12 +225,14 @@ impl AppConfig {
             .or_else(|| env_non_empty(env_vars, "HOMEBOX_IP").map(|ip| expand_homebox_ip(&ip)))
         {
             merged.url = Some(env_url);
+            url_source = Some(CredentialSource::Env);
         }
 
         if let Some(env_key) = env_non_empty(env_vars, "HBX_API_KEY")
             .or_else(|| env_non_empty(env_vars, "HOMEBOX_API_KEY"))
         {
             merged.api_key = Some(env_key);
+            api_key_source = Some(CredentialSource::Env);
         }
 
         if let Some(env_output) = env_non_empty(env_vars, "HBX_OUTPUT") {
@@ -145,9 +242,11 @@ impl AppConfig {
         // Tier 1: CLI flags
         if let Some(url) = non_empty(overrides.url.as_deref()) {
             merged.url = Some(url.to_string());
+            url_source = Some(CredentialSource::CliFlag);
         }
         if let Some(key) = non_empty(overrides.api_key.as_deref()) {
             merged.api_key = Some(key.to_string());
+            api_key_source = Some(CredentialSource::CliFlag);
         }
         if let Some(out) = overrides.output {
             merged.output = Some(out);
@@ -161,9 +260,28 @@ impl AppConfig {
             None => None,
         };
 
+        // Fallback to stored `hbx auth` credentials (OS keyring or 0600 file store)
+        // when no higher-precedence API key (CLI / env / .hbx.toml / config.toml) is set.
+        if merged.api_key.is_none() {
+            if let (Some(url), Some(store)) = (base_url.as_deref(), secret_store) {
+                if let Ok(Some((token, backend))) = store.get_token(url) {
+                    merged.api_key = Some(token);
+                    api_key_source = Some(match backend {
+                        CredentialBackend::Keyring => CredentialSource::Keyring,
+                        CredentialBackend::File => CredentialSource::CredentialsFile,
+                    });
+                }
+            }
+        }
+
         Ok(Self {
             base_url,
             api_key: merged.api_key,
+            url_source,
+            api_key_source,
+            token_type: merged.token_type,
+            expires_at: merged.expires_at,
+            credential_backend: merged.credential_backend,
             output: merged.output.unwrap_or(OutputFormat::Table),
             timeout_secs: merged.timeout_secs.unwrap_or(DEFAULT_TIMEOUT_SECS),
             download_timeout_secs: merged
@@ -181,12 +299,20 @@ impl AppConfig {
     }
 }
 
-fn apply_config_layer(target: &mut ConfigFile, layer: ConfigFile) {
+fn apply_config_layer(
+    target: &mut ConfigFile,
+    layer: ConfigFile,
+    source: CredentialSource,
+    url_source: &mut Option<CredentialSource>,
+    api_key_source: &mut Option<CredentialSource>,
+) {
     if layer.url.is_some() {
         target.url = layer.url;
+        *url_source = Some(source);
     }
     if layer.api_key.is_some() {
         target.api_key = layer.api_key;
+        *api_key_source = Some(source);
     }
     if layer.output.is_some() {
         target.output = layer.output;
@@ -196,6 +322,15 @@ fn apply_config_layer(target: &mut ConfigFile, layer: ConfigFile) {
     }
     if layer.download_timeout_secs.is_some() {
         target.download_timeout_secs = layer.download_timeout_secs;
+    }
+    if layer.token_type.is_some() {
+        target.token_type = layer.token_type;
+    }
+    if layer.expires_at.is_some() {
+        target.expires_at = layer.expires_at;
+    }
+    if layer.credential_backend.is_some() {
+        target.credential_backend = layer.credential_backend;
     }
 }
 
@@ -312,6 +447,7 @@ pub fn redact_secret(text: &str, api_key: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::auth_store::FileSecretStore;
     use tempfile::tempdir;
 
     #[test]
@@ -412,6 +548,7 @@ api_key = "hb_local"
             Some("http://user.local:7745/api/v1")
         );
         assert_eq!(cfg.api_key.as_deref(), Some("hb_user"));
+        assert_eq!(cfg.api_key_source, Some(CredentialSource::UserConfig));
         assert_eq!(cfg.output, OutputFormat::Plain);
         assert_eq!(cfg.timeout_secs, 45);
         assert_eq!(cfg.download_timeout_secs, 240);
@@ -429,6 +566,7 @@ api_key = "hb_local"
             Some("http://local.local:7745/api/v1")
         );
         assert_eq!(cfg.api_key.as_deref(), Some("hb_local"));
+        assert_eq!(cfg.api_key_source, Some(CredentialSource::LocalConfig));
         assert_eq!(cfg.output, OutputFormat::Plain);
 
         // 3. Env HOMEBOX_IP < HOMEBOX_URL < HBX_URL
@@ -447,6 +585,7 @@ api_key = "hb_local"
             Some("http://192.168.1.99:7745/api/v1")
         );
         assert_eq!(cfg.api_key.as_deref(), Some("hb_env_homebox"));
+        assert_eq!(cfg.api_key_source, Some(CredentialSource::Env));
 
         env.insert("HOMEBOX_URL".into(), "http://env-homebox:7745".into());
         let cfg = AppConfig::resolve(
@@ -487,6 +626,56 @@ api_key = "hb_local"
             Some("http://cli.local:7745/api/v1")
         );
         assert_eq!(cfg.api_key.as_deref(), Some("hb_cli"));
+        assert_eq!(cfg.api_key_source, Some(CredentialSource::CliFlag));
         assert_eq!(cfg.output, OutputFormat::Json);
+    }
+
+    #[test]
+    fn test_secret_store_fallback_and_precedence() {
+        let dir = tempdir().unwrap();
+        let user_cfg = dir.path().join("config.toml");
+        ConfigFile {
+            url: Some("http://stored.local:7745/api/v1".into()),
+            token_type: Some("api_key".into()),
+            credential_backend: Some("file".into()),
+            ..Default::default()
+        }
+        .save_to_path(&user_cfg)
+        .unwrap();
+
+        let creds = FileSecretStore::new(dir.path().join("credentials.json"));
+        creds
+            .set_token("http://stored.local:7745/api/v1", "hb_from_store")
+            .unwrap();
+
+        let empty_dir = dir.path().join("empty");
+        fs::create_dir_all(&empty_dir).unwrap();
+
+        // Loads token from SecretStore when config.toml has only metadata
+        let cfg = AppConfig::resolve_with_store(
+            &CliConfigOverrides::default(),
+            &HashMap::new(),
+            &empty_dir,
+            Some(&user_cfg),
+            Some(&creds),
+        )
+        .unwrap();
+        assert_eq!(cfg.api_key.as_deref(), Some("hb_from_store"));
+        assert_eq!(cfg.api_key_source, Some(CredentialSource::CredentialsFile));
+        assert_eq!(cfg.token_type.as_deref(), Some("api_key"));
+
+        // Env overrides SecretStore
+        let mut env = HashMap::new();
+        env.insert("HOMEBOX_API_KEY".into(), "hb_env_wins".into());
+        let cfg = AppConfig::resolve_with_store(
+            &CliConfigOverrides::default(),
+            &env,
+            &empty_dir,
+            Some(&user_cfg),
+            Some(&creds),
+        )
+        .unwrap();
+        assert_eq!(cfg.api_key.as_deref(), Some("hb_env_wins"));
+        assert_eq!(cfg.api_key_source, Some(CredentialSource::Env));
     }
 }

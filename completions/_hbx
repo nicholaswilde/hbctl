@@ -38,7 +38,142 @@ _hbx() {
         (( CURRENT += 1 ))
         curcontext="${curcontext%:*:*}:hbx-command-$line[1]:"
         case $line[1] in
-            (item)
+            (auth)
+_arguments "${_arguments_options[@]}" : \
+'--url=[Homebox base URL (env\: HBX_URL > HOMEBOX_URL > http\://<HOMEBOX_IP>\:7745)]:URL:_default' \
+'--api-key=[Homebox API key or Bearer token (env\: HBX_API_KEY > HOMEBOX_API_KEY)]:API_KEY:_default' \
+'--output=[Output format (table, json, plain) \[env\: HBX_OUTPUT\]]:OUTPUT:(table json plain)' \
+'*--select=[Comma-separated field projection for JSON/table output (e.g. id,name,fields)]:SELECT:_default' \
+'-C+[Path to explicit TOML configuration file]:CONFIG:_files' \
+'--config=[Path to explicit TOML configuration file]:CONFIG:_files' \
+'--json[Shorthand for --output json (emits compact JSON)]' \
+'--dry-run[Preview mutating requests without hitting the server (redacts Authorization)]' \
+'-q[Output only created/affected IDs for shell piping]' \
+'--quiet[Output only created/affected IDs for shell piping]' \
+'-h[Print help]' \
+'--help[Print help]' \
+":: :_hbx__subcmd__auth_commands" \
+"*::: :->auth" \
+&& ret=0
+
+    case $state in
+    (auth)
+        words=($line[1] "${words[@]}")
+        (( CURRENT += 1 ))
+        curcontext="${curcontext%:*:*}:hbx-auth-command-$line[1]:"
+        case $line[1] in
+            (login)
+_arguments "${_arguments_options[@]}" : \
+'-u+[Email or username for password login (POST /api/v1/users/login)]:USERNAME:_default' \
+'--username=[Email or username for password login (POST /api/v1/users/login)]:USERNAME:_default' \
+'--url=[Homebox base URL (env\: HBX_URL > HOMEBOX_URL > http\://<HOMEBOX_IP>\:7745)]:URL:_default' \
+'--api-key=[Homebox API key or Bearer token (env\: HBX_API_KEY > HOMEBOX_API_KEY)]:API_KEY:_default' \
+'--output=[Output format (table, json, plain) \[env\: HBX_OUTPUT\]]:OUTPUT:(table json plain)' \
+'*--select=[Comma-separated field projection for JSON/table output (e.g. id,name,fields)]:SELECT:_default' \
+'-C+[Path to explicit TOML configuration file]:CONFIG:_files' \
+'--config=[Path to explicit TOML configuration file]:CONFIG:_files' \
+'(-u --username --password-stdin)--with-token[Read a Homebox API key (hb_...) or Bearer token from stdin]' \
+'--password-stdin[Read login password from stdin instead of prompting interactively]' \
+'--insecure-storage[Store token in 0600 local file store instead of OS keyring]' \
+'--json[Shorthand for --output json (emits compact JSON)]' \
+'--dry-run[Preview mutating requests without hitting the server (redacts Authorization)]' \
+'-q[Output only created/affected IDs for shell piping]' \
+'--quiet[Output only created/affected IDs for shell piping]' \
+'-h[Print help]' \
+'--help[Print help]' \
+&& ret=0
+;;
+(status)
+_arguments "${_arguments_options[@]}" : \
+'--url=[Homebox base URL (env\: HBX_URL > HOMEBOX_URL > http\://<HOMEBOX_IP>\:7745)]:URL:_default' \
+'--api-key=[Homebox API key or Bearer token (env\: HBX_API_KEY > HOMEBOX_API_KEY)]:API_KEY:_default' \
+'--output=[Output format (table, json, plain) \[env\: HBX_OUTPUT\]]:OUTPUT:(table json plain)' \
+'*--select=[Comma-separated field projection for JSON/table output (e.g. id,name,fields)]:SELECT:_default' \
+'-C+[Path to explicit TOML configuration file]:CONFIG:_files' \
+'--config=[Path to explicit TOML configuration file]:CONFIG:_files' \
+'--json[Shorthand for --output json (emits compact JSON)]' \
+'--dry-run[Preview mutating requests without hitting the server (redacts Authorization)]' \
+'-q[Output only created/affected IDs for shell piping]' \
+'--quiet[Output only created/affected IDs for shell piping]' \
+'-h[Print help]' \
+'--help[Print help]' \
+&& ret=0
+;;
+(logout)
+_arguments "${_arguments_options[@]}" : \
+'--url=[Homebox base URL (env\: HBX_URL > HOMEBOX_URL > http\://<HOMEBOX_IP>\:7745)]:URL:_default' \
+'--api-key=[Homebox API key or Bearer token (env\: HBX_API_KEY > HOMEBOX_API_KEY)]:API_KEY:_default' \
+'--output=[Output format (table, json, plain) \[env\: HBX_OUTPUT\]]:OUTPUT:(table json plain)' \
+'*--select=[Comma-separated field projection for JSON/table output (e.g. id,name,fields)]:SELECT:_default' \
+'-C+[Path to explicit TOML configuration file]:CONFIG:_files' \
+'--config=[Path to explicit TOML configuration file]:CONFIG:_files' \
+'--insecure-storage[Skip OS keyring and only clear local 0600 fallback store]' \
+'--json[Shorthand for --output json (emits compact JSON)]' \
+'--dry-run[Preview mutating requests without hitting the server (redacts Authorization)]' \
+'-q[Output only created/affected IDs for shell piping]' \
+'--quiet[Output only created/affected IDs for shell piping]' \
+'-h[Print help]' \
+'--help[Print help]' \
+&& ret=0
+;;
+(refresh)
+_arguments "${_arguments_options[@]}" : \
+'--url=[Homebox base URL (env\: HBX_URL > HOMEBOX_URL > http\://<HOMEBOX_IP>\:7745)]:URL:_default' \
+'--api-key=[Homebox API key or Bearer token (env\: HBX_API_KEY > HOMEBOX_API_KEY)]:API_KEY:_default' \
+'--output=[Output format (table, json, plain) \[env\: HBX_OUTPUT\]]:OUTPUT:(table json plain)' \
+'*--select=[Comma-separated field projection for JSON/table output (e.g. id,name,fields)]:SELECT:_default' \
+'-C+[Path to explicit TOML configuration file]:CONFIG:_files' \
+'--config=[Path to explicit TOML configuration file]:CONFIG:_files' \
+'--insecure-storage[Store refreshed token in 0600 local file store instead of OS keyring]' \
+'--json[Shorthand for --output json (emits compact JSON)]' \
+'--dry-run[Preview mutating requests without hitting the server (redacts Authorization)]' \
+'-q[Output only created/affected IDs for shell piping]' \
+'--quiet[Output only created/affected IDs for shell piping]' \
+'-h[Print help]' \
+'--help[Print help]' \
+&& ret=0
+;;
+(help)
+_arguments "${_arguments_options[@]}" : \
+":: :_hbx__subcmd__auth__subcmd__help_commands" \
+"*::: :->help" \
+&& ret=0
+
+    case $state in
+    (help)
+        words=($line[1] "${words[@]}")
+        (( CURRENT += 1 ))
+        curcontext="${curcontext%:*:*}:hbx-auth-help-command-$line[1]:"
+        case $line[1] in
+            (login)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+(status)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+(logout)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+(refresh)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+(help)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+        esac
+    ;;
+esac
+;;
+        esac
+    ;;
+esac
+;;
+(item)
 _arguments "${_arguments_options[@]}" : \
 '--url=[Homebox base URL (env\: HBX_URL > HOMEBOX_URL > http\://<HOMEBOX_IP>\:7745)]:URL:_default' \
 '--api-key=[Homebox API key or Bearer token (env\: HBX_API_KEY > HOMEBOX_API_KEY)]:API_KEY:_default' \
@@ -852,7 +987,39 @@ _arguments "${_arguments_options[@]}" : \
         (( CURRENT += 1 ))
         curcontext="${curcontext%:*:*}:hbx-help-command-$line[1]:"
         case $line[1] in
-            (item)
+            (auth)
+_arguments "${_arguments_options[@]}" : \
+":: :_hbx__subcmd__help__subcmd__auth_commands" \
+"*::: :->auth" \
+&& ret=0
+
+    case $state in
+    (auth)
+        words=($line[1] "${words[@]}")
+        (( CURRENT += 1 ))
+        curcontext="${curcontext%:*:*}:hbx-help-auth-command-$line[1]:"
+        case $line[1] in
+            (login)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+(status)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+(logout)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+(refresh)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+        esac
+    ;;
+esac
+;;
+(item)
 _arguments "${_arguments_options[@]}" : \
 ":: :_hbx__subcmd__help__subcmd__item_commands" \
 "*::: :->item" \
@@ -1032,6 +1199,7 @@ esac
 (( $+functions[_hbx_commands] )) ||
 _hbx_commands() {
     local commands; commands=(
+'auth:Authenticate with a remote Homebox instance (login, status, logout, refresh)' \
 'item:Manage inventory items (/api/v1/entities)' \
 'attachment:Manage item attachments (/api/v1/entities/{id}/attachments)' \
 'search:Full-text and structured item search' \
@@ -1112,6 +1280,73 @@ _hbx__subcmd__attachment__subcmd__list_commands() {
 _hbx__subcmd__attachment__subcmd__upload_commands() {
     local commands; commands=()
     _describe -t commands 'hbx attachment upload commands' commands "$@"
+}
+(( $+functions[_hbx__subcmd__auth_commands] )) ||
+_hbx__subcmd__auth_commands() {
+    local commands; commands=(
+'login:Authenticate with Homebox via API key (--with-token) or email/password' \
+'status:Check authentication status and validate the active session' \
+'logout:Remove stored credentials from OS keyring and local fallback store' \
+'refresh:Refresh an active JWT session token' \
+'help:Print this message or the help of the given subcommand(s)' \
+    )
+    _describe -t commands 'hbx auth commands' commands "$@"
+}
+(( $+functions[_hbx__subcmd__auth__subcmd__help_commands] )) ||
+_hbx__subcmd__auth__subcmd__help_commands() {
+    local commands; commands=(
+'login:Authenticate with Homebox via API key (--with-token) or email/password' \
+'status:Check authentication status and validate the active session' \
+'logout:Remove stored credentials from OS keyring and local fallback store' \
+'refresh:Refresh an active JWT session token' \
+'help:Print this message or the help of the given subcommand(s)' \
+    )
+    _describe -t commands 'hbx auth help commands' commands "$@"
+}
+(( $+functions[_hbx__subcmd__auth__subcmd__help__subcmd__help_commands] )) ||
+_hbx__subcmd__auth__subcmd__help__subcmd__help_commands() {
+    local commands; commands=()
+    _describe -t commands 'hbx auth help help commands' commands "$@"
+}
+(( $+functions[_hbx__subcmd__auth__subcmd__help__subcmd__login_commands] )) ||
+_hbx__subcmd__auth__subcmd__help__subcmd__login_commands() {
+    local commands; commands=()
+    _describe -t commands 'hbx auth help login commands' commands "$@"
+}
+(( $+functions[_hbx__subcmd__auth__subcmd__help__subcmd__logout_commands] )) ||
+_hbx__subcmd__auth__subcmd__help__subcmd__logout_commands() {
+    local commands; commands=()
+    _describe -t commands 'hbx auth help logout commands' commands "$@"
+}
+(( $+functions[_hbx__subcmd__auth__subcmd__help__subcmd__refresh_commands] )) ||
+_hbx__subcmd__auth__subcmd__help__subcmd__refresh_commands() {
+    local commands; commands=()
+    _describe -t commands 'hbx auth help refresh commands' commands "$@"
+}
+(( $+functions[_hbx__subcmd__auth__subcmd__help__subcmd__status_commands] )) ||
+_hbx__subcmd__auth__subcmd__help__subcmd__status_commands() {
+    local commands; commands=()
+    _describe -t commands 'hbx auth help status commands' commands "$@"
+}
+(( $+functions[_hbx__subcmd__auth__subcmd__login_commands] )) ||
+_hbx__subcmd__auth__subcmd__login_commands() {
+    local commands; commands=()
+    _describe -t commands 'hbx auth login commands' commands "$@"
+}
+(( $+functions[_hbx__subcmd__auth__subcmd__logout_commands] )) ||
+_hbx__subcmd__auth__subcmd__logout_commands() {
+    local commands; commands=()
+    _describe -t commands 'hbx auth logout commands' commands "$@"
+}
+(( $+functions[_hbx__subcmd__auth__subcmd__refresh_commands] )) ||
+_hbx__subcmd__auth__subcmd__refresh_commands() {
+    local commands; commands=()
+    _describe -t commands 'hbx auth refresh commands' commands "$@"
+}
+(( $+functions[_hbx__subcmd__auth__subcmd__status_commands] )) ||
+_hbx__subcmd__auth__subcmd__status_commands() {
+    local commands; commands=()
+    _describe -t commands 'hbx auth status commands' commands "$@"
 }
 (( $+functions[_hbx__subcmd__completions_commands] )) ||
 _hbx__subcmd__completions_commands() {
@@ -1200,6 +1435,7 @@ _hbx__subcmd__field__subcmd__set_commands() {
 (( $+functions[_hbx__subcmd__help_commands] )) ||
 _hbx__subcmd__help_commands() {
     local commands; commands=(
+'auth:Authenticate with a remote Homebox instance (login, status, logout, refresh)' \
 'item:Manage inventory items (/api/v1/entities)' \
 'attachment:Manage item attachments (/api/v1/entities/{id}/attachments)' \
 'search:Full-text and structured item search' \
@@ -1242,6 +1478,36 @@ _hbx__subcmd__help__subcmd__attachment__subcmd__list_commands() {
 _hbx__subcmd__help__subcmd__attachment__subcmd__upload_commands() {
     local commands; commands=()
     _describe -t commands 'hbx help attachment upload commands' commands "$@"
+}
+(( $+functions[_hbx__subcmd__help__subcmd__auth_commands] )) ||
+_hbx__subcmd__help__subcmd__auth_commands() {
+    local commands; commands=(
+'login:Authenticate with Homebox via API key (--with-token) or email/password' \
+'status:Check authentication status and validate the active session' \
+'logout:Remove stored credentials from OS keyring and local fallback store' \
+'refresh:Refresh an active JWT session token' \
+    )
+    _describe -t commands 'hbx help auth commands' commands "$@"
+}
+(( $+functions[_hbx__subcmd__help__subcmd__auth__subcmd__login_commands] )) ||
+_hbx__subcmd__help__subcmd__auth__subcmd__login_commands() {
+    local commands; commands=()
+    _describe -t commands 'hbx help auth login commands' commands "$@"
+}
+(( $+functions[_hbx__subcmd__help__subcmd__auth__subcmd__logout_commands] )) ||
+_hbx__subcmd__help__subcmd__auth__subcmd__logout_commands() {
+    local commands; commands=()
+    _describe -t commands 'hbx help auth logout commands' commands "$@"
+}
+(( $+functions[_hbx__subcmd__help__subcmd__auth__subcmd__refresh_commands] )) ||
+_hbx__subcmd__help__subcmd__auth__subcmd__refresh_commands() {
+    local commands; commands=()
+    _describe -t commands 'hbx help auth refresh commands' commands "$@"
+}
+(( $+functions[_hbx__subcmd__help__subcmd__auth__subcmd__status_commands] )) ||
+_hbx__subcmd__help__subcmd__auth__subcmd__status_commands() {
+    local commands; commands=()
+    _describe -t commands 'hbx help auth status commands' commands "$@"
 }
 (( $+functions[_hbx__subcmd__help__subcmd__completions_commands] )) ||
 _hbx__subcmd__help__subcmd__completions_commands() {
