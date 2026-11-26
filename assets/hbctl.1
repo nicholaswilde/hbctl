@@ -4,7 +4,7 @@
 .SH NAME
 hbctl \- Fast, agent\-friendly Rust CLI for remote Homebox v0.26+ instances
 .SH SYNOPSIS
-\fBhbctl\fR [\fB\-\-url\fR] [\fB\-\-api\-key\fR] [\fB\-\-output\fR] [\fB\-\-json\fR] [\fB\-\-select\fR] [\fB\-\-dry\-run\fR] [\fB\-q\fR|\fB\-\-quiet\fR] [\fB\-C\fR|\fB\-\-config\fR] [\fB\-h\fR|\fB\-\-help\fR] [\fB\-V\fR|\fB\-\-version\fR] <\fIsubcommands\fR>
+\fBhbctl\fR [\fB\-\-url\fR] [\fB\-\-api\-key\fR] [\fB\-\-output\fR] [\fB\-\-json\fR] [\fB\-\-select\fR] [\fB\-\-dry\-run\fR] [\fB\-q\fR|\fB\-\-quiet\fR] [\fB\-C\fR|\fB\-\-config\fR] [\fB\-P\fR|\fB\-\-profile\fR] [\fB\-h\fR|\fB\-\-help\fR] [\fB\-V\fR|\fB\-\-version\fR] <\fIsubcommands\fR>
 .SH DESCRIPTION
 Fast, agent\-friendly Rust CLI for remote Homebox v0.26+ instances
 .SH OPTIONS
@@ -45,6 +45,9 @@ Output only created/affected IDs for shell piping
 \fB\-C\fR, \fB\-\-config\fR \fI<CONFIG>\fR
 Path to explicit TOML configuration file
 .TP
+\fB\-P\fR, \fB\-\-profile\fR \fI<NAME>\fR
+Named configuration profile (env: HBCTL_PROFILE)
+.TP
 \fB\-h\fR, \fB\-\-help\fR
 Print help
 .TP
@@ -71,7 +74,10 @@ hbctl\-tag(1)
 Manage tags (/api/v1/tags)
 .TP
 hbctl\-entity\-types(1)
-List Homebox entity types (/api/v1/entity\-types)
+Manage Homebox entity types (/api/v1/entity\-types)
+.TP
+hbctl\-status(1)
+Check remote Homebox server connectivity and version (/api/v1/status)
 .TP
 hbctl\-export(1)
 Export filtered items to JSON, CSV, or Markdown

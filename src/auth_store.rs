@@ -79,6 +79,16 @@ pub trait SecretStore {
     fn delete_token(&self, account: &str) -> Result<bool>;
 }
 
+/// Build the credential store account key for an optional profile and normalized base URL.
+/// Legacy single-instance mode (`profile: None`) uses `base_url` directly; named profiles use
+/// `profile:<name>:<base_url>` so entries stay isolated in both OS keyring and `0600` file store.
+pub fn credential_account_key(profile: Option<&str>, base_url: &str) -> String {
+    match profile.map(str::trim).filter(|s| !s.is_empty()) {
+        Some(name) => format!("profile:{name}:{base_url}"),
+        None => base_url.to_string(),
+    }
+}
+
 /// Default local fallback credentials path (`~/.config/hbctl/credentials.json` or XDG equivalent).
 pub fn default_credentials_file_path() -> Option<PathBuf> {
     if let Ok(xdg) = std::env::var("XDG_CONFIG_HOME") {
@@ -401,5 +411,40 @@ mod tests {
 
         assert!(store.delete_token("http://box:7745/api/v1").unwrap());
         assert_eq!(store.get_token("http://box:7745/api/v1").unwrap(), None);
+    }
+
+    #[test]
+    fn test_credential_account_key_and_profile_isolation() {
+        let url = "http://box:7745/api/v1";
+        assert_eq!(credential_account_key(None, url), url);
+        assert_eq!(credential_account_key(Some("  "), url), url);
+        assert_eq!(
+            credential_account_key(Some("staging"), url),
+            "profile:staging:http://box:7745/api/v1"
+        );
+
+        let dir = tempdir().unwrap();
+        let store = FileSecretStore::new(dir.path().join("credentials.json"));
+        let k_home = credential_account_key(Some("homelab"), url);
+        let k_stage = credential_account_key(Some("staging"), url);
+
+        store.set_token(&k_home, "hb_homelab").unwrap();
+        store.set_token(&k_stage, "hb_staging").unwrap();
+
+        assert_eq!(
+            store.get_token(&k_home).unwrap(),
+            Some(("hb_homelab".to_string(), CredentialBackend::File))
+        );
+        assert_eq!(
+            store.get_token(&k_stage).unwrap(),
+            Some(("hb_staging".to_string(), CredentialBackend::File))
+        );
+
+        assert!(store.delete_token(&k_stage).unwrap());
+        assert_eq!(store.get_token(&k_stage).unwrap(), None);
+        assert_eq!(
+            store.get_token(&k_home).unwrap(),
+            Some(("hb_homelab".to_string(), CredentialBackend::File))
+        );
     }
 }

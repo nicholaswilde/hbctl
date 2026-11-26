@@ -4,12 +4,12 @@ use std::path::PathBuf;
 use serde::Serialize;
 use serde_json::json;
 
-use crate::auth_store::{AutoSecretStore, SecretStore, TokenType};
+use crate::auth_store::{credential_account_key, AutoSecretStore, SecretStore, TokenType};
 use crate::cli::{AuthArgs, AuthCommands, AuthLoginArgs, AuthLogoutArgs, AuthRefreshArgs};
 use crate::client::HomeboxClient;
 use crate::config::{
     default_user_config_path, normalize_base_url, redact_auth_header, AppConfig, ConfigFile,
-    OutputFormat,
+    OutputFormat, ProfileConfig,
 };
 use crate::error::{HbctlError, Result};
 use crate::output::{
@@ -35,6 +35,8 @@ pub fn handle(
 
 #[derive(Debug, Serialize)]
 struct AuthStatusOutput {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    profile: Option<String>,
     authenticated: bool,
     url: String,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -46,6 +48,30 @@ struct AuthStatusOutput {
     #[serde(skip_serializing_if = "Option::is_none")]
     expires_at: Option<String>,
     authorization: String,
+}
+
+fn update_config_auth_metadata(
+    cfg_file: &mut ConfigFile,
+    profile: Option<&str>,
+    url: &str,
+    token_type: &str,
+    expires_at: Option<&str>,
+    backend: &str,
+) {
+    if let Some(prof_name) = profile {
+        let entry: &mut ProfileConfig = cfg_file.profiles.entry(prof_name.to_string()).or_default();
+        entry.url = Some(url.to_string());
+        entry.api_key = None;
+        entry.token_type = Some(token_type.to_string());
+        entry.expires_at = expires_at.map(ToOwned::to_owned);
+        entry.credential_backend = Some(backend.to_string());
+    } else {
+        cfg_file.url = Some(url.to_string());
+        cfg_file.api_key = None;
+        cfg_file.token_type = Some(token_type.to_string());
+        cfg_file.expires_at = expires_at.map(ToOwned::to_owned);
+        cfg_file.credential_backend = Some(backend.to_string());
+    }
 }
 
 fn resolve_config_target_path(explicit: Option<&PathBuf>) -> Result<PathBuf> {
@@ -237,9 +263,10 @@ fn handle_login(
         ));
     };
 
-    // Persist secret to OS keyring (falling back to 0600 file store)
+    // Persist secret to OS keyring (falling back to 0600 file store), scoped to active profile
+    let account = credential_account_key(config.profile.as_deref(), &base_url);
     let store = AutoSecretStore::from_defaults(args.insecure_storage)?;
-    let backend = store.set_token_with_notice(&base_url, &token, err)?;
+    let backend = store.set_token_with_notice(&account, &token, err)?;
 
     // Save non-secret metadata to config.toml without duplicating plaintext api_key
     let cfg_path = resolve_config_target_path(config_path)?;
@@ -248,14 +275,18 @@ fn handle_login(
     } else {
         ConfigFile::default()
     };
-    cfg_file.url = Some(base_url.clone());
-    cfg_file.api_key = None;
-    cfg_file.token_type = Some(token_type.as_str().to_string());
-    cfg_file.expires_at = expires_at.clone();
-    cfg_file.credential_backend = Some(backend.as_str().to_string());
+    update_config_auth_metadata(
+        &mut cfg_file,
+        config.profile.as_deref(),
+        &base_url,
+        token_type.as_str(),
+        expires_at.as_deref(),
+        backend.as_str(),
+    );
     cfg_file.save_to_path(&cfg_path)?;
 
     let status_out = AuthStatusOutput {
+        profile: config.profile.clone(),
         authenticated: true,
         url: base_url.clone(),
         user: user_name,
@@ -285,6 +316,7 @@ fn handle_status(config: &AppConfig, ctx: &OutputContext, out: &mut dyn Write) -
         .unwrap_or_else(|| "unknown".to_string());
 
     let status_out = AuthStatusOutput {
+        profile: config.profile.clone(),
         authenticated: true,
         url: base_url.to_string(),
         user: non_empty_opt(&profile.name),
@@ -309,36 +341,65 @@ fn handle_logout(
     let base_url = config.require_base_url()?;
 
     if dry_run {
-        let payload = json!({
+        let mut payload = json!({
             "action": "logout",
             "url": base_url,
             "authorization": redact_auth_header(""),
         });
+        if let Some(ref prof_name) = config.profile {
+            payload["profile"] = json!(prof_name);
+        }
         if ctx.format == OutputFormat::Json {
             return write_compact_json(&payload, ctx.select.as_deref(), out);
         }
-        writeln!(out, "[dry-run] logout {base_url}")?;
+        if let Some(ref prof_name) = config.profile {
+            writeln!(out, "[dry-run] logout {base_url} (profile: {prof_name})")?;
+        } else {
+            writeln!(out, "[dry-run] logout {base_url}")?;
+        }
         return Ok(());
     }
 
     let store = AutoSecretStore::from_defaults(args.insecure_storage)?;
-    let removed_secret = store.delete_token(base_url)?;
+    let account = credential_account_key(config.profile.as_deref(), base_url);
+    let mut removed_secret = store.delete_token(&account)?;
+    if !removed_secret && config.profile.as_deref() == Some("default") {
+        removed_secret = store.delete_token(base_url)?;
+    }
 
     let cfg_path = resolve_config_target_path(config_path)?;
     if cfg_path.is_file() {
         let mut cfg_file = ConfigFile::load_from_path(&cfg_path)?;
-        let matches_url = cfg_file
-            .url
-            .as_deref()
-            .and_then(|u| normalize_base_url(u).ok())
-            .map(|u| u == base_url)
-            .unwrap_or(true);
-        if matches_url {
-            cfg_file.api_key = None;
-            cfg_file.token_type = None;
-            cfg_file.expires_at = None;
-            cfg_file.credential_backend = None;
-            cfg_file.save_to_path(&cfg_path)?;
+        if let Some(ref prof_name) = config.profile {
+            if let Some(entry) = cfg_file.profiles.get_mut(prof_name) {
+                let matches_url = entry
+                    .url
+                    .as_deref()
+                    .and_then(|u| normalize_base_url(u).ok())
+                    .map(|u| u == base_url)
+                    .unwrap_or(true);
+                if matches_url {
+                    entry.api_key = None;
+                    entry.token_type = None;
+                    entry.expires_at = None;
+                    entry.credential_backend = None;
+                    cfg_file.save_to_path(&cfg_path)?;
+                }
+            }
+        } else {
+            let matches_url = cfg_file
+                .url
+                .as_deref()
+                .and_then(|u| normalize_base_url(u).ok())
+                .map(|u| u == base_url)
+                .unwrap_or(true);
+            if matches_url {
+                cfg_file.api_key = None;
+                cfg_file.token_type = None;
+                cfg_file.expires_at = None;
+                cfg_file.credential_backend = None;
+                cfg_file.save_to_path(&cfg_path)?;
+            }
         }
     }
 
@@ -346,18 +407,22 @@ fn handle_logout(
         return write_quiet_ids(&[base_url.to_string()], out);
     }
     if ctx.format == OutputFormat::Json {
-        return write_compact_json(
-            &json!({
-                "logged_out": true,
-                "url": base_url,
-                "removed_secret": removed_secret,
-            }),
-            ctx.select.as_deref(),
-            out,
-        );
+        let mut payload = json!({
+            "logged_out": true,
+            "url": base_url,
+            "removed_secret": removed_secret,
+        });
+        if let Some(ref prof_name) = config.profile {
+            payload["profile"] = json!(prof_name);
+        }
+        return write_compact_json(&payload, ctx.select.as_deref(), out);
     }
 
-    writeln!(out, "Logged out of {base_url}")?;
+    if let Some(ref prof_name) = config.profile {
+        writeln!(out, "Logged out of {base_url} (profile: {prof_name})")?;
+    } else {
+        writeln!(out, "Logged out of {base_url}")?;
+    }
     Ok(())
 }
 
@@ -382,7 +447,8 @@ fn handle_refresh(
     let refreshed = client.refresh_token()?;
 
     let store = AutoSecretStore::from_defaults(args.insecure_storage)?;
-    let backend = store.set_token_with_notice(base_url, &refreshed.token, err)?;
+    let account = credential_account_key(config.profile.as_deref(), base_url);
+    let backend = store.set_token_with_notice(&account, &refreshed.token, err)?;
 
     let cfg_path = resolve_config_target_path(config_path)?;
     let mut cfg_file = if cfg_path.is_file() {
@@ -390,14 +456,18 @@ fn handle_refresh(
     } else {
         ConfigFile::default()
     };
-    cfg_file.url = Some(base_url.to_string());
-    cfg_file.api_key = None;
-    cfg_file.token_type = Some(TokenType::Jwt.as_str().to_string());
-    cfg_file.expires_at = refreshed.expires_at.clone();
-    cfg_file.credential_backend = Some(backend.as_str().to_string());
+    update_config_auth_metadata(
+        &mut cfg_file,
+        config.profile.as_deref(),
+        base_url,
+        TokenType::Jwt.as_str(),
+        refreshed.expires_at.as_deref(),
+        backend.as_str(),
+    );
     cfg_file.save_to_path(&cfg_path)?;
 
     let status_out = AuthStatusOutput {
+        profile: config.profile.clone(),
         authenticated: true,
         url: base_url.to_string(),
         user: None,
@@ -423,7 +493,11 @@ fn render_auth_status(
         return write_compact_json(status, ctx.select.as_deref(), out);
     }
 
-    let mut rows = vec![
+    let mut rows = Vec::new();
+    if let Some(ref prof_name) = status.profile {
+        rows.push(vec!["profile".to_string(), prof_name.clone()]);
+    }
+    rows.extend([
         vec!["url".to_string(), status.url.clone()],
         vec![
             "authenticated".to_string(),
@@ -432,7 +506,7 @@ fn render_auth_status(
         vec!["source".to_string(), status.source.clone()],
         vec!["token_type".to_string(), status.token_type.clone()],
         vec!["authorization".to_string(), status.authorization.clone()],
-    ];
+    ]);
     if let Some(ref user) = status.user {
         rows.push(vec!["user".to_string(), user.clone()]);
     }

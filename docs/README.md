@@ -42,8 +42,14 @@ echo "$HOMEBOX_API_KEY" | hbctl auth login --url http://192.168.1.50:7745 --with
 # Or authenticate with email & password
 hbctl auth login --url http://192.168.1.50:7745 --username you@example.com
 
+# Check remote server connectivity and version (no auth required)
+hbctl status --url http://192.168.1.50:7745
+
 # Check active session status (redacted Bearer ***)
 hbctl auth status
+
+# Create a location entity type
+hbctl entity-types create "Storage Bin" --description "Container" --is-location
 
 # List items with compact JSON and field projection
 hbctl item list --tag electronics --json --select id,name,quantity
@@ -76,11 +82,22 @@ hbctl update --check
 
 Layered precedence (highest to lowest):
 
-1. CLI flags (`--url`, `--api-key`, `--output`, `--config`)
-2. Environment variables / local `.env` (`HBCTL_URL` > `HOMEBOX_URL` > `HOMEBOX_IP`, `HBCTL_API_KEY` > `HOMEBOX_API_KEY`, `HBCTL_OUTPUT`)
+1. CLI flags (`--url`, `--api-key`, `--profile`, `--output`, `--config`)
+2. Environment variables / local `.env` (`HBCTL_URL` > `HOMEBOX_URL` > `HOMEBOX_IP`, `HBCTL_API_KEY` > `HOMEBOX_API_KEY`, `HBCTL_PROFILE`, `HBCTL_OUTPUT`)
 3. Project-local `.hbctl.toml`
-4. User global `~/.config/hbctl/config.toml` + stored `hbctl auth` credentials (OS keyring with automatic `0600` `~/.config/hbctl/credentials.json` fallback)
+4. User global `~/.config/hbctl/config.toml` (supports named `[profiles.<name>]` sections and `default_profile`) + stored `hbctl auth` credentials (OS keyring with automatic `0600` `~/.config/hbctl/credentials.json` fallback, scoped per profile)
 5. Built-in defaults (`output = "table"`, `timeout_secs = 30`, `download_timeout_secs = 120`)
+
+Multi-instance usage:
+
+```bash
+# Authenticate separate profiles
+echo "$HOMELAB_KEY" | hbctl --profile homelab auth login --url http://192.168.1.50:7745 --with-token
+echo "$STAGING_KEY" | hbctl --profile staging auth login --url https://homebox-staging.example.com --with-token
+
+# Target an instance via flag or HBCTL_PROFILE
+HBCTL_PROFILE=staging hbctl item list
+```
 
 See [`assets/config.example.toml`](../assets/config.example.toml).
 

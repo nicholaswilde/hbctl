@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -7,7 +7,7 @@ use directories::BaseDirs;
 use serde::{Deserialize, Serialize};
 use url::Url;
 
-use crate::auth_store::{AutoSecretStore, CredentialBackend, SecretStore};
+use crate::auth_store::{credential_account_key, AutoSecretStore, CredentialBackend, SecretStore};
 use crate::error::{HbctlError, Result};
 
 pub const DEFAULT_TIMEOUT_SECS: u64 = 30;
@@ -70,9 +70,9 @@ impl std::fmt::Display for CredentialSource {
     }
 }
 
-/// On-disk TOML configuration representation (`.hbctl.toml` or `~/.config/hbctl/config.toml`).
+/// Per-instance configuration section (`[profiles.<name>]`) inside `config.toml`.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
-pub struct ConfigFile {
+pub struct ProfileConfig {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub url: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -89,6 +89,31 @@ pub struct ConfigFile {
     pub expires_at: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub credential_backend: Option<String>,
+}
+
+/// On-disk TOML configuration representation (`.hbctl.toml` or `~/.config/hbctl/config.toml`).
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ConfigFile {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub default_profile: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub url: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub api_key: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub output: Option<OutputFormat>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub timeout_secs: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub download_timeout_secs: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub token_type: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub expires_at: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub credential_backend: Option<String>,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub profiles: BTreeMap<String, ProfileConfig>,
 }
 
 impl ConfigFile {
@@ -120,12 +145,30 @@ pub struct CliConfigOverrides {
     pub output: Option<OutputFormat>,
     pub json: bool,
     pub config_path: Option<PathBuf>,
+    pub profile: Option<String>,
+}
+
+/// Validate and normalize an optional profile name (`None` when absent/blank).
+pub fn normalize_profile_name(raw: Option<&str>) -> Result<Option<String>> {
+    let Some(trimmed) = non_empty(raw) else {
+        return Ok(None);
+    };
+    if !trimmed
+        .chars()
+        .all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.'))
+    {
+        return Err(HbctlError::Config(format!(
+            "invalid profile name '{trimmed}': use letters, digits, '-', '_', or '.'"
+        )));
+    }
+    Ok(Some(trimmed.to_string()))
 }
 
 /// Fully resolved runtime configuration after layering:
 /// CLI flags > env / `.env` > `.hbctl.toml` > `~/.config/hbctl/config.toml` & stored auth > defaults.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AppConfig {
+    pub profile: Option<String>,
     pub base_url: Option<String>,
     pub api_key: Option<String>,
     pub url_source: Option<CredentialSource>,
@@ -177,46 +220,73 @@ impl AppConfig {
         user_config_path: Option<&Path>,
         secret_store: Option<&dyn SecretStore>,
     ) -> Result<Self> {
+        let loaded_files: Vec<(ConfigFile, CredentialSource)> =
+            if let Some(explicit_path) = &overrides.config_path {
+                vec![(
+                    ConfigFile::load_from_path(explicit_path)?,
+                    CredentialSource::LocalConfig,
+                )]
+            } else {
+                let mut files = Vec::new();
+                // Tier 4: User global ~/.config/hbctl/config.toml
+                if let Some(user_path) = user_config_path {
+                    if user_path.is_file() {
+                        files.push((
+                            ConfigFile::load_from_path(user_path)?,
+                            CredentialSource::UserConfig,
+                        ));
+                    }
+                }
+                // Tier 3: Project-local .hbctl.toml
+                let local_path = cwd.join(".hbctl.toml");
+                if local_path.is_file() {
+                    files.push((
+                        ConfigFile::load_from_path(&local_path)?,
+                        CredentialSource::LocalConfig,
+                    ));
+                }
+                files
+            };
+
+        let explicit_profile = normalize_profile_name(overrides.profile.as_deref())?.or(
+            normalize_profile_name(env_non_empty(env_vars, "HBCTL_PROFILE").as_deref())?,
+        );
+
+        let mut cfg_default_profile: Option<String> = None;
+        for (file, _) in loaded_files.iter().rev() {
+            if let Some(prof) = normalize_profile_name(file.default_profile.as_deref())? {
+                cfg_default_profile = Some(prof);
+                break;
+            }
+        }
+
+        let active_profile = if explicit_profile.is_some() {
+            explicit_profile.clone()
+        } else if cfg_default_profile.is_some() {
+            cfg_default_profile
+        } else if loaded_files
+            .iter()
+            .any(|(f, _)| f.profiles.contains_key("default"))
+        {
+            Some("default".to_string())
+        } else {
+            None
+        };
+
         let mut merged = ConfigFile::default();
         let mut url_source = None;
         let mut api_key_source = None;
 
-        if let Some(explicit_path) = &overrides.config_path {
-            let explicit = ConfigFile::load_from_path(explicit_path)?;
-            apply_config_layer(
+        for (file, source) in loaded_files {
+            apply_config_file(
                 &mut merged,
-                explicit,
-                CredentialSource::LocalConfig,
+                file,
+                source,
+                active_profile.as_deref(),
+                explicit_profile.is_some(),
                 &mut url_source,
                 &mut api_key_source,
             );
-        } else {
-            // Tier 4: User global ~/.config/hbctl/config.toml
-            if let Some(user_path) = user_config_path {
-                if user_path.is_file() {
-                    let user_cfg = ConfigFile::load_from_path(user_path)?;
-                    apply_config_layer(
-                        &mut merged,
-                        user_cfg,
-                        CredentialSource::UserConfig,
-                        &mut url_source,
-                        &mut api_key_source,
-                    );
-                }
-            }
-
-            // Tier 3: Project-local .hbctl.toml
-            let local_path = cwd.join(".hbctl.toml");
-            if local_path.is_file() {
-                let local_cfg = ConfigFile::load_from_path(&local_path)?;
-                apply_config_layer(
-                    &mut merged,
-                    local_cfg,
-                    CredentialSource::LocalConfig,
-                    &mut url_source,
-                    &mut api_key_source,
-                );
-            }
         }
 
         // Tier 2: Environment variables (and .env already loaded into env)
@@ -264,7 +334,15 @@ impl AppConfig {
         // when no higher-precedence API key (CLI / env / .hbctl.toml / config.toml) is set.
         if merged.api_key.is_none() {
             if let (Some(url), Some(store)) = (base_url.as_deref(), secret_store) {
-                if let Ok(Some((token, backend))) = store.get_token(url) {
+                let primary_account = credential_account_key(active_profile.as_deref(), url);
+                let found = match store.get_token(&primary_account) {
+                    Ok(Some(hit)) => Some(hit),
+                    _ if active_profile.as_deref() == Some("default") => {
+                        store.get_token(url).ok().flatten()
+                    }
+                    _ => None,
+                };
+                if let Some((token, backend)) = found {
                     merged.api_key = Some(token);
                     api_key_source = Some(match backend {
                         CredentialBackend::Keyring => CredentialSource::Keyring,
@@ -275,6 +353,7 @@ impl AppConfig {
         }
 
         Ok(Self {
+            profile: active_profile,
             base_url,
             api_key: merged.api_key,
             url_source,
@@ -299,9 +378,70 @@ impl AppConfig {
     }
 }
 
-fn apply_config_layer(
+fn apply_shared_defaults(target: &mut ConfigFile, layer: &ConfigFile) {
+    if layer.output.is_some() {
+        target.output = layer.output;
+    }
+    if layer.timeout_secs.is_some() {
+        target.timeout_secs = layer.timeout_secs;
+    }
+    if layer.download_timeout_secs.is_some() {
+        target.download_timeout_secs = layer.download_timeout_secs;
+    }
+}
+
+fn apply_config_file(
     target: &mut ConfigFile,
-    layer: ConfigFile,
+    mut file: ConfigFile,
+    source: CredentialSource,
+    active_profile: Option<&str>,
+    has_explicit_profile: bool,
+    url_source: &mut Option<CredentialSource>,
+    api_key_source: &mut Option<CredentialSource>,
+) {
+    apply_shared_defaults(target, &file);
+
+    let profile_layer = match active_profile {
+        Some(prof_name) => {
+            if let Some(p_cfg) = file.profiles.remove(prof_name) {
+                Some(p_cfg)
+            } else if prof_name == "default"
+                || (!has_explicit_profile && source == CredentialSource::LocalConfig)
+            {
+                Some(ProfileConfig {
+                    url: file.url,
+                    api_key: file.api_key,
+                    output: None,
+                    timeout_secs: None,
+                    download_timeout_secs: None,
+                    token_type: file.token_type,
+                    expires_at: file.expires_at,
+                    credential_backend: file.credential_backend,
+                })
+            } else {
+                None
+            }
+        }
+        None => Some(ProfileConfig {
+            url: file.url,
+            api_key: file.api_key,
+            output: None,
+            timeout_secs: None,
+            download_timeout_secs: None,
+            token_type: file.token_type,
+            expires_at: file.expires_at,
+            credential_backend: file.credential_backend,
+        }),
+    };
+
+    if let Some(layer) = profile_layer {
+        apply_profile_layer(target, layer, source, url_source, api_key_source);
+    }
+}
+
+fn apply_profile_layer(
+    target: &mut ConfigFile,
+    layer: ProfileConfig,
     source: CredentialSource,
     url_source: &mut Option<CredentialSource>,
     api_key_source: &mut Option<CredentialSource>,
@@ -622,6 +762,7 @@ api_key = "hb_local"
             output: Some(OutputFormat::Table),
             json: true,
             config_path: None,
+            profile: None,
         };
         let cfg = AppConfig::resolve(&overrides, &env, &local_dir, Some(&user_cfg)).unwrap();
         assert_eq!(
@@ -680,5 +821,140 @@ api_key = "hb_local"
         .unwrap();
         assert_eq!(cfg.api_key.as_deref(), Some("hb_env_wins"));
         assert_eq!(cfg.api_key_source, Some(CredentialSource::Env));
+    }
+
+    #[test]
+    fn test_profiles_precedence_default_fallback_and_secret_scoping() {
+        let dir = tempdir().unwrap();
+        let empty_dir = dir.path().join("empty");
+        fs::create_dir_all(&empty_dir).unwrap();
+
+        let user_cfg = dir.path().join("config.toml");
+        fs::write(
+            &user_cfg,
+            r#"
+default_profile = "homelab"
+url = "http://legacy.local:7745"
+api_key = "hb_legacy"
+output = "plain"
+timeout_secs = 55
+
+[profiles.homelab]
+url = "http://homelab.local:7745"
+token_type = "api_key"
+
+[profiles.staging]
+url = "http://staging.local:7745"
+timeout_secs = 15
+"#,
+        )
+        .unwrap();
+
+        let creds = FileSecretStore::new(dir.path().join("credentials.json"));
+        creds
+            .set_token(
+                &credential_account_key(Some("homelab"), "http://homelab.local:7745/api/v1"),
+                "hb_homelab_store",
+            )
+            .unwrap();
+        creds
+            .set_token(
+                &credential_account_key(Some("staging"), "http://staging.local:7745/api/v1"),
+                "hb_staging_store",
+            )
+            .unwrap();
+
+        // 1. default_profile selects homelab and inherits shared top-level defaults
+        let cfg = AppConfig::resolve_with_store(
+            &CliConfigOverrides::default(),
+            &HashMap::new(),
+            &empty_dir,
+            Some(&user_cfg),
+            Some(&creds),
+        )
+        .unwrap();
+        assert_eq!(cfg.profile.as_deref(), Some("homelab"));
+        assert_eq!(
+            cfg.base_url.as_deref(),
+            Some("http://homelab.local:7745/api/v1")
+        );
+        assert_eq!(cfg.api_key.as_deref(), Some("hb_homelab_store"));
+        assert_eq!(cfg.output, OutputFormat::Plain);
+        assert_eq!(cfg.timeout_secs, 55);
+
+        // 2. HBCTL_PROFILE overrides default_profile
+        let mut env = HashMap::new();
+        env.insert("HBCTL_PROFILE".into(), "staging".into());
+        let cfg = AppConfig::resolve_with_store(
+            &CliConfigOverrides::default(),
+            &env,
+            &empty_dir,
+            Some(&user_cfg),
+            Some(&creds),
+        )
+        .unwrap();
+        assert_eq!(cfg.profile.as_deref(), Some("staging"));
+        assert_eq!(
+            cfg.base_url.as_deref(),
+            Some("http://staging.local:7745/api/v1")
+        );
+        assert_eq!(cfg.api_key.as_deref(), Some("hb_staging_store"));
+        assert_eq!(cfg.timeout_secs, 15);
+
+        // 3. CLI --profile overrides HBCTL_PROFILE and does not leak top-level url/api_key into unknown profile
+        let overrides = CliConfigOverrides {
+            profile: Some("sandbox".into()),
+            ..Default::default()
+        };
+        let cfg = AppConfig::resolve_with_store(
+            &overrides,
+            &env,
+            &empty_dir,
+            Some(&user_cfg),
+            Some(&creds),
+        )
+        .unwrap();
+        assert_eq!(cfg.profile.as_deref(), Some("sandbox"));
+        assert_eq!(cfg.base_url, None);
+        assert_eq!(cfg.api_key, None);
+        assert_eq!(cfg.output, OutputFormat::Plain);
+
+        // 4. Implicit [profiles.default] and legacy fallback for `default`
+        let default_cfg_path = dir.path().join("default_only.toml");
+        fs::write(
+            &default_cfg_path,
+            r#"
+[profiles.default]
+url = "http://legacy.local:7745"
+"#,
+        )
+        .unwrap();
+        creds
+            .set_token("http://legacy.local:7745/api/v1", "hb_legacy_creds")
+            .unwrap();
+        let cfg = AppConfig::resolve_with_store(
+            &CliConfigOverrides::default(),
+            &HashMap::new(),
+            &empty_dir,
+            Some(&default_cfg_path),
+            Some(&creds),
+        )
+        .unwrap();
+        assert_eq!(cfg.profile.as_deref(), Some("default"));
+        assert_eq!(cfg.api_key.as_deref(), Some("hb_legacy_creds"));
+
+        // 5. Invalid profile name fails cleanly
+        let bad = CliConfigOverrides {
+            profile: Some("bad/name".into()),
+            ..Default::default()
+        };
+        assert!(AppConfig::resolve_with_store(
+            &bad,
+            &HashMap::new(),
+            &empty_dir,
+            Some(&user_cfg),
+            Some(&creds),
+        )
+        .is_err());
     }
 }

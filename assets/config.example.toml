@@ -31,3 +31,20 @@
 
 # HTTP request timeout in seconds for streaming attachment downloads (default: 120).
 # download_timeout_secs = 120
+
+# =============================================================================
+# Named Multi-Instance Profiles
+# =============================================================================
+# Select a profile with `--profile <name>` (`-P <name>`), `HBCTL_PROFILE`,
+# or `default_profile` below. Credentials stored via `hbctl auth login` are
+# automatically isolated per profile in the OS keyring and 0600 credentials file.
+#
+# default_profile = "homelab"
+#
+# [profiles.homelab]
+# url = "http://192.168.1.50:7745"
+#
+# [profiles.staging]
+# url = "https://homebox-staging.example.com"
+# output = "json"
+# timeout_secs = 15

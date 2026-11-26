@@ -1,13 +1,14 @@
-use crate::client::models::{EntityType, Tag};
-use crate::client::HomeboxClient;
+use crate::client::models::{Entity, EntityType, Tag};
+use crate::client::{HomeboxClient, ListEntitiesQuery};
 use crate::error::{HbctlError, Result};
 
-/// Case-insensitive name-to-UUID resolver for Homebox tags and entity types.
+/// Case-insensitive name-to-UUID resolver for Homebox tags, entity types, and parent items.
 /// Caches list responses within a single command execution.
 pub struct Resolver<'a> {
     client: &'a HomeboxClient,
     tags_cache: Option<Vec<Tag>>,
     entity_types_cache: Option<Vec<EntityType>>,
+    entities_cache: Option<Vec<Entity>>,
 }
 
 impl<'a> Resolver<'a> {
@@ -16,6 +17,7 @@ impl<'a> Resolver<'a> {
             client,
             tags_cache: None,
             entity_types_cache: None,
+            entities_cache: None,
         }
     }
 
@@ -34,6 +36,19 @@ impl<'a> Resolver<'a> {
             .entity_types_cache
             .as_deref()
             .expect("entity types cache populated"))
+    }
+
+    fn entities(&mut self) -> Result<&[Entity]> {
+        if self.entities_cache.is_none() {
+            self.entities_cache = Some(
+                self.client
+                    .list_entities(&ListEntitiesQuery::default(), true)?,
+            );
+        }
+        Ok(self
+            .entities_cache
+            .as_deref()
+            .expect("entities cache populated"))
     }
 
     /// Resolve a tag name or UUID case-insensitively.
@@ -104,6 +119,39 @@ impl<'a> Resolver<'a> {
         } else {
             Err(HbctlError::NotFound {
                 kind: "entity type".to_string(),
+                query: needle.to_string(),
+            })
+        }
+    }
+
+    /// Resolve a parent item name, UUID, or `'none'` (returns `Ok(None)`).
+    pub fn resolve_parent_id(&mut self, name_or_id: &str) -> Result<Option<String>> {
+        let needle = name_or_id.trim();
+        if needle.is_empty() {
+            return Err(HbctlError::InvalidInput(
+                "parent cannot be empty".to_string(),
+            ));
+        }
+        if needle.eq_ignore_ascii_case("none") {
+            return Ok(None);
+        }
+
+        let entities = self.entities()?;
+        if let Some(found) = entities.iter().find(|e| e.id == needle) {
+            return Ok(Some(found.id.clone()));
+        }
+        if let Some(found) = entities
+            .iter()
+            .find(|e| e.name.trim().eq_ignore_ascii_case(needle))
+        {
+            return Ok(Some(found.id.clone()));
+        }
+
+        if is_uuid_like(needle) {
+            Ok(Some(needle.to_string()))
+        } else {
+            Err(HbctlError::NotFound {
+                kind: "parent item".to_string(),
                 query: needle.to_string(),
             })
         }

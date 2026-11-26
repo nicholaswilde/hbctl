@@ -21,6 +21,8 @@ _hbctl() {
 '*--select=[Comma-separated field projection for JSON/table output (e.g. id,name,fields)]:SELECT:_default' \
 '-C+[Path to explicit TOML configuration file]:CONFIG:_files' \
 '--config=[Path to explicit TOML configuration file]:CONFIG:_files' \
+'-P+[Named configuration profile (env\: HBCTL_PROFILE)]:NAME:_default' \
+'--profile=[Named configuration profile (env\: HBCTL_PROFILE)]:NAME:_default' \
 '--json[Shorthand for --output json (emits compact JSON)]' \
 '--dry-run[Preview mutating requests without hitting the server (redacts Authorization)]' \
 '-q[Output only created/affected IDs for shell piping]' \
@@ -46,6 +48,8 @@ _arguments "${_arguments_options[@]}" : \
 '*--select=[Comma-separated field projection for JSON/table output (e.g. id,name,fields)]:SELECT:_default' \
 '-C+[Path to explicit TOML configuration file]:CONFIG:_files' \
 '--config=[Path to explicit TOML configuration file]:CONFIG:_files' \
+'-P+[Named configuration profile (env\: HBCTL_PROFILE)]:NAME:_default' \
+'--profile=[Named configuration profile (env\: HBCTL_PROFILE)]:NAME:_default' \
 '--json[Shorthand for --output json (emits compact JSON)]' \
 '--dry-run[Preview mutating requests without hitting the server (redacts Authorization)]' \
 '-q[Output only created/affected IDs for shell piping]' \
@@ -72,6 +76,8 @@ _arguments "${_arguments_options[@]}" : \
 '*--select=[Comma-separated field projection for JSON/table output (e.g. id,name,fields)]:SELECT:_default' \
 '-C+[Path to explicit TOML configuration file]:CONFIG:_files' \
 '--config=[Path to explicit TOML configuration file]:CONFIG:_files' \
+'-P+[Named configuration profile (env\: HBCTL_PROFILE)]:NAME:_default' \
+'--profile=[Named configuration profile (env\: HBCTL_PROFILE)]:NAME:_default' \
 '(-u --username --password-stdin)--with-token[Read a Homebox API key (hb_...) or Bearer token from stdin]' \
 '--password-stdin[Read login password from stdin instead of prompting interactively]' \
 '--insecure-storage[Store token in 0600 local file store instead of OS keyring]' \
@@ -91,6 +97,8 @@ _arguments "${_arguments_options[@]}" : \
 '*--select=[Comma-separated field projection for JSON/table output (e.g. id,name,fields)]:SELECT:_default' \
 '-C+[Path to explicit TOML configuration file]:CONFIG:_files' \
 '--config=[Path to explicit TOML configuration file]:CONFIG:_files' \
+'-P+[Named configuration profile (env\: HBCTL_PROFILE)]:NAME:_default' \
+'--profile=[Named configuration profile (env\: HBCTL_PROFILE)]:NAME:_default' \
 '--json[Shorthand for --output json (emits compact JSON)]' \
 '--dry-run[Preview mutating requests without hitting the server (redacts Authorization)]' \
 '-q[Output only created/affected IDs for shell piping]' \
@@ -107,6 +115,8 @@ _arguments "${_arguments_options[@]}" : \
 '*--select=[Comma-separated field projection for JSON/table output (e.g. id,name,fields)]:SELECT:_default' \
 '-C+[Path to explicit TOML configuration file]:CONFIG:_files' \
 '--config=[Path to explicit TOML configuration file]:CONFIG:_files' \
+'-P+[Named configuration profile (env\: HBCTL_PROFILE)]:NAME:_default' \
+'--profile=[Named configuration profile (env\: HBCTL_PROFILE)]:NAME:_default' \
 '--insecure-storage[Skip OS keyring and only clear local 0600 fallback store]' \
 '--json[Shorthand for --output json (emits compact JSON)]' \
 '--dry-run[Preview mutating requests without hitting the server (redacts Authorization)]' \
@@ -124,6 +134,8 @@ _arguments "${_arguments_options[@]}" : \
 '*--select=[Comma-separated field projection for JSON/table output (e.g. id,name,fields)]:SELECT:_default' \
 '-C+[Path to explicit TOML configuration file]:CONFIG:_files' \
 '--config=[Path to explicit TOML configuration file]:CONFIG:_files' \
+'-P+[Named configuration profile (env\: HBCTL_PROFILE)]:NAME:_default' \
+'--profile=[Named configuration profile (env\: HBCTL_PROFILE)]:NAME:_default' \
 '--insecure-storage[Store refreshed token in 0600 local file store instead of OS keyring]' \
 '--json[Shorthand for --output json (emits compact JSON)]' \
 '--dry-run[Preview mutating requests without hitting the server (redacts Authorization)]' \
@@ -181,6 +193,8 @@ _arguments "${_arguments_options[@]}" : \
 '*--select=[Comma-separated field projection for JSON/table output (e.g. id,name,fields)]:SELECT:_default' \
 '-C+[Path to explicit TOML configuration file]:CONFIG:_files' \
 '--config=[Path to explicit TOML configuration file]:CONFIG:_files' \
+'-P+[Named configuration profile (env\: HBCTL_PROFILE)]:NAME:_default' \
+'--profile=[Named configuration profile (env\: HBCTL_PROFILE)]:NAME:_default' \
 '--json[Shorthand for --output json (emits compact JSON)]' \
 '--dry-run[Preview mutating requests without hitting the server (redacts Authorization)]' \
 '-q[Output only created/affected IDs for shell piping]' \
@@ -201,6 +215,7 @@ _arguments "${_arguments_options[@]}" : \
 _arguments "${_arguments_options[@]}" : \
 '--tag=[Filter by tag name or UUID]:TAG:_default' \
 '--type=[Filter by entity type name or UUID]:ENTITY_TYPE:_default' \
+'--parent=[Filter by parent item name, ID, or '\''none'\'' for top-level items]:PARENT:_default' \
 '--has-field=[Only include items having the named custom field (hydrates details if missing)]:HAS_FIELD:_default' \
 '--page-size=[Page size for listing]:PAGE_SIZE:_default' \
 '--url=[Homebox base URL (env\: HBCTL_URL > HOMEBOX_URL > http\://<HOMEBOX_IP>\:7745)]:URL:_default' \
@@ -209,6 +224,8 @@ _arguments "${_arguments_options[@]}" : \
 '*--select=[Comma-separated field projection for JSON/table output (e.g. id,name,fields)]:SELECT:_default' \
 '-C+[Path to explicit TOML configuration file]:CONFIG:_files' \
 '--config=[Path to explicit TOML configuration file]:CONFIG:_files' \
+'-P+[Named configuration profile (env\: HBCTL_PROFILE)]:NAME:_default' \
+'--profile=[Named configuration profile (env\: HBCTL_PROFILE)]:NAME:_default' \
 '--all[Fetch all pages]' \
 '--json[Shorthand for --output json (emits compact JSON)]' \
 '--dry-run[Preview mutating requests without hitting the server (redacts Authorization)]' \
@@ -226,6 +243,8 @@ _arguments "${_arguments_options[@]}" : \
 '*--select=[Comma-separated field projection for JSON/table output (e.g. id,name,fields)]:SELECT:_default' \
 '-C+[Path to explicit TOML configuration file]:CONFIG:_files' \
 '--config=[Path to explicit TOML configuration file]:CONFIG:_files' \
+'-P+[Named configuration profile (env\: HBCTL_PROFILE)]:NAME:_default' \
+'--profile=[Named configuration profile (env\: HBCTL_PROFILE)]:NAME:_default' \
 '--json[Shorthand for --output json (emits compact JSON)]' \
 '--dry-run[Preview mutating requests without hitting the server (redacts Authorization)]' \
 '-q[Output only created/affected IDs for shell piping]' \
@@ -240,6 +259,7 @@ _arguments "${_arguments_options[@]}" : \
 '--name=[Item name (required unless supplied via --from-json)]:NAME:_default' \
 '--description=[Item description]:DESCRIPTION:_default' \
 '--type=[Entity type name or UUID]:ENTITY_TYPE:_default' \
+'--parent=[Parent item/location name, ID, or '\''none'\'']:PARENT:_default' \
 '*--tag=[Tag name or UUID (repeatable; missing tags auto-created)]:TAGS:_default' \
 '--manufacturer=[Manufacturer (normalized into custom field '\''Manufacturer'\'')]:MANUFACTURER:_default' \
 '--model=[Model number (normalized into custom field '\''Model Number'\'')]:MODEL:_default' \
@@ -252,12 +272,16 @@ _arguments "${_arguments_options[@]}" : \
 '*--field=[Custom field KEY=VAL (repeatable)]:FIELDS:_default' \
 '--field-type=[Value type for --field entries]:FIELD_TYPE:(text number boolean)' \
 '--from-json=[Load initial item JSON from file path or '\''-'\'' for stdin]:FROM_JSON:_default' \
+'*--attach=[Local file path(s) to attach after creating the item (repeatable)]:FILE:_files' \
 '--url=[Homebox base URL (env\: HBCTL_URL > HOMEBOX_URL > http\://<HOMEBOX_IP>\:7745)]:URL:_default' \
 '--api-key=[Homebox API key or Bearer token (env\: HBCTL_API_KEY > HOMEBOX_API_KEY)]:API_KEY:_default' \
 '--output=[Output format (table, json, plain) \[env\: HBCTL_OUTPUT\]]:OUTPUT:(table json plain)' \
 '*--select=[Comma-separated field projection for JSON/table output (e.g. id,name,fields)]:SELECT:_default' \
 '-C+[Path to explicit TOML configuration file]:CONFIG:_files' \
 '--config=[Path to explicit TOML configuration file]:CONFIG:_files' \
+'-P+[Named configuration profile (env\: HBCTL_PROFILE)]:NAME:_default' \
+'--profile=[Named configuration profile (env\: HBCTL_PROFILE)]:NAME:_default' \
+'--force[Allow attaching images larger than 500KB]' \
 '--json[Shorthand for --output json (emits compact JSON)]' \
 '--dry-run[Preview mutating requests without hitting the server (redacts Authorization)]' \
 '-q[Output only created/affected IDs for shell piping]' \
@@ -271,6 +295,7 @@ _arguments "${_arguments_options[@]}" : \
 '--name=[Updated item name]:NAME:_default' \
 '--description=[Updated item description]:DESCRIPTION:_default' \
 '--type=[Entity type name or UUID]:ENTITY_TYPE:_default' \
+'--parent=[Parent item/location name, ID, or '\''none'\'' to unparent]:PARENT:_default' \
 '*--tag=[Tag name or UUID to merge (repeatable)]:TAGS:_default' \
 '*--add-tag=[Tag name or UUID to add while preserving existing tags (repeatable)]:ADD_TAGS:_default' \
 '*--remove-tag=[Tag name or UUID to remove while preserving other existing tags (repeatable)]:REMOVE_TAGS:_default' \
@@ -291,6 +316,9 @@ _arguments "${_arguments_options[@]}" : \
 '*--select=[Comma-separated field projection for JSON/table output (e.g. id,name,fields)]:SELECT:_default' \
 '-C+[Path to explicit TOML configuration file]:CONFIG:_files' \
 '--config=[Path to explicit TOML configuration file]:CONFIG:_files' \
+'-P+[Named configuration profile (env\: HBCTL_PROFILE)]:NAME:_default' \
+'--profile=[Named configuration profile (env\: HBCTL_PROFILE)]:NAME:_default' \
+'--fill-missing[Only populate blank/missing/zero fields; preserve existing non-empty values]' \
 '--json[Shorthand for --output json (emits compact JSON)]' \
 '--dry-run[Preview mutating requests without hitting the server (redacts Authorization)]' \
 '-q[Output only created/affected IDs for shell piping]' \
@@ -302,9 +330,10 @@ _arguments "${_arguments_options[@]}" : \
 ;;
 (upsert)
 _arguments "${_arguments_options[@]}" : \
-'--name=[Item name to match or create]:NAME:_default' \
+'--name=[Item name to match or create (required unless supplied via --from-json)]:NAME:_default' \
 '--description=[Item description]:DESCRIPTION:_default' \
 '--type=[Entity type name or UUID]:ENTITY_TYPE:_default' \
+'--parent=[Parent item/location name, ID, or '\''none'\'']:PARENT:_default' \
 '*--tag=[Tag name or UUID (repeatable; missing tags auto-created)]:TAGS:_default' \
 '--manufacturer=[Manufacturer]:MANUFACTURER:_default' \
 '--model=[Model number]:MODEL:_default' \
@@ -316,12 +345,19 @@ _arguments "${_arguments_options[@]}" : \
 '--purchase-from=[Purchase source]:PURCHASE_FROM:_default' \
 '*--field=[Custom field KEY=VAL (repeatable)]:FIELDS:_default' \
 '--field-type=[Value type for --field entries]:FIELD_TYPE:(text number boolean)' \
+'--from-json=[Load item JSON from file path or '\''-'\'' for stdin]:FROM_JSON:_default' \
+'*--match-by=[Match existing items by key in priority order\: name, model, serial, or field\:KEY (repeatable; defaults to name)]:KEY:_default' \
+'*--attach=[Local file path(s) to attach after upserting the item (repeatable)]:FILE:_files' \
 '--url=[Homebox base URL (env\: HBCTL_URL > HOMEBOX_URL > http\://<HOMEBOX_IP>\:7745)]:URL:_default' \
 '--api-key=[Homebox API key or Bearer token (env\: HBCTL_API_KEY > HOMEBOX_API_KEY)]:API_KEY:_default' \
 '--output=[Output format (table, json, plain) \[env\: HBCTL_OUTPUT\]]:OUTPUT:(table json plain)' \
 '*--select=[Comma-separated field projection for JSON/table output (e.g. id,name,fields)]:SELECT:_default' \
 '-C+[Path to explicit TOML configuration file]:CONFIG:_files' \
 '--config=[Path to explicit TOML configuration file]:CONFIG:_files' \
+'-P+[Named configuration profile (env\: HBCTL_PROFILE)]:NAME:_default' \
+'--profile=[Named configuration profile (env\: HBCTL_PROFILE)]:NAME:_default' \
+'--fill-missing[When updating an existing item, only populate blank/missing/zero fields]' \
+'--force[Allow attaching images larger than 500KB]' \
 '--json[Shorthand for --output json (emits compact JSON)]' \
 '--dry-run[Preview mutating requests without hitting the server (redacts Authorization)]' \
 '-q[Output only created/affected IDs for shell piping]' \
@@ -338,6 +374,8 @@ _arguments "${_arguments_options[@]}" : \
 '*--select=[Comma-separated field projection for JSON/table output (e.g. id,name,fields)]:SELECT:_default' \
 '-C+[Path to explicit TOML configuration file]:CONFIG:_files' \
 '--config=[Path to explicit TOML configuration file]:CONFIG:_files' \
+'-P+[Named configuration profile (env\: HBCTL_PROFILE)]:NAME:_default' \
+'--profile=[Named configuration profile (env\: HBCTL_PROFILE)]:NAME:_default' \
 '--force[Skip interactive confirmation prompt]' \
 '--json[Shorthand for --output json (emits compact JSON)]' \
 '--dry-run[Preview mutating requests without hitting the server (redacts Authorization)]' \
@@ -351,14 +389,21 @@ _arguments "${_arguments_options[@]}" : \
 (import)
 _arguments "${_arguments_options[@]}" : \
 '--format=[Input format (inferred from extension if omitted; defaults to json for stdin)]:FORMAT:(json csv)' \
+'*--match-by=[Match existing items by key in priority order\: name, model, serial, or field\:KEY (repeatable; defaults to name)]:KEY:_default' \
+'--parent=[Default parent item/location name, ID, or '\''none'\'' for imported records without one]:PARENT:_default' \
+'*--attach=[Local file path(s) to attach to each imported item (repeatable)]:FILE:_files' \
 '--url=[Homebox base URL (env\: HBCTL_URL > HOMEBOX_URL > http\://<HOMEBOX_IP>\:7745)]:URL:_default' \
 '--api-key=[Homebox API key or Bearer token (env\: HBCTL_API_KEY > HOMEBOX_API_KEY)]:API_KEY:_default' \
 '--output=[Output format (table, json, plain) \[env\: HBCTL_OUTPUT\]]:OUTPUT:(table json plain)' \
 '*--select=[Comma-separated field projection for JSON/table output (e.g. id,name,fields)]:SELECT:_default' \
 '-C+[Path to explicit TOML configuration file]:CONFIG:_files' \
 '--config=[Path to explicit TOML configuration file]:CONFIG:_files' \
+'-P+[Named configuration profile (env\: HBCTL_PROFILE)]:NAME:_default' \
+'--profile=[Named configuration profile (env\: HBCTL_PROFILE)]:NAME:_default' \
 '(--update-existing)--skip-existing[Skip items whose name already exists in Homebox]' \
 '(--skip-existing)--update-existing[Update items whose name already exists in Homebox]' \
+'(--skip-existing)--fill-missing[With --update-existing, only populate blank/missing/zero fields on existing items]' \
+'--force[Allow attaching images larger than 500KB]' \
 '--json[Shorthand for --output json (emits compact JSON)]' \
 '--dry-run[Preview mutating requests without hitting the server (redacts Authorization)]' \
 '-q[Output only created/affected IDs for shell piping]' \
@@ -377,8 +422,50 @@ _arguments "${_arguments_options[@]}" : \
 '*--select=[Comma-separated field projection for JSON/table output (e.g. id,name,fields)]:SELECT:_default' \
 '-C+[Path to explicit TOML configuration file]:CONFIG:_files' \
 '--config=[Path to explicit TOML configuration file]:CONFIG:_files' \
+'-P+[Named configuration profile (env\: HBCTL_PROFILE)]:NAME:_default' \
+'--profile=[Named configuration profile (env\: HBCTL_PROFILE)]:NAME:_default' \
 '--delete[Delete detected duplicate items, retaining only the keeper]' \
 '--merge[Sum duplicate quantities onto the keeper before deleting duplicates (implies --delete)]' \
+'--json[Shorthand for --output json (emits compact JSON)]' \
+'--dry-run[Preview mutating requests without hitting the server (redacts Authorization)]' \
+'-q[Output only created/affected IDs for shell piping]' \
+'--quiet[Output only created/affected IDs for shell piping]' \
+'-h[Print help]' \
+'--help[Print help]' \
+&& ret=0
+;;
+(move)
+_arguments "${_arguments_options[@]}" : \
+'--url=[Homebox base URL (env\: HBCTL_URL > HOMEBOX_URL > http\://<HOMEBOX_IP>\:7745)]:URL:_default' \
+'--api-key=[Homebox API key or Bearer token (env\: HBCTL_API_KEY > HOMEBOX_API_KEY)]:API_KEY:_default' \
+'--output=[Output format (table, json, plain) \[env\: HBCTL_OUTPUT\]]:OUTPUT:(table json plain)' \
+'*--select=[Comma-separated field projection for JSON/table output (e.g. id,name,fields)]:SELECT:_default' \
+'-C+[Path to explicit TOML configuration file]:CONFIG:_files' \
+'--config=[Path to explicit TOML configuration file]:CONFIG:_files' \
+'-P+[Named configuration profile (env\: HBCTL_PROFILE)]:NAME:_default' \
+'--profile=[Named configuration profile (env\: HBCTL_PROFILE)]:NAME:_default' \
+'--json[Shorthand for --output json (emits compact JSON)]' \
+'--dry-run[Preview mutating requests without hitting the server (redacts Authorization)]' \
+'-q[Output only created/affected IDs for shell piping]' \
+'--quiet[Output only created/affected IDs for shell piping]' \
+'-h[Print help]' \
+'--help[Print help]' \
+':id -- Entity ID to move:_default' \
+':parent -- Target parent item name, ID, or '\''none'\'' to unparent:_default' \
+&& ret=0
+;;
+(tree)
+_arguments "${_arguments_options[@]}" : \
+'--root=[Optional root item name or ID to start the tree from]:ROOT:_default' \
+'--max-depth=[Optional maximum depth to display (0 = roots only)]:MAX_DEPTH:_default' \
+'--url=[Homebox base URL (env\: HBCTL_URL > HOMEBOX_URL > http\://<HOMEBOX_IP>\:7745)]:URL:_default' \
+'--api-key=[Homebox API key or Bearer token (env\: HBCTL_API_KEY > HOMEBOX_API_KEY)]:API_KEY:_default' \
+'--output=[Output format (table, json, plain) \[env\: HBCTL_OUTPUT\]]:OUTPUT:(table json plain)' \
+'*--select=[Comma-separated field projection for JSON/table output (e.g. id,name,fields)]:SELECT:_default' \
+'-C+[Path to explicit TOML configuration file]:CONFIG:_files' \
+'--config=[Path to explicit TOML configuration file]:CONFIG:_files' \
+'-P+[Named configuration profile (env\: HBCTL_PROFILE)]:NAME:_default' \
+'--profile=[Named configuration profile (env\: HBCTL_PROFILE)]:NAME:_default' \
 '--json[Shorthand for --output json (emits compact JSON)]' \
 '--dry-run[Preview mutating requests without hitting the server (redacts Authorization)]' \
 '-q[Output only created/affected IDs for shell piping]' \
@@ -431,6 +518,14 @@ _arguments "${_arguments_options[@]}" : \
 _arguments "${_arguments_options[@]}" : \
 && ret=0
 ;;
+(move)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+(tree)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
 (help)
 _arguments "${_arguments_options[@]}" : \
 && ret=0
@@ -451,6 +546,8 @@ _arguments "${_arguments_options[@]}" : \
 '*--select=[Comma-separated field projection for JSON/table output (e.g. id,name,fields)]:SELECT:_default' \
 '-C+[Path to explicit TOML configuration file]:CONFIG:_files' \
 '--config=[Path to explicit TOML configuration file]:CONFIG:_files' \
+'-P+[Named configuration profile (env\: HBCTL_PROFILE)]:NAME:_default' \
+'--profile=[Named configuration profile (env\: HBCTL_PROFILE)]:NAME:_default' \
 '--json[Shorthand for --output json (emits compact JSON)]' \
 '--dry-run[Preview mutating requests without hitting the server (redacts Authorization)]' \
 '-q[Output only created/affected IDs for shell piping]' \
@@ -469,12 +566,15 @@ _arguments "${_arguments_options[@]}" : \
         case $line[1] in
             (upload)
 _arguments "${_arguments_options[@]}" : \
+'--name=[Override remote filename/title (for single-file or stdin '\''-'\'' uploads)]:NAME:_default' \
 '--url=[Homebox base URL (env\: HBCTL_URL > HOMEBOX_URL > http\://<HOMEBOX_IP>\:7745)]:URL:_default' \
 '--api-key=[Homebox API key or Bearer token (env\: HBCTL_API_KEY > HOMEBOX_API_KEY)]:API_KEY:_default' \
 '--output=[Output format (table, json, plain) \[env\: HBCTL_OUTPUT\]]:OUTPUT:(table json plain)' \
 '*--select=[Comma-separated field projection for JSON/table output (e.g. id,name,fields)]:SELECT:_default' \
 '-C+[Path to explicit TOML configuration file]:CONFIG:_files' \
 '--config=[Path to explicit TOML configuration file]:CONFIG:_files' \
+'-P+[Named configuration profile (env\: HBCTL_PROFILE)]:NAME:_default' \
+'--profile=[Named configuration profile (env\: HBCTL_PROFILE)]:NAME:_default' \
 '(--overwrite)--skip-existing[Skip files that already exist on the item (default behavior)]' \
 '(--skip-existing)--overwrite[Delete and re-upload files that already exist on the item]' \
 '--force[Allow uploading images larger than 500KB]' \
@@ -485,7 +585,7 @@ _arguments "${_arguments_options[@]}" : \
 '-h[Print help]' \
 '--help[Print help]' \
 ':item_id -- Target entity ID:_default' \
-'*::files -- Local file path(s) to upload:_files' \
+'*::files -- Local file path(s) to upload (or '\''-'\'' for stdin when combined with --name):_files' \
 && ret=0
 ;;
 (list)
@@ -496,6 +596,8 @@ _arguments "${_arguments_options[@]}" : \
 '*--select=[Comma-separated field projection for JSON/table output (e.g. id,name,fields)]:SELECT:_default' \
 '-C+[Path to explicit TOML configuration file]:CONFIG:_files' \
 '--config=[Path to explicit TOML configuration file]:CONFIG:_files' \
+'-P+[Named configuration profile (env\: HBCTL_PROFILE)]:NAME:_default' \
+'--profile=[Named configuration profile (env\: HBCTL_PROFILE)]:NAME:_default' \
 '--json[Shorthand for --output json (emits compact JSON)]' \
 '--dry-run[Preview mutating requests without hitting the server (redacts Authorization)]' \
 '-q[Output only created/affected IDs for shell piping]' \
@@ -507,16 +609,21 @@ _arguments "${_arguments_options[@]}" : \
 ;;
 (download)
 _arguments "${_arguments_options[@]}" : \
+'(--all-items --items-from)--tag=[Download matching attachments across items matching this tag name or UUID]:TAG:_default' \
+'(--all-items --tag)--items-from=[Download matching attachments for newline-delimited entity IDs from a file or '\''-'\'' (stdin)]:FILE|-:_files' \
 '--mime=[Filter attachments by MIME type (e.g. application/pdf)]:MIME:_default' \
 '--ext=[Filter attachments by file extension (e.g. pdf)]:EXT:_default' \
-'--out=[Output file path (single download) or directory (multi-download / --all)]:OUT:_files' \
+'--out=[Output file path (single download) or directory (multi-download / --all / bulk)]:OUT:_files' \
 '--url=[Homebox base URL (env\: HBCTL_URL > HOMEBOX_URL > http\://<HOMEBOX_IP>\:7745)]:URL:_default' \
 '--api-key=[Homebox API key or Bearer token (env\: HBCTL_API_KEY > HOMEBOX_API_KEY)]:API_KEY:_default' \
 '--output=[Output format (table, json, plain) \[env\: HBCTL_OUTPUT\]]:OUTPUT:(table json plain)' \
 '*--select=[Comma-separated field projection for JSON/table output (e.g. id,name,fields)]:SELECT:_default' \
 '-C+[Path to explicit TOML configuration file]:CONFIG:_files' \
 '--config=[Path to explicit TOML configuration file]:CONFIG:_files' \
+'-P+[Named configuration profile (env\: HBCTL_PROFILE)]:NAME:_default' \
+'--profile=[Named configuration profile (env\: HBCTL_PROFILE)]:NAME:_default' \
 '--all[Download all matching attachments on the item]' \
+'(--tag --items-from)--all-items[Download matching attachments across all items]' \
 '--overwrite[Overwrite existing local files instead of skipping]' \
 '--json[Shorthand for --output json (emits compact JSON)]' \
 '--dry-run[Preview mutating requests without hitting the server (redacts Authorization)]' \
@@ -524,8 +631,8 @@ _arguments "${_arguments_options[@]}" : \
 '--quiet[Output only created/affected IDs for shell piping]' \
 '-h[Print help]' \
 '--help[Print help]' \
-':item_id -- Target entity ID:_default' \
-'::attachment_id -- Specific attachment ID to download (omit when using --all):_default' \
+'::item_id -- Target entity ID (omit when using --all-items, --tag, or --items-from):_default' \
+'::attachment_id -- Specific attachment ID to download (omit when using --all or bulk selectors):_default' \
 && ret=0
 ;;
 (delete)
@@ -536,6 +643,8 @@ _arguments "${_arguments_options[@]}" : \
 '*--select=[Comma-separated field projection for JSON/table output (e.g. id,name,fields)]:SELECT:_default' \
 '-C+[Path to explicit TOML configuration file]:CONFIG:_files' \
 '--config=[Path to explicit TOML configuration file]:CONFIG:_files' \
+'-P+[Named configuration profile (env\: HBCTL_PROFILE)]:NAME:_default' \
+'--profile=[Named configuration profile (env\: HBCTL_PROFILE)]:NAME:_default' \
 '--json[Shorthand for --output json (emits compact JSON)]' \
 '--dry-run[Preview mutating requests without hitting the server (redacts Authorization)]' \
 '-q[Output only created/affected IDs for shell piping]' \
@@ -592,12 +701,15 @@ _arguments "${_arguments_options[@]}" : \
 '--model=[Filter by model number (exact or substring, case-insensitive)]:MODEL:_default' \
 '--serial=[Filter by serial number (exact or substring, case-insensitive)]:SERIAL:_default' \
 '--manufacturer=[Filter by manufacturer (exact or substring, case-insensitive)]:MANUFACTURER:_default' \
+'*--field=[Filter by custom field existence (KEY) or substring value (KEY=VAL), case-insensitive (repeatable)]:KEY[=VAL]:_default' \
 '--url=[Homebox base URL (env\: HBCTL_URL > HOMEBOX_URL > http\://<HOMEBOX_IP>\:7745)]:URL:_default' \
 '--api-key=[Homebox API key or Bearer token (env\: HBCTL_API_KEY > HOMEBOX_API_KEY)]:API_KEY:_default' \
 '--output=[Output format (table, json, plain) \[env\: HBCTL_OUTPUT\]]:OUTPUT:(table json plain)' \
 '*--select=[Comma-separated field projection for JSON/table output (e.g. id,name,fields)]:SELECT:_default' \
 '-C+[Path to explicit TOML configuration file]:CONFIG:_files' \
 '--config=[Path to explicit TOML configuration file]:CONFIG:_files' \
+'-P+[Named configuration profile (env\: HBCTL_PROFILE)]:NAME:_default' \
+'--profile=[Named configuration profile (env\: HBCTL_PROFILE)]:NAME:_default' \
 '--json[Shorthand for --output json (emits compact JSON)]' \
 '--dry-run[Preview mutating requests without hitting the server (redacts Authorization)]' \
 '-q[Output only created/affected IDs for shell piping]' \
@@ -615,6 +727,8 @@ _arguments "${_arguments_options[@]}" : \
 '*--select=[Comma-separated field projection for JSON/table output (e.g. id,name,fields)]:SELECT:_default' \
 '-C+[Path to explicit TOML configuration file]:CONFIG:_files' \
 '--config=[Path to explicit TOML configuration file]:CONFIG:_files' \
+'-P+[Named configuration profile (env\: HBCTL_PROFILE)]:NAME:_default' \
+'--profile=[Named configuration profile (env\: HBCTL_PROFILE)]:NAME:_default' \
 '--json[Shorthand for --output json (emits compact JSON)]' \
 '--dry-run[Preview mutating requests without hitting the server (redacts Authorization)]' \
 '-q[Output only created/affected IDs for shell piping]' \
@@ -639,6 +753,8 @@ _arguments "${_arguments_options[@]}" : \
 '*--select=[Comma-separated field projection for JSON/table output (e.g. id,name,fields)]:SELECT:_default' \
 '-C+[Path to explicit TOML configuration file]:CONFIG:_files' \
 '--config=[Path to explicit TOML configuration file]:CONFIG:_files' \
+'-P+[Named configuration profile (env\: HBCTL_PROFILE)]:NAME:_default' \
+'--profile=[Named configuration profile (env\: HBCTL_PROFILE)]:NAME:_default' \
 '--json[Shorthand for --output json (emits compact JSON)]' \
 '--dry-run[Preview mutating requests without hitting the server (redacts Authorization)]' \
 '-q[Output only created/affected IDs for shell piping]' \
@@ -656,6 +772,8 @@ _arguments "${_arguments_options[@]}" : \
 '*--select=[Comma-separated field projection for JSON/table output (e.g. id,name,fields)]:SELECT:_default' \
 '-C+[Path to explicit TOML configuration file]:CONFIG:_files' \
 '--config=[Path to explicit TOML configuration file]:CONFIG:_files' \
+'-P+[Named configuration profile (env\: HBCTL_PROFILE)]:NAME:_default' \
+'--profile=[Named configuration profile (env\: HBCTL_PROFILE)]:NAME:_default' \
 '--json[Shorthand for --output json (emits compact JSON)]' \
 '--dry-run[Preview mutating requests without hitting the server (redacts Authorization)]' \
 '-q[Output only created/affected IDs for shell piping]' \
@@ -675,6 +793,8 @@ _arguments "${_arguments_options[@]}" : \
 '*--select=[Comma-separated field projection for JSON/table output (e.g. id,name,fields)]:SELECT:_default' \
 '-C+[Path to explicit TOML configuration file]:CONFIG:_files' \
 '--config=[Path to explicit TOML configuration file]:CONFIG:_files' \
+'-P+[Named configuration profile (env\: HBCTL_PROFILE)]:NAME:_default' \
+'--profile=[Named configuration profile (env\: HBCTL_PROFILE)]:NAME:_default' \
 '--json[Shorthand for --output json (emits compact JSON)]' \
 '--dry-run[Preview mutating requests without hitting the server (redacts Authorization)]' \
 '-q[Output only created/affected IDs for shell piping]' \
@@ -694,6 +814,8 @@ _arguments "${_arguments_options[@]}" : \
 '*--select=[Comma-separated field projection for JSON/table output (e.g. id,name,fields)]:SELECT:_default' \
 '-C+[Path to explicit TOML configuration file]:CONFIG:_files' \
 '--config=[Path to explicit TOML configuration file]:CONFIG:_files' \
+'-P+[Named configuration profile (env\: HBCTL_PROFILE)]:NAME:_default' \
+'--profile=[Named configuration profile (env\: HBCTL_PROFILE)]:NAME:_default' \
 '--json[Shorthand for --output json (emits compact JSON)]' \
 '--dry-run[Preview mutating requests without hitting the server (redacts Authorization)]' \
 '-q[Output only created/affected IDs for shell piping]' \
@@ -752,6 +874,8 @@ _arguments "${_arguments_options[@]}" : \
 '*--select=[Comma-separated field projection for JSON/table output (e.g. id,name,fields)]:SELECT:_default' \
 '-C+[Path to explicit TOML configuration file]:CONFIG:_files' \
 '--config=[Path to explicit TOML configuration file]:CONFIG:_files' \
+'-P+[Named configuration profile (env\: HBCTL_PROFILE)]:NAME:_default' \
+'--profile=[Named configuration profile (env\: HBCTL_PROFILE)]:NAME:_default' \
 '--json[Shorthand for --output json (emits compact JSON)]' \
 '--dry-run[Preview mutating requests without hitting the server (redacts Authorization)]' \
 '-q[Output only created/affected IDs for shell piping]' \
@@ -776,6 +900,8 @@ _arguments "${_arguments_options[@]}" : \
 '*--select=[Comma-separated field projection for JSON/table output (e.g. id,name,fields)]:SELECT:_default' \
 '-C+[Path to explicit TOML configuration file]:CONFIG:_files' \
 '--config=[Path to explicit TOML configuration file]:CONFIG:_files' \
+'-P+[Named configuration profile (env\: HBCTL_PROFILE)]:NAME:_default' \
+'--profile=[Named configuration profile (env\: HBCTL_PROFILE)]:NAME:_default' \
 '--json[Shorthand for --output json (emits compact JSON)]' \
 '--dry-run[Preview mutating requests without hitting the server (redacts Authorization)]' \
 '-q[Output only created/affected IDs for shell piping]' \
@@ -792,6 +918,8 @@ _arguments "${_arguments_options[@]}" : \
 '*--select=[Comma-separated field projection for JSON/table output (e.g. id,name,fields)]:SELECT:_default' \
 '-C+[Path to explicit TOML configuration file]:CONFIG:_files' \
 '--config=[Path to explicit TOML configuration file]:CONFIG:_files' \
+'-P+[Named configuration profile (env\: HBCTL_PROFILE)]:NAME:_default' \
+'--profile=[Named configuration profile (env\: HBCTL_PROFILE)]:NAME:_default' \
 '--json[Shorthand for --output json (emits compact JSON)]' \
 '--dry-run[Preview mutating requests without hitting the server (redacts Authorization)]' \
 '-q[Output only created/affected IDs for shell piping]' \
@@ -812,6 +940,8 @@ _arguments "${_arguments_options[@]}" : \
 '*--select=[Comma-separated field projection for JSON/table output (e.g. id,name,fields)]:SELECT:_default' \
 '-C+[Path to explicit TOML configuration file]:CONFIG:_files' \
 '--config=[Path to explicit TOML configuration file]:CONFIG:_files' \
+'-P+[Named configuration profile (env\: HBCTL_PROFILE)]:NAME:_default' \
+'--profile=[Named configuration profile (env\: HBCTL_PROFILE)]:NAME:_default' \
 '--json[Shorthand for --output json (emits compact JSON)]' \
 '--dry-run[Preview mutating requests without hitting the server (redacts Authorization)]' \
 '-q[Output only created/affected IDs for shell piping]' \
@@ -829,6 +959,8 @@ _arguments "${_arguments_options[@]}" : \
 '*--select=[Comma-separated field projection for JSON/table output (e.g. id,name,fields)]:SELECT:_default' \
 '-C+[Path to explicit TOML configuration file]:CONFIG:_files' \
 '--config=[Path to explicit TOML configuration file]:CONFIG:_files' \
+'-P+[Named configuration profile (env\: HBCTL_PROFILE)]:NAME:_default' \
+'--profile=[Named configuration profile (env\: HBCTL_PROFILE)]:NAME:_default' \
 '--force[Skip interactive confirmation prompt]' \
 '--json[Shorthand for --output json (emits compact JSON)]' \
 '--dry-run[Preview mutating requests without hitting the server (redacts Authorization)]' \
@@ -887,6 +1019,8 @@ _arguments "${_arguments_options[@]}" : \
 '*--select=[Comma-separated field projection for JSON/table output (e.g. id,name,fields)]:SELECT:_default' \
 '-C+[Path to explicit TOML configuration file]:CONFIG:_files' \
 '--config=[Path to explicit TOML configuration file]:CONFIG:_files' \
+'-P+[Named configuration profile (env\: HBCTL_PROFILE)]:NAME:_default' \
+'--profile=[Named configuration profile (env\: HBCTL_PROFILE)]:NAME:_default' \
 '--json[Shorthand for --output json (emits compact JSON)]' \
 '--dry-run[Preview mutating requests without hitting the server (redacts Authorization)]' \
 '-q[Output only created/affected IDs for shell piping]' \
@@ -911,12 +1045,55 @@ _arguments "${_arguments_options[@]}" : \
 '*--select=[Comma-separated field projection for JSON/table output (e.g. id,name,fields)]:SELECT:_default' \
 '-C+[Path to explicit TOML configuration file]:CONFIG:_files' \
 '--config=[Path to explicit TOML configuration file]:CONFIG:_files' \
+'-P+[Named configuration profile (env\: HBCTL_PROFILE)]:NAME:_default' \
+'--profile=[Named configuration profile (env\: HBCTL_PROFILE)]:NAME:_default' \
 '--json[Shorthand for --output json (emits compact JSON)]' \
 '--dry-run[Preview mutating requests without hitting the server (redacts Authorization)]' \
 '-q[Output only created/affected IDs for shell piping]' \
 '--quiet[Output only created/affected IDs for shell piping]' \
 '-h[Print help]' \
 '--help[Print help]' \
+&& ret=0
+;;
+(create)
+_arguments "${_arguments_options[@]}" : \
+'--description=[Optional description]:DESCRIPTION:_default' \
+'--url=[Homebox base URL (env\: HBCTL_URL > HOMEBOX_URL > http\://<HOMEBOX_IP>\:7745)]:URL:_default' \
+'--api-key=[Homebox API key or Bearer token (env\: HBCTL_API_KEY > HOMEBOX_API_KEY)]:API_KEY:_default' \
+'--output=[Output format (table, json, plain) \[env\: HBCTL_OUTPUT\]]:OUTPUT:(table json plain)' \
+'*--select=[Comma-separated field projection for JSON/table output (e.g. id,name,fields)]:SELECT:_default' \
+'-C+[Path to explicit TOML configuration file]:CONFIG:_files' \
+'--config=[Path to explicit TOML configuration file]:CONFIG:_files' \
+'-P+[Named configuration profile (env\: HBCTL_PROFILE)]:NAME:_default' \
+'--profile=[Named configuration profile (env\: HBCTL_PROFILE)]:NAME:_default' \
+'--is-location[Mark this entity type as a location/container]' \
+'--json[Shorthand for --output json (emits compact JSON)]' \
+'--dry-run[Preview mutating requests without hitting the server (redacts Authorization)]' \
+'-q[Output only created/affected IDs for shell piping]' \
+'--quiet[Output only created/affected IDs for shell piping]' \
+'-h[Print help]' \
+'--help[Print help]' \
+':name -- Entity type name:_default' \
+&& ret=0
+;;
+(delete)
+_arguments "${_arguments_options[@]}" : \
+'--url=[Homebox base URL (env\: HBCTL_URL > HOMEBOX_URL > http\://<HOMEBOX_IP>\:7745)]:URL:_default' \
+'--api-key=[Homebox API key or Bearer token (env\: HBCTL_API_KEY > HOMEBOX_API_KEY)]:API_KEY:_default' \
+'--output=[Output format (table, json, plain) \[env\: HBCTL_OUTPUT\]]:OUTPUT:(table json plain)' \
+'*--select=[Comma-separated field projection for JSON/table output (e.g. id,name,fields)]:SELECT:_default' \
+'-C+[Path to explicit TOML configuration file]:CONFIG:_files' \
+'--config=[Path to explicit TOML configuration file]:CONFIG:_files' \
+'-P+[Named configuration profile (env\: HBCTL_PROFILE)]:NAME:_default' \
+'--profile=[Named configuration profile (env\: HBCTL_PROFILE)]:NAME:_default' \
+'--force[Skip interactive confirmation prompt]' \
+'--json[Shorthand for --output json (emits compact JSON)]' \
+'--dry-run[Preview mutating requests without hitting the server (redacts Authorization)]' \
+'-q[Output only created/affected IDs for shell piping]' \
+'--quiet[Output only created/affected IDs for shell piping]' \
+'-h[Print help]' \
+'--help[Print help]' \
+':id -- Entity type ID:_default' \
 && ret=0
 ;;
 (help)
@@ -932,6 +1109,14 @@ _arguments "${_arguments_options[@]}" : \
         curcontext="${curcontext%:*:*}:hbctl-entity-types-help-command-$line[1]:"
         case $line[1] in
             (list)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+(create)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+(delete)
 _arguments "${_arguments_options[@]}" : \
 && ret=0
 ;;
@@ -955,6 +1140,8 @@ _arguments "${_arguments_options[@]}" : \
 '*--select=[Comma-separated field projection for JSON/table output (e.g. id,name,fields)]:SELECT:_default' \
 '-C+[Path to explicit TOML configuration file]:CONFIG:_files' \
 '--config=[Path to explicit TOML configuration file]:CONFIG:_files' \
+'-P+[Named configuration profile (env\: HBCTL_PROFILE)]:NAME:_default' \
+'--profile=[Named configuration profile (env\: HBCTL_PROFILE)]:NAME:_default' \
 '--json[Shorthand for --output json (emits compact JSON)]' \
 '--dry-run[Preview mutating requests without hitting the server (redacts Authorization)]' \
 '-q[Output only created/affected IDs for shell piping]' \
@@ -979,12 +1166,55 @@ _arguments "${_arguments_options[@]}" : \
 '*--select=[Comma-separated field projection for JSON/table output (e.g. id,name,fields)]:SELECT:_default' \
 '-C+[Path to explicit TOML configuration file]:CONFIG:_files' \
 '--config=[Path to explicit TOML configuration file]:CONFIG:_files' \
+'-P+[Named configuration profile (env\: HBCTL_PROFILE)]:NAME:_default' \
+'--profile=[Named configuration profile (env\: HBCTL_PROFILE)]:NAME:_default' \
 '--json[Shorthand for --output json (emits compact JSON)]' \
 '--dry-run[Preview mutating requests without hitting the server (redacts Authorization)]' \
 '-q[Output only created/affected IDs for shell piping]' \
 '--quiet[Output only created/affected IDs for shell piping]' \
 '-h[Print help]' \
 '--help[Print help]' \
+&& ret=0
+;;
+(create)
+_arguments "${_arguments_options[@]}" : \
+'--description=[Optional description]:DESCRIPTION:_default' \
+'--url=[Homebox base URL (env\: HBCTL_URL > HOMEBOX_URL > http\://<HOMEBOX_IP>\:7745)]:URL:_default' \
+'--api-key=[Homebox API key or Bearer token (env\: HBCTL_API_KEY > HOMEBOX_API_KEY)]:API_KEY:_default' \
+'--output=[Output format (table, json, plain) \[env\: HBCTL_OUTPUT\]]:OUTPUT:(table json plain)' \
+'*--select=[Comma-separated field projection for JSON/table output (e.g. id,name,fields)]:SELECT:_default' \
+'-C+[Path to explicit TOML configuration file]:CONFIG:_files' \
+'--config=[Path to explicit TOML configuration file]:CONFIG:_files' \
+'-P+[Named configuration profile (env\: HBCTL_PROFILE)]:NAME:_default' \
+'--profile=[Named configuration profile (env\: HBCTL_PROFILE)]:NAME:_default' \
+'--is-location[Mark this entity type as a location/container]' \
+'--json[Shorthand for --output json (emits compact JSON)]' \
+'--dry-run[Preview mutating requests without hitting the server (redacts Authorization)]' \
+'-q[Output only created/affected IDs for shell piping]' \
+'--quiet[Output only created/affected IDs for shell piping]' \
+'-h[Print help]' \
+'--help[Print help]' \
+':name -- Entity type name:_default' \
+&& ret=0
+;;
+(delete)
+_arguments "${_arguments_options[@]}" : \
+'--url=[Homebox base URL (env\: HBCTL_URL > HOMEBOX_URL > http\://<HOMEBOX_IP>\:7745)]:URL:_default' \
+'--api-key=[Homebox API key or Bearer token (env\: HBCTL_API_KEY > HOMEBOX_API_KEY)]:API_KEY:_default' \
+'--output=[Output format (table, json, plain) \[env\: HBCTL_OUTPUT\]]:OUTPUT:(table json plain)' \
+'*--select=[Comma-separated field projection for JSON/table output (e.g. id,name,fields)]:SELECT:_default' \
+'-C+[Path to explicit TOML configuration file]:CONFIG:_files' \
+'--config=[Path to explicit TOML configuration file]:CONFIG:_files' \
+'-P+[Named configuration profile (env\: HBCTL_PROFILE)]:NAME:_default' \
+'--profile=[Named configuration profile (env\: HBCTL_PROFILE)]:NAME:_default' \
+'--force[Skip interactive confirmation prompt]' \
+'--json[Shorthand for --output json (emits compact JSON)]' \
+'--dry-run[Preview mutating requests without hitting the server (redacts Authorization)]' \
+'-q[Output only created/affected IDs for shell piping]' \
+'--quiet[Output only created/affected IDs for shell piping]' \
+'-h[Print help]' \
+'--help[Print help]' \
+':id -- Entity type ID:_default' \
 && ret=0
 ;;
 (help)
@@ -1003,6 +1233,14 @@ _arguments "${_arguments_options[@]}" : \
 _arguments "${_arguments_options[@]}" : \
 && ret=0
 ;;
+(create)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+(delete)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
 (help)
 _arguments "${_arguments_options[@]}" : \
 && ret=0
@@ -1015,6 +1253,24 @@ esac
     ;;
 esac
 ;;
+(status)
+_arguments "${_arguments_options[@]}" : \
+'--url=[Homebox base URL (env\: HBCTL_URL > HOMEBOX_URL > http\://<HOMEBOX_IP>\:7745)]:URL:_default' \
+'--api-key=[Homebox API key or Bearer token (env\: HBCTL_API_KEY > HOMEBOX_API_KEY)]:API_KEY:_default' \
+'--output=[Output format (table, json, plain) \[env\: HBCTL_OUTPUT\]]:OUTPUT:(table json plain)' \
+'*--select=[Comma-separated field projection for JSON/table output (e.g. id,name,fields)]:SELECT:_default' \
+'-C+[Path to explicit TOML configuration file]:CONFIG:_files' \
+'--config=[Path to explicit TOML configuration file]:CONFIG:_files' \
+'-P+[Named configuration profile (env\: HBCTL_PROFILE)]:NAME:_default' \
+'--profile=[Named configuration profile (env\: HBCTL_PROFILE)]:NAME:_default' \
+'--json[Shorthand for --output json (emits compact JSON)]' \
+'--dry-run[Preview mutating requests without hitting the server (redacts Authorization)]' \
+'-q[Output only created/affected IDs for shell piping]' \
+'--quiet[Output only created/affected IDs for shell piping]' \
+'-h[Print help]' \
+'--help[Print help]' \
+&& ret=0
+;;
 (export)
 _arguments "${_arguments_options[@]}" : \
 '--tag=[Filter by tag name or UUID]:TAG:_default' \
@@ -1022,12 +1278,17 @@ _arguments "${_arguments_options[@]}" : \
 '*--field=[Custom field column(s) to include in export (repeatable)]:FIELDS:_default' \
 '--sort=[Sort exported items by name or id]:SORT:(name id)' \
 '--format=[Export format (json, csv, markdown)]:FORMAT:(json csv markdown)' \
+'*--columns=[Custom column list and order (comma-separated or repeatable; supports '\''key=Header Alias'\'')]:COL[=ALIAS]:_default' \
+'--align=[Markdown table column alignment (default, left, right, center)]:ALIGN:(default left right center)' \
+'--empty=[Placeholder string for empty/missing cells]:STR:_default' \
 '--url=[Homebox base URL (env\: HBCTL_URL > HOMEBOX_URL > http\://<HOMEBOX_IP>\:7745)]:URL:_default' \
 '--api-key=[Homebox API key or Bearer token (env\: HBCTL_API_KEY > HOMEBOX_API_KEY)]:API_KEY:_default' \
 '--output=[Output format (table, json, plain) \[env\: HBCTL_OUTPUT\]]:OUTPUT:(table json plain)' \
 '*--select=[Comma-separated field projection for JSON/table output (e.g. id,name,fields)]:SELECT:_default' \
 '-C+[Path to explicit TOML configuration file]:CONFIG:_files' \
 '--config=[Path to explicit TOML configuration file]:CONFIG:_files' \
+'-P+[Named configuration profile (env\: HBCTL_PROFILE)]:NAME:_default' \
+'--profile=[Named configuration profile (env\: HBCTL_PROFILE)]:NAME:_default' \
 '--json[Shorthand for --output json (emits compact JSON)]' \
 '--dry-run[Preview mutating requests without hitting the server (redacts Authorization)]' \
 '-q[Output only created/affected IDs for shell piping]' \
@@ -1044,6 +1305,8 @@ _arguments "${_arguments_options[@]}" : \
 '*--select=[Comma-separated field projection for JSON/table output (e.g. id,name,fields)]:SELECT:_default' \
 '-C+[Path to explicit TOML configuration file]:CONFIG:_files' \
 '--config=[Path to explicit TOML configuration file]:CONFIG:_files' \
+'-P+[Named configuration profile (env\: HBCTL_PROFILE)]:NAME:_default' \
+'--profile=[Named configuration profile (env\: HBCTL_PROFILE)]:NAME:_default' \
 '--json[Shorthand for --output json (emits compact JSON)]' \
 '--dry-run[Preview mutating requests without hitting the server (redacts Authorization)]' \
 '-q[Output only created/affected IDs for shell piping]' \
@@ -1061,6 +1324,8 @@ _arguments "${_arguments_options[@]}" : \
 '*--select=[Comma-separated field projection for JSON/table output (e.g. id,name,fields)]:SELECT:_default' \
 '-C+[Path to explicit TOML configuration file]:CONFIG:_files' \
 '--config=[Path to explicit TOML configuration file]:CONFIG:_files' \
+'-P+[Named configuration profile (env\: HBCTL_PROFILE)]:NAME:_default' \
+'--profile=[Named configuration profile (env\: HBCTL_PROFILE)]:NAME:_default' \
 '--json[Shorthand for --output json (emits compact JSON)]' \
 '--dry-run[Preview mutating requests without hitting the server (redacts Authorization)]' \
 '-q[Output only created/affected IDs for shell piping]' \
@@ -1078,6 +1343,8 @@ _arguments "${_arguments_options[@]}" : \
 '*--select=[Comma-separated field projection for JSON/table output (e.g. id,name,fields)]:SELECT:_default' \
 '-C+[Path to explicit TOML configuration file]:CONFIG:_files' \
 '--config=[Path to explicit TOML configuration file]:CONFIG:_files' \
+'-P+[Named configuration profile (env\: HBCTL_PROFILE)]:NAME:_default' \
+'--profile=[Named configuration profile (env\: HBCTL_PROFILE)]:NAME:_default' \
 '--check[Check for available updates without installing]' \
 '-y[Skip confirmation prompt before installing]' \
 '--yes[Skip confirmation prompt before installing]' \
@@ -1098,6 +1365,8 @@ _arguments "${_arguments_options[@]}" : \
 '*--select=[Comma-separated field projection for JSON/table output (e.g. id,name,fields)]:SELECT:_default' \
 '-C+[Path to explicit TOML configuration file]:CONFIG:_files' \
 '--config=[Path to explicit TOML configuration file]:CONFIG:_files' \
+'-P+[Named configuration profile (env\: HBCTL_PROFILE)]:NAME:_default' \
+'--profile=[Named configuration profile (env\: HBCTL_PROFILE)]:NAME:_default' \
 '--check[Check for available updates without installing]' \
 '-y[Skip confirmation prompt before installing]' \
 '--yes[Skip confirmation prompt before installing]' \
@@ -1194,6 +1463,14 @@ _arguments "${_arguments_options[@]}" : \
 && ret=0
 ;;
 (dedup)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+(move)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+(tree)
 _arguments "${_arguments_options[@]}" : \
 && ret=0
 ;;
@@ -1317,9 +1594,21 @@ _arguments "${_arguments_options[@]}" : \
 _arguments "${_arguments_options[@]}" : \
 && ret=0
 ;;
+(create)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+(delete)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
         esac
     ;;
 esac
+;;
+(status)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
 ;;
 (export)
 _arguments "${_arguments_options[@]}" : \
@@ -1359,8 +1648,9 @@ _hbctl_commands() {
 'search:Full-text and structured item search' \
 'field:List, get, set, or delete typed custom fields on an item' \
 'tag:Manage tags (/api/v1/tags)' \
-'entity-types:List Homebox entity types (/api/v1/entity-types)' \
-'entity-type:List Homebox entity types (/api/v1/entity-types)' \
+'entity-types:Manage Homebox entity types (/api/v1/entity-types)' \
+'entity-type:Manage Homebox entity types (/api/v1/entity-types)' \
+'status:Check remote Homebox server connectivity and version (/api/v1/status)' \
 'export:Export filtered items to JSON, CSV, or Markdown' \
 'completions:Generate shell completion scripts' \
 'man:Generate UNIX roff man page' \
@@ -1375,7 +1665,7 @@ _hbctl__subcmd__attachment_commands() {
     local commands; commands=(
 'upload:Upload one or more files as item attachments' \
 'list:List attachments on an item' \
-'download:Stream-download one or all attachments from an item' \
+'download:Stream-download attachments from one or multiple items' \
 'delete:Delete an attachment from an item' \
 'help:Print this message or the help of the given subcommand(s)' \
     )
@@ -1396,7 +1686,7 @@ _hbctl__subcmd__attachment__subcmd__help_commands() {
     local commands; commands=(
 'upload:Upload one or more files as item attachments' \
 'list:List attachments on an item' \
-'download:Stream-download one or all attachments from an item' \
+'download:Stream-download attachments from one or multiple items' \
 'delete:Delete an attachment from an item' \
 'help:Print this message or the help of the given subcommand(s)' \
     )
@@ -1513,17 +1803,41 @@ _hbctl__subcmd__completions_commands() {
 _hbctl__subcmd__entity-types_commands() {
     local commands; commands=(
 'list:List all entity types' \
+'create:Create a new entity type' \
+'delete:Delete an entity type by ID' \
 'help:Print this message or the help of the given subcommand(s)' \
     )
     _describe -t commands 'hbctl entity-types commands' commands "$@"
+}
+(( $+functions[_hbctl__subcmd__entity-types__subcmd__create_commands] )) ||
+_hbctl__subcmd__entity-types__subcmd__create_commands() {
+    local commands; commands=()
+    _describe -t commands 'hbctl entity-types create commands' commands "$@"
+}
+(( $+functions[_hbctl__subcmd__entity-types__subcmd__delete_commands] )) ||
+_hbctl__subcmd__entity-types__subcmd__delete_commands() {
+    local commands; commands=()
+    _describe -t commands 'hbctl entity-types delete commands' commands "$@"
 }
 (( $+functions[_hbctl__subcmd__entity-types__subcmd__help_commands] )) ||
 _hbctl__subcmd__entity-types__subcmd__help_commands() {
     local commands; commands=(
 'list:List all entity types' \
+'create:Create a new entity type' \
+'delete:Delete an entity type by ID' \
 'help:Print this message or the help of the given subcommand(s)' \
     )
     _describe -t commands 'hbctl entity-types help commands' commands "$@"
+}
+(( $+functions[_hbctl__subcmd__entity-types__subcmd__help__subcmd__create_commands] )) ||
+_hbctl__subcmd__entity-types__subcmd__help__subcmd__create_commands() {
+    local commands; commands=()
+    _describe -t commands 'hbctl entity-types help create commands' commands "$@"
+}
+(( $+functions[_hbctl__subcmd__entity-types__subcmd__help__subcmd__delete_commands] )) ||
+_hbctl__subcmd__entity-types__subcmd__help__subcmd__delete_commands() {
+    local commands; commands=()
+    _describe -t commands 'hbctl entity-types help delete commands' commands "$@"
 }
 (( $+functions[_hbctl__subcmd__entity-types__subcmd__help__subcmd__help_commands] )) ||
 _hbctl__subcmd__entity-types__subcmd__help__subcmd__help_commands() {
@@ -1621,7 +1935,8 @@ _hbctl__subcmd__help_commands() {
 'search:Full-text and structured item search' \
 'field:List, get, set, or delete typed custom fields on an item' \
 'tag:Manage tags (/api/v1/tags)' \
-'entity-types:List Homebox entity types (/api/v1/entity-types)' \
+'entity-types:Manage Homebox entity types (/api/v1/entity-types)' \
+'status:Check remote Homebox server connectivity and version (/api/v1/status)' \
 'export:Export filtered items to JSON, CSV, or Markdown' \
 'completions:Generate shell completion scripts' \
 'man:Generate UNIX roff man page' \
@@ -1635,7 +1950,7 @@ _hbctl__subcmd__help__subcmd__attachment_commands() {
     local commands; commands=(
 'upload:Upload one or more files as item attachments' \
 'list:List attachments on an item' \
-'download:Stream-download one or all attachments from an item' \
+'download:Stream-download attachments from one or multiple items' \
 'delete:Delete an attachment from an item' \
     )
     _describe -t commands 'hbctl help attachment commands' commands "$@"
@@ -1699,8 +2014,20 @@ _hbctl__subcmd__help__subcmd__completions_commands() {
 _hbctl__subcmd__help__subcmd__entity-types_commands() {
     local commands; commands=(
 'list:List all entity types' \
+'create:Create a new entity type' \
+'delete:Delete an entity type by ID' \
     )
     _describe -t commands 'hbctl help entity-types commands' commands "$@"
+}
+(( $+functions[_hbctl__subcmd__help__subcmd__entity-types__subcmd__create_commands] )) ||
+_hbctl__subcmd__help__subcmd__entity-types__subcmd__create_commands() {
+    local commands; commands=()
+    _describe -t commands 'hbctl help entity-types create commands' commands "$@"
+}
+(( $+functions[_hbctl__subcmd__help__subcmd__entity-types__subcmd__delete_commands] )) ||
+_hbctl__subcmd__help__subcmd__entity-types__subcmd__delete_commands() {
+    local commands; commands=()
+    _describe -t commands 'hbctl help entity-types delete commands' commands "$@"
 }
 (( $+functions[_hbctl__subcmd__help__subcmd__entity-types__subcmd__list_commands] )) ||
 _hbctl__subcmd__help__subcmd__entity-types__subcmd__list_commands() {
@@ -1758,6 +2085,8 @@ _hbctl__subcmd__help__subcmd__item_commands() {
 'delete:Delete an item by ID' \
 'import:Bulk import items from JSON or CSV (file or '\''-'\'' for stdin)' \
 'dedup:Detect (and optionally delete or merge) duplicate items' \
+'move:Move an item under a parent item/location (or '\''none'\'' to unparent)' \
+'tree:Render item parent/location hierarchy as a tree' \
     )
     _describe -t commands 'hbctl help item commands' commands "$@"
 }
@@ -1791,6 +2120,16 @@ _hbctl__subcmd__help__subcmd__item__subcmd__list_commands() {
     local commands; commands=()
     _describe -t commands 'hbctl help item list commands' commands "$@"
 }
+(( $+functions[_hbctl__subcmd__help__subcmd__item__subcmd__move_commands] )) ||
+_hbctl__subcmd__help__subcmd__item__subcmd__move_commands() {
+    local commands; commands=()
+    _describe -t commands 'hbctl help item move commands' commands "$@"
+}
+(( $+functions[_hbctl__subcmd__help__subcmd__item__subcmd__tree_commands] )) ||
+_hbctl__subcmd__help__subcmd__item__subcmd__tree_commands() {
+    local commands; commands=()
+    _describe -t commands 'hbctl help item tree commands' commands "$@"
+}
 (( $+functions[_hbctl__subcmd__help__subcmd__item__subcmd__update_commands] )) ||
 _hbctl__subcmd__help__subcmd__item__subcmd__update_commands() {
     local commands; commands=()
@@ -1810,6 +2149,11 @@ _hbctl__subcmd__help__subcmd__man_commands() {
 _hbctl__subcmd__help__subcmd__search_commands() {
     local commands; commands=()
     _describe -t commands 'hbctl help search commands' commands "$@"
+}
+(( $+functions[_hbctl__subcmd__help__subcmd__status_commands] )) ||
+_hbctl__subcmd__help__subcmd__status_commands() {
+    local commands; commands=()
+    _describe -t commands 'hbctl help status commands' commands "$@"
 }
 (( $+functions[_hbctl__subcmd__help__subcmd__tag_commands] )) ||
 _hbctl__subcmd__help__subcmd__tag_commands() {
@@ -1857,6 +2201,8 @@ _hbctl__subcmd__item_commands() {
 'delete:Delete an item by ID' \
 'import:Bulk import items from JSON or CSV (file or '\''-'\'' for stdin)' \
 'dedup:Detect (and optionally delete or merge) duplicate items' \
+'move:Move an item under a parent item/location (or '\''none'\'' to unparent)' \
+'tree:Render item parent/location hierarchy as a tree' \
 'help:Print this message or the help of the given subcommand(s)' \
     )
     _describe -t commands 'hbctl item commands' commands "$@"
@@ -1892,6 +2238,8 @@ _hbctl__subcmd__item__subcmd__help_commands() {
 'delete:Delete an item by ID' \
 'import:Bulk import items from JSON or CSV (file or '\''-'\'' for stdin)' \
 'dedup:Detect (and optionally delete or merge) duplicate items' \
+'move:Move an item under a parent item/location (or '\''none'\'' to unparent)' \
+'tree:Render item parent/location hierarchy as a tree' \
 'help:Print this message or the help of the given subcommand(s)' \
     )
     _describe -t commands 'hbctl item help commands' commands "$@"
@@ -1931,6 +2279,16 @@ _hbctl__subcmd__item__subcmd__help__subcmd__list_commands() {
     local commands; commands=()
     _describe -t commands 'hbctl item help list commands' commands "$@"
 }
+(( $+functions[_hbctl__subcmd__item__subcmd__help__subcmd__move_commands] )) ||
+_hbctl__subcmd__item__subcmd__help__subcmd__move_commands() {
+    local commands; commands=()
+    _describe -t commands 'hbctl item help move commands' commands "$@"
+}
+(( $+functions[_hbctl__subcmd__item__subcmd__help__subcmd__tree_commands] )) ||
+_hbctl__subcmd__item__subcmd__help__subcmd__tree_commands() {
+    local commands; commands=()
+    _describe -t commands 'hbctl item help tree commands' commands "$@"
+}
 (( $+functions[_hbctl__subcmd__item__subcmd__help__subcmd__update_commands] )) ||
 _hbctl__subcmd__item__subcmd__help__subcmd__update_commands() {
     local commands; commands=()
@@ -1951,6 +2309,16 @@ _hbctl__subcmd__item__subcmd__list_commands() {
     local commands; commands=()
     _describe -t commands 'hbctl item list commands' commands "$@"
 }
+(( $+functions[_hbctl__subcmd__item__subcmd__move_commands] )) ||
+_hbctl__subcmd__item__subcmd__move_commands() {
+    local commands; commands=()
+    _describe -t commands 'hbctl item move commands' commands "$@"
+}
+(( $+functions[_hbctl__subcmd__item__subcmd__tree_commands] )) ||
+_hbctl__subcmd__item__subcmd__tree_commands() {
+    local commands; commands=()
+    _describe -t commands 'hbctl item tree commands' commands "$@"
+}
 (( $+functions[_hbctl__subcmd__item__subcmd__update_commands] )) ||
 _hbctl__subcmd__item__subcmd__update_commands() {
     local commands; commands=()
@@ -1970,6 +2338,11 @@ _hbctl__subcmd__man_commands() {
 _hbctl__subcmd__search_commands() {
     local commands; commands=()
     _describe -t commands 'hbctl search commands' commands "$@"
+}
+(( $+functions[_hbctl__subcmd__status_commands] )) ||
+_hbctl__subcmd__status_commands() {
+    local commands; commands=()
+    _describe -t commands 'hbctl status commands' commands "$@"
 }
 (( $+functions[_hbctl__subcmd__tag_commands] )) ||
 _hbctl__subcmd__tag_commands() {

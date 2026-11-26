@@ -27,6 +27,8 @@ Register-ArgumentCompleter -Native -CommandName 'hbctl' -ScriptBlock {
             [CompletionResult]::new('--select', '--select', [CompletionResultType]::ParameterName, 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)')
             [CompletionResult]::new('-C', '-C ', [CompletionResultType]::ParameterName, 'Path to explicit TOML configuration file')
             [CompletionResult]::new('--config', '--config', [CompletionResultType]::ParameterName, 'Path to explicit TOML configuration file')
+            [CompletionResult]::new('-P', '-P ', [CompletionResultType]::ParameterName, 'Named configuration profile (env: HBCTL_PROFILE)')
+            [CompletionResult]::new('--profile', '--profile', [CompletionResultType]::ParameterName, 'Named configuration profile (env: HBCTL_PROFILE)')
             [CompletionResult]::new('--json', '--json', [CompletionResultType]::ParameterName, 'Shorthand for --output json (emits compact JSON)')
             [CompletionResult]::new('--dry-run', '--dry-run', [CompletionResultType]::ParameterName, 'Preview mutating requests without hitting the server (redacts Authorization)')
             [CompletionResult]::new('-q', '-q', [CompletionResultType]::ParameterName, 'Output only created/affected IDs for shell piping')
@@ -41,8 +43,9 @@ Register-ArgumentCompleter -Native -CommandName 'hbctl' -ScriptBlock {
             [CompletionResult]::new('search', 'search', [CompletionResultType]::ParameterValue, 'Full-text and structured item search')
             [CompletionResult]::new('field', 'field', [CompletionResultType]::ParameterValue, 'List, get, set, or delete typed custom fields on an item')
             [CompletionResult]::new('tag', 'tag', [CompletionResultType]::ParameterValue, 'Manage tags (/api/v1/tags)')
-            [CompletionResult]::new('entity-types', 'entity-types', [CompletionResultType]::ParameterValue, 'List Homebox entity types (/api/v1/entity-types)')
-            [CompletionResult]::new('entity-type', 'entity-type', [CompletionResultType]::ParameterValue, 'List Homebox entity types (/api/v1/entity-types)')
+            [CompletionResult]::new('entity-types', 'entity-types', [CompletionResultType]::ParameterValue, 'Manage Homebox entity types (/api/v1/entity-types)')
+            [CompletionResult]::new('entity-type', 'entity-type', [CompletionResultType]::ParameterValue, 'Manage Homebox entity types (/api/v1/entity-types)')
+            [CompletionResult]::new('status', 'status', [CompletionResultType]::ParameterValue, 'Check remote Homebox server connectivity and version (/api/v1/status)')
             [CompletionResult]::new('export', 'export', [CompletionResultType]::ParameterValue, 'Export filtered items to JSON, CSV, or Markdown')
             [CompletionResult]::new('completions', 'completions', [CompletionResultType]::ParameterValue, 'Generate shell completion scripts')
             [CompletionResult]::new('man', 'man', [CompletionResultType]::ParameterValue, 'Generate UNIX roff man page')
@@ -58,6 +61,8 @@ Register-ArgumentCompleter -Native -CommandName 'hbctl' -ScriptBlock {
             [CompletionResult]::new('--select', '--select', [CompletionResultType]::ParameterName, 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)')
             [CompletionResult]::new('-C', '-C ', [CompletionResultType]::ParameterName, 'Path to explicit TOML configuration file')
             [CompletionResult]::new('--config', '--config', [CompletionResultType]::ParameterName, 'Path to explicit TOML configuration file')
+            [CompletionResult]::new('-P', '-P ', [CompletionResultType]::ParameterName, 'Named configuration profile (env: HBCTL_PROFILE)')
+            [CompletionResult]::new('--profile', '--profile', [CompletionResultType]::ParameterName, 'Named configuration profile (env: HBCTL_PROFILE)')
             [CompletionResult]::new('--json', '--json', [CompletionResultType]::ParameterName, 'Shorthand for --output json (emits compact JSON)')
             [CompletionResult]::new('--dry-run', '--dry-run', [CompletionResultType]::ParameterName, 'Preview mutating requests without hitting the server (redacts Authorization)')
             [CompletionResult]::new('-q', '-q', [CompletionResultType]::ParameterName, 'Output only created/affected IDs for shell piping')
@@ -80,6 +85,8 @@ Register-ArgumentCompleter -Native -CommandName 'hbctl' -ScriptBlock {
             [CompletionResult]::new('--select', '--select', [CompletionResultType]::ParameterName, 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)')
             [CompletionResult]::new('-C', '-C ', [CompletionResultType]::ParameterName, 'Path to explicit TOML configuration file')
             [CompletionResult]::new('--config', '--config', [CompletionResultType]::ParameterName, 'Path to explicit TOML configuration file')
+            [CompletionResult]::new('-P', '-P ', [CompletionResultType]::ParameterName, 'Named configuration profile (env: HBCTL_PROFILE)')
+            [CompletionResult]::new('--profile', '--profile', [CompletionResultType]::ParameterName, 'Named configuration profile (env: HBCTL_PROFILE)')
             [CompletionResult]::new('--with-token', '--with-token', [CompletionResultType]::ParameterName, 'Read a Homebox API key (hb_...) or Bearer token from stdin')
             [CompletionResult]::new('--password-stdin', '--password-stdin', [CompletionResultType]::ParameterName, 'Read login password from stdin instead of prompting interactively')
             [CompletionResult]::new('--insecure-storage', '--insecure-storage', [CompletionResultType]::ParameterName, 'Store token in 0600 local file store instead of OS keyring')
@@ -98,6 +105,8 @@ Register-ArgumentCompleter -Native -CommandName 'hbctl' -ScriptBlock {
             [CompletionResult]::new('--select', '--select', [CompletionResultType]::ParameterName, 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)')
             [CompletionResult]::new('-C', '-C ', [CompletionResultType]::ParameterName, 'Path to explicit TOML configuration file')
             [CompletionResult]::new('--config', '--config', [CompletionResultType]::ParameterName, 'Path to explicit TOML configuration file')
+            [CompletionResult]::new('-P', '-P ', [CompletionResultType]::ParameterName, 'Named configuration profile (env: HBCTL_PROFILE)')
+            [CompletionResult]::new('--profile', '--profile', [CompletionResultType]::ParameterName, 'Named configuration profile (env: HBCTL_PROFILE)')
             [CompletionResult]::new('--json', '--json', [CompletionResultType]::ParameterName, 'Shorthand for --output json (emits compact JSON)')
             [CompletionResult]::new('--dry-run', '--dry-run', [CompletionResultType]::ParameterName, 'Preview mutating requests without hitting the server (redacts Authorization)')
             [CompletionResult]::new('-q', '-q', [CompletionResultType]::ParameterName, 'Output only created/affected IDs for shell piping')
@@ -113,6 +122,8 @@ Register-ArgumentCompleter -Native -CommandName 'hbctl' -ScriptBlock {
             [CompletionResult]::new('--select', '--select', [CompletionResultType]::ParameterName, 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)')
             [CompletionResult]::new('-C', '-C ', [CompletionResultType]::ParameterName, 'Path to explicit TOML configuration file')
             [CompletionResult]::new('--config', '--config', [CompletionResultType]::ParameterName, 'Path to explicit TOML configuration file')
+            [CompletionResult]::new('-P', '-P ', [CompletionResultType]::ParameterName, 'Named configuration profile (env: HBCTL_PROFILE)')
+            [CompletionResult]::new('--profile', '--profile', [CompletionResultType]::ParameterName, 'Named configuration profile (env: HBCTL_PROFILE)')
             [CompletionResult]::new('--insecure-storage', '--insecure-storage', [CompletionResultType]::ParameterName, 'Skip OS keyring and only clear local 0600 fallback store')
             [CompletionResult]::new('--json', '--json', [CompletionResultType]::ParameterName, 'Shorthand for --output json (emits compact JSON)')
             [CompletionResult]::new('--dry-run', '--dry-run', [CompletionResultType]::ParameterName, 'Preview mutating requests without hitting the server (redacts Authorization)')
@@ -129,6 +140,8 @@ Register-ArgumentCompleter -Native -CommandName 'hbctl' -ScriptBlock {
             [CompletionResult]::new('--select', '--select', [CompletionResultType]::ParameterName, 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)')
             [CompletionResult]::new('-C', '-C ', [CompletionResultType]::ParameterName, 'Path to explicit TOML configuration file')
             [CompletionResult]::new('--config', '--config', [CompletionResultType]::ParameterName, 'Path to explicit TOML configuration file')
+            [CompletionResult]::new('-P', '-P ', [CompletionResultType]::ParameterName, 'Named configuration profile (env: HBCTL_PROFILE)')
+            [CompletionResult]::new('--profile', '--profile', [CompletionResultType]::ParameterName, 'Named configuration profile (env: HBCTL_PROFILE)')
             [CompletionResult]::new('--insecure-storage', '--insecure-storage', [CompletionResultType]::ParameterName, 'Store refreshed token in 0600 local file store instead of OS keyring')
             [CompletionResult]::new('--json', '--json', [CompletionResultType]::ParameterName, 'Shorthand for --output json (emits compact JSON)')
             [CompletionResult]::new('--dry-run', '--dry-run', [CompletionResultType]::ParameterName, 'Preview mutating requests without hitting the server (redacts Authorization)')
@@ -168,6 +181,8 @@ Register-ArgumentCompleter -Native -CommandName 'hbctl' -ScriptBlock {
             [CompletionResult]::new('--select', '--select', [CompletionResultType]::ParameterName, 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)')
             [CompletionResult]::new('-C', '-C ', [CompletionResultType]::ParameterName, 'Path to explicit TOML configuration file')
             [CompletionResult]::new('--config', '--config', [CompletionResultType]::ParameterName, 'Path to explicit TOML configuration file')
+            [CompletionResult]::new('-P', '-P ', [CompletionResultType]::ParameterName, 'Named configuration profile (env: HBCTL_PROFILE)')
+            [CompletionResult]::new('--profile', '--profile', [CompletionResultType]::ParameterName, 'Named configuration profile (env: HBCTL_PROFILE)')
             [CompletionResult]::new('--json', '--json', [CompletionResultType]::ParameterName, 'Shorthand for --output json (emits compact JSON)')
             [CompletionResult]::new('--dry-run', '--dry-run', [CompletionResultType]::ParameterName, 'Preview mutating requests without hitting the server (redacts Authorization)')
             [CompletionResult]::new('-q', '-q', [CompletionResultType]::ParameterName, 'Output only created/affected IDs for shell piping')
@@ -182,12 +197,15 @@ Register-ArgumentCompleter -Native -CommandName 'hbctl' -ScriptBlock {
             [CompletionResult]::new('delete', 'delete', [CompletionResultType]::ParameterValue, 'Delete an item by ID')
             [CompletionResult]::new('import', 'import', [CompletionResultType]::ParameterValue, 'Bulk import items from JSON or CSV (file or ''-'' for stdin)')
             [CompletionResult]::new('dedup', 'dedup', [CompletionResultType]::ParameterValue, 'Detect (and optionally delete or merge) duplicate items')
+            [CompletionResult]::new('move', 'move', [CompletionResultType]::ParameterValue, 'Move an item under a parent item/location (or ''none'' to unparent)')
+            [CompletionResult]::new('tree', 'tree', [CompletionResultType]::ParameterValue, 'Render item parent/location hierarchy as a tree')
             [CompletionResult]::new('help', 'help', [CompletionResultType]::ParameterValue, 'Print this message or the help of the given subcommand(s)')
             break
         }
         'hbctl;item;list' {
             [CompletionResult]::new('--tag', '--tag', [CompletionResultType]::ParameterName, 'Filter by tag name or UUID')
             [CompletionResult]::new('--type', '--type', [CompletionResultType]::ParameterName, 'Filter by entity type name or UUID')
+            [CompletionResult]::new('--parent', '--parent', [CompletionResultType]::ParameterName, 'Filter by parent item name, ID, or ''none'' for top-level items')
             [CompletionResult]::new('--has-field', '--has-field', [CompletionResultType]::ParameterName, 'Only include items having the named custom field (hydrates details if missing)')
             [CompletionResult]::new('--page-size', '--page-size', [CompletionResultType]::ParameterName, 'Page size for listing')
             [CompletionResult]::new('--url', '--url', [CompletionResultType]::ParameterName, 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)')
@@ -196,6 +214,8 @@ Register-ArgumentCompleter -Native -CommandName 'hbctl' -ScriptBlock {
             [CompletionResult]::new('--select', '--select', [CompletionResultType]::ParameterName, 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)')
             [CompletionResult]::new('-C', '-C ', [CompletionResultType]::ParameterName, 'Path to explicit TOML configuration file')
             [CompletionResult]::new('--config', '--config', [CompletionResultType]::ParameterName, 'Path to explicit TOML configuration file')
+            [CompletionResult]::new('-P', '-P ', [CompletionResultType]::ParameterName, 'Named configuration profile (env: HBCTL_PROFILE)')
+            [CompletionResult]::new('--profile', '--profile', [CompletionResultType]::ParameterName, 'Named configuration profile (env: HBCTL_PROFILE)')
             [CompletionResult]::new('--all', '--all', [CompletionResultType]::ParameterName, 'Fetch all pages')
             [CompletionResult]::new('--json', '--json', [CompletionResultType]::ParameterName, 'Shorthand for --output json (emits compact JSON)')
             [CompletionResult]::new('--dry-run', '--dry-run', [CompletionResultType]::ParameterName, 'Preview mutating requests without hitting the server (redacts Authorization)')
@@ -212,6 +232,8 @@ Register-ArgumentCompleter -Native -CommandName 'hbctl' -ScriptBlock {
             [CompletionResult]::new('--select', '--select', [CompletionResultType]::ParameterName, 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)')
             [CompletionResult]::new('-C', '-C ', [CompletionResultType]::ParameterName, 'Path to explicit TOML configuration file')
             [CompletionResult]::new('--config', '--config', [CompletionResultType]::ParameterName, 'Path to explicit TOML configuration file')
+            [CompletionResult]::new('-P', '-P ', [CompletionResultType]::ParameterName, 'Named configuration profile (env: HBCTL_PROFILE)')
+            [CompletionResult]::new('--profile', '--profile', [CompletionResultType]::ParameterName, 'Named configuration profile (env: HBCTL_PROFILE)')
             [CompletionResult]::new('--json', '--json', [CompletionResultType]::ParameterName, 'Shorthand for --output json (emits compact JSON)')
             [CompletionResult]::new('--dry-run', '--dry-run', [CompletionResultType]::ParameterName, 'Preview mutating requests without hitting the server (redacts Authorization)')
             [CompletionResult]::new('-q', '-q', [CompletionResultType]::ParameterName, 'Output only created/affected IDs for shell piping')
@@ -224,6 +246,7 @@ Register-ArgumentCompleter -Native -CommandName 'hbctl' -ScriptBlock {
             [CompletionResult]::new('--name', '--name', [CompletionResultType]::ParameterName, 'Item name (required unless supplied via --from-json)')
             [CompletionResult]::new('--description', '--description', [CompletionResultType]::ParameterName, 'Item description')
             [CompletionResult]::new('--type', '--type', [CompletionResultType]::ParameterName, 'Entity type name or UUID')
+            [CompletionResult]::new('--parent', '--parent', [CompletionResultType]::ParameterName, 'Parent item/location name, ID, or ''none''')
             [CompletionResult]::new('--tag', '--tag', [CompletionResultType]::ParameterName, 'Tag name or UUID (repeatable; missing tags auto-created)')
             [CompletionResult]::new('--manufacturer', '--manufacturer', [CompletionResultType]::ParameterName, 'Manufacturer (normalized into custom field ''Manufacturer'')')
             [CompletionResult]::new('--model', '--model', [CompletionResultType]::ParameterName, 'Model number (normalized into custom field ''Model Number'')')
@@ -236,12 +259,16 @@ Register-ArgumentCompleter -Native -CommandName 'hbctl' -ScriptBlock {
             [CompletionResult]::new('--field', '--field', [CompletionResultType]::ParameterName, 'Custom field KEY=VAL (repeatable)')
             [CompletionResult]::new('--field-type', '--field-type', [CompletionResultType]::ParameterName, 'Value type for --field entries')
             [CompletionResult]::new('--from-json', '--from-json', [CompletionResultType]::ParameterName, 'Load initial item JSON from file path or ''-'' for stdin')
+            [CompletionResult]::new('--attach', '--attach', [CompletionResultType]::ParameterName, 'Local file path(s) to attach after creating the item (repeatable)')
             [CompletionResult]::new('--url', '--url', [CompletionResultType]::ParameterName, 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)')
             [CompletionResult]::new('--api-key', '--api-key', [CompletionResultType]::ParameterName, 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)')
             [CompletionResult]::new('--output', '--output', [CompletionResultType]::ParameterName, 'Output format (table, json, plain) [env: HBCTL_OUTPUT]')
             [CompletionResult]::new('--select', '--select', [CompletionResultType]::ParameterName, 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)')
             [CompletionResult]::new('-C', '-C ', [CompletionResultType]::ParameterName, 'Path to explicit TOML configuration file')
             [CompletionResult]::new('--config', '--config', [CompletionResultType]::ParameterName, 'Path to explicit TOML configuration file')
+            [CompletionResult]::new('-P', '-P ', [CompletionResultType]::ParameterName, 'Named configuration profile (env: HBCTL_PROFILE)')
+            [CompletionResult]::new('--profile', '--profile', [CompletionResultType]::ParameterName, 'Named configuration profile (env: HBCTL_PROFILE)')
+            [CompletionResult]::new('--force', '--force', [CompletionResultType]::ParameterName, 'Allow attaching images larger than 500KB')
             [CompletionResult]::new('--json', '--json', [CompletionResultType]::ParameterName, 'Shorthand for --output json (emits compact JSON)')
             [CompletionResult]::new('--dry-run', '--dry-run', [CompletionResultType]::ParameterName, 'Preview mutating requests without hitting the server (redacts Authorization)')
             [CompletionResult]::new('-q', '-q', [CompletionResultType]::ParameterName, 'Output only created/affected IDs for shell piping')
@@ -254,6 +281,7 @@ Register-ArgumentCompleter -Native -CommandName 'hbctl' -ScriptBlock {
             [CompletionResult]::new('--name', '--name', [CompletionResultType]::ParameterName, 'Updated item name')
             [CompletionResult]::new('--description', '--description', [CompletionResultType]::ParameterName, 'Updated item description')
             [CompletionResult]::new('--type', '--type', [CompletionResultType]::ParameterName, 'Entity type name or UUID')
+            [CompletionResult]::new('--parent', '--parent', [CompletionResultType]::ParameterName, 'Parent item/location name, ID, or ''none'' to unparent')
             [CompletionResult]::new('--tag', '--tag', [CompletionResultType]::ParameterName, 'Tag name or UUID to merge (repeatable)')
             [CompletionResult]::new('--add-tag', '--add-tag', [CompletionResultType]::ParameterName, 'Tag name or UUID to add while preserving existing tags (repeatable)')
             [CompletionResult]::new('--remove-tag', '--remove-tag', [CompletionResultType]::ParameterName, 'Tag name or UUID to remove while preserving other existing tags (repeatable)')
@@ -274,6 +302,9 @@ Register-ArgumentCompleter -Native -CommandName 'hbctl' -ScriptBlock {
             [CompletionResult]::new('--select', '--select', [CompletionResultType]::ParameterName, 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)')
             [CompletionResult]::new('-C', '-C ', [CompletionResultType]::ParameterName, 'Path to explicit TOML configuration file')
             [CompletionResult]::new('--config', '--config', [CompletionResultType]::ParameterName, 'Path to explicit TOML configuration file')
+            [CompletionResult]::new('-P', '-P ', [CompletionResultType]::ParameterName, 'Named configuration profile (env: HBCTL_PROFILE)')
+            [CompletionResult]::new('--profile', '--profile', [CompletionResultType]::ParameterName, 'Named configuration profile (env: HBCTL_PROFILE)')
+            [CompletionResult]::new('--fill-missing', '--fill-missing', [CompletionResultType]::ParameterName, 'Only populate blank/missing/zero fields; preserve existing non-empty values')
             [CompletionResult]::new('--json', '--json', [CompletionResultType]::ParameterName, 'Shorthand for --output json (emits compact JSON)')
             [CompletionResult]::new('--dry-run', '--dry-run', [CompletionResultType]::ParameterName, 'Preview mutating requests without hitting the server (redacts Authorization)')
             [CompletionResult]::new('-q', '-q', [CompletionResultType]::ParameterName, 'Output only created/affected IDs for shell piping')
@@ -283,9 +314,10 @@ Register-ArgumentCompleter -Native -CommandName 'hbctl' -ScriptBlock {
             break
         }
         'hbctl;item;upsert' {
-            [CompletionResult]::new('--name', '--name', [CompletionResultType]::ParameterName, 'Item name to match or create')
+            [CompletionResult]::new('--name', '--name', [CompletionResultType]::ParameterName, 'Item name to match or create (required unless supplied via --from-json)')
             [CompletionResult]::new('--description', '--description', [CompletionResultType]::ParameterName, 'Item description')
             [CompletionResult]::new('--type', '--type', [CompletionResultType]::ParameterName, 'Entity type name or UUID')
+            [CompletionResult]::new('--parent', '--parent', [CompletionResultType]::ParameterName, 'Parent item/location name, ID, or ''none''')
             [CompletionResult]::new('--tag', '--tag', [CompletionResultType]::ParameterName, 'Tag name or UUID (repeatable; missing tags auto-created)')
             [CompletionResult]::new('--manufacturer', '--manufacturer', [CompletionResultType]::ParameterName, 'Manufacturer')
             [CompletionResult]::new('--model', '--model', [CompletionResultType]::ParameterName, 'Model number')
@@ -297,12 +329,19 @@ Register-ArgumentCompleter -Native -CommandName 'hbctl' -ScriptBlock {
             [CompletionResult]::new('--purchase-from', '--purchase-from', [CompletionResultType]::ParameterName, 'Purchase source')
             [CompletionResult]::new('--field', '--field', [CompletionResultType]::ParameterName, 'Custom field KEY=VAL (repeatable)')
             [CompletionResult]::new('--field-type', '--field-type', [CompletionResultType]::ParameterName, 'Value type for --field entries')
+            [CompletionResult]::new('--from-json', '--from-json', [CompletionResultType]::ParameterName, 'Load item JSON from file path or ''-'' for stdin')
+            [CompletionResult]::new('--match-by', '--match-by', [CompletionResultType]::ParameterName, 'Match existing items by key in priority order: name, model, serial, or field:KEY (repeatable; defaults to name)')
+            [CompletionResult]::new('--attach', '--attach', [CompletionResultType]::ParameterName, 'Local file path(s) to attach after upserting the item (repeatable)')
             [CompletionResult]::new('--url', '--url', [CompletionResultType]::ParameterName, 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)')
             [CompletionResult]::new('--api-key', '--api-key', [CompletionResultType]::ParameterName, 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)')
             [CompletionResult]::new('--output', '--output', [CompletionResultType]::ParameterName, 'Output format (table, json, plain) [env: HBCTL_OUTPUT]')
             [CompletionResult]::new('--select', '--select', [CompletionResultType]::ParameterName, 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)')
             [CompletionResult]::new('-C', '-C ', [CompletionResultType]::ParameterName, 'Path to explicit TOML configuration file')
             [CompletionResult]::new('--config', '--config', [CompletionResultType]::ParameterName, 'Path to explicit TOML configuration file')
+            [CompletionResult]::new('-P', '-P ', [CompletionResultType]::ParameterName, 'Named configuration profile (env: HBCTL_PROFILE)')
+            [CompletionResult]::new('--profile', '--profile', [CompletionResultType]::ParameterName, 'Named configuration profile (env: HBCTL_PROFILE)')
+            [CompletionResult]::new('--fill-missing', '--fill-missing', [CompletionResultType]::ParameterName, 'When updating an existing item, only populate blank/missing/zero fields')
+            [CompletionResult]::new('--force', '--force', [CompletionResultType]::ParameterName, 'Allow attaching images larger than 500KB')
             [CompletionResult]::new('--json', '--json', [CompletionResultType]::ParameterName, 'Shorthand for --output json (emits compact JSON)')
             [CompletionResult]::new('--dry-run', '--dry-run', [CompletionResultType]::ParameterName, 'Preview mutating requests without hitting the server (redacts Authorization)')
             [CompletionResult]::new('-q', '-q', [CompletionResultType]::ParameterName, 'Output only created/affected IDs for shell piping')
@@ -318,6 +357,8 @@ Register-ArgumentCompleter -Native -CommandName 'hbctl' -ScriptBlock {
             [CompletionResult]::new('--select', '--select', [CompletionResultType]::ParameterName, 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)')
             [CompletionResult]::new('-C', '-C ', [CompletionResultType]::ParameterName, 'Path to explicit TOML configuration file')
             [CompletionResult]::new('--config', '--config', [CompletionResultType]::ParameterName, 'Path to explicit TOML configuration file')
+            [CompletionResult]::new('-P', '-P ', [CompletionResultType]::ParameterName, 'Named configuration profile (env: HBCTL_PROFILE)')
+            [CompletionResult]::new('--profile', '--profile', [CompletionResultType]::ParameterName, 'Named configuration profile (env: HBCTL_PROFILE)')
             [CompletionResult]::new('--force', '--force', [CompletionResultType]::ParameterName, 'Skip interactive confirmation prompt')
             [CompletionResult]::new('--json', '--json', [CompletionResultType]::ParameterName, 'Shorthand for --output json (emits compact JSON)')
             [CompletionResult]::new('--dry-run', '--dry-run', [CompletionResultType]::ParameterName, 'Preview mutating requests without hitting the server (redacts Authorization)')
@@ -329,14 +370,21 @@ Register-ArgumentCompleter -Native -CommandName 'hbctl' -ScriptBlock {
         }
         'hbctl;item;import' {
             [CompletionResult]::new('--format', '--format', [CompletionResultType]::ParameterName, 'Input format (inferred from extension if omitted; defaults to json for stdin)')
+            [CompletionResult]::new('--match-by', '--match-by', [CompletionResultType]::ParameterName, 'Match existing items by key in priority order: name, model, serial, or field:KEY (repeatable; defaults to name)')
+            [CompletionResult]::new('--parent', '--parent', [CompletionResultType]::ParameterName, 'Default parent item/location name, ID, or ''none'' for imported records without one')
+            [CompletionResult]::new('--attach', '--attach', [CompletionResultType]::ParameterName, 'Local file path(s) to attach to each imported item (repeatable)')
             [CompletionResult]::new('--url', '--url', [CompletionResultType]::ParameterName, 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)')
             [CompletionResult]::new('--api-key', '--api-key', [CompletionResultType]::ParameterName, 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)')
             [CompletionResult]::new('--output', '--output', [CompletionResultType]::ParameterName, 'Output format (table, json, plain) [env: HBCTL_OUTPUT]')
             [CompletionResult]::new('--select', '--select', [CompletionResultType]::ParameterName, 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)')
             [CompletionResult]::new('-C', '-C ', [CompletionResultType]::ParameterName, 'Path to explicit TOML configuration file')
             [CompletionResult]::new('--config', '--config', [CompletionResultType]::ParameterName, 'Path to explicit TOML configuration file')
+            [CompletionResult]::new('-P', '-P ', [CompletionResultType]::ParameterName, 'Named configuration profile (env: HBCTL_PROFILE)')
+            [CompletionResult]::new('--profile', '--profile', [CompletionResultType]::ParameterName, 'Named configuration profile (env: HBCTL_PROFILE)')
             [CompletionResult]::new('--skip-existing', '--skip-existing', [CompletionResultType]::ParameterName, 'Skip items whose name already exists in Homebox')
             [CompletionResult]::new('--update-existing', '--update-existing', [CompletionResultType]::ParameterName, 'Update items whose name already exists in Homebox')
+            [CompletionResult]::new('--fill-missing', '--fill-missing', [CompletionResultType]::ParameterName, 'With --update-existing, only populate blank/missing/zero fields on existing items')
+            [CompletionResult]::new('--force', '--force', [CompletionResultType]::ParameterName, 'Allow attaching images larger than 500KB')
             [CompletionResult]::new('--json', '--json', [CompletionResultType]::ParameterName, 'Shorthand for --output json (emits compact JSON)')
             [CompletionResult]::new('--dry-run', '--dry-run', [CompletionResultType]::ParameterName, 'Preview mutating requests without hitting the server (redacts Authorization)')
             [CompletionResult]::new('-q', '-q', [CompletionResultType]::ParameterName, 'Output only created/affected IDs for shell piping')
@@ -353,8 +401,46 @@ Register-ArgumentCompleter -Native -CommandName 'hbctl' -ScriptBlock {
             [CompletionResult]::new('--select', '--select', [CompletionResultType]::ParameterName, 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)')
             [CompletionResult]::new('-C', '-C ', [CompletionResultType]::ParameterName, 'Path to explicit TOML configuration file')
             [CompletionResult]::new('--config', '--config', [CompletionResultType]::ParameterName, 'Path to explicit TOML configuration file')
+            [CompletionResult]::new('-P', '-P ', [CompletionResultType]::ParameterName, 'Named configuration profile (env: HBCTL_PROFILE)')
+            [CompletionResult]::new('--profile', '--profile', [CompletionResultType]::ParameterName, 'Named configuration profile (env: HBCTL_PROFILE)')
             [CompletionResult]::new('--delete', '--delete', [CompletionResultType]::ParameterName, 'Delete detected duplicate items, retaining only the keeper')
             [CompletionResult]::new('--merge', '--merge', [CompletionResultType]::ParameterName, 'Sum duplicate quantities onto the keeper before deleting duplicates (implies --delete)')
+            [CompletionResult]::new('--json', '--json', [CompletionResultType]::ParameterName, 'Shorthand for --output json (emits compact JSON)')
+            [CompletionResult]::new('--dry-run', '--dry-run', [CompletionResultType]::ParameterName, 'Preview mutating requests without hitting the server (redacts Authorization)')
+            [CompletionResult]::new('-q', '-q', [CompletionResultType]::ParameterName, 'Output only created/affected IDs for shell piping')
+            [CompletionResult]::new('--quiet', '--quiet', [CompletionResultType]::ParameterName, 'Output only created/affected IDs for shell piping')
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'hbctl;item;move' {
+            [CompletionResult]::new('--url', '--url', [CompletionResultType]::ParameterName, 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)')
+            [CompletionResult]::new('--api-key', '--api-key', [CompletionResultType]::ParameterName, 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)')
+            [CompletionResult]::new('--output', '--output', [CompletionResultType]::ParameterName, 'Output format (table, json, plain) [env: HBCTL_OUTPUT]')
+            [CompletionResult]::new('--select', '--select', [CompletionResultType]::ParameterName, 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)')
+            [CompletionResult]::new('-C', '-C ', [CompletionResultType]::ParameterName, 'Path to explicit TOML configuration file')
+            [CompletionResult]::new('--config', '--config', [CompletionResultType]::ParameterName, 'Path to explicit TOML configuration file')
+            [CompletionResult]::new('-P', '-P ', [CompletionResultType]::ParameterName, 'Named configuration profile (env: HBCTL_PROFILE)')
+            [CompletionResult]::new('--profile', '--profile', [CompletionResultType]::ParameterName, 'Named configuration profile (env: HBCTL_PROFILE)')
+            [CompletionResult]::new('--json', '--json', [CompletionResultType]::ParameterName, 'Shorthand for --output json (emits compact JSON)')
+            [CompletionResult]::new('--dry-run', '--dry-run', [CompletionResultType]::ParameterName, 'Preview mutating requests without hitting the server (redacts Authorization)')
+            [CompletionResult]::new('-q', '-q', [CompletionResultType]::ParameterName, 'Output only created/affected IDs for shell piping')
+            [CompletionResult]::new('--quiet', '--quiet', [CompletionResultType]::ParameterName, 'Output only created/affected IDs for shell piping')
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'hbctl;item;tree' {
+            [CompletionResult]::new('--root', '--root', [CompletionResultType]::ParameterName, 'Optional root item name or ID to start the tree from')
+            [CompletionResult]::new('--max-depth', '--max-depth', [CompletionResultType]::ParameterName, 'Optional maximum depth to display (0 = roots only)')
+            [CompletionResult]::new('--url', '--url', [CompletionResultType]::ParameterName, 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)')
+            [CompletionResult]::new('--api-key', '--api-key', [CompletionResultType]::ParameterName, 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)')
+            [CompletionResult]::new('--output', '--output', [CompletionResultType]::ParameterName, 'Output format (table, json, plain) [env: HBCTL_OUTPUT]')
+            [CompletionResult]::new('--select', '--select', [CompletionResultType]::ParameterName, 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)')
+            [CompletionResult]::new('-C', '-C ', [CompletionResultType]::ParameterName, 'Path to explicit TOML configuration file')
+            [CompletionResult]::new('--config', '--config', [CompletionResultType]::ParameterName, 'Path to explicit TOML configuration file')
+            [CompletionResult]::new('-P', '-P ', [CompletionResultType]::ParameterName, 'Named configuration profile (env: HBCTL_PROFILE)')
+            [CompletionResult]::new('--profile', '--profile', [CompletionResultType]::ParameterName, 'Named configuration profile (env: HBCTL_PROFILE)')
             [CompletionResult]::new('--json', '--json', [CompletionResultType]::ParameterName, 'Shorthand for --output json (emits compact JSON)')
             [CompletionResult]::new('--dry-run', '--dry-run', [CompletionResultType]::ParameterName, 'Preview mutating requests without hitting the server (redacts Authorization)')
             [CompletionResult]::new('-q', '-q', [CompletionResultType]::ParameterName, 'Output only created/affected IDs for shell piping')
@@ -372,6 +458,8 @@ Register-ArgumentCompleter -Native -CommandName 'hbctl' -ScriptBlock {
             [CompletionResult]::new('delete', 'delete', [CompletionResultType]::ParameterValue, 'Delete an item by ID')
             [CompletionResult]::new('import', 'import', [CompletionResultType]::ParameterValue, 'Bulk import items from JSON or CSV (file or ''-'' for stdin)')
             [CompletionResult]::new('dedup', 'dedup', [CompletionResultType]::ParameterValue, 'Detect (and optionally delete or merge) duplicate items')
+            [CompletionResult]::new('move', 'move', [CompletionResultType]::ParameterValue, 'Move an item under a parent item/location (or ''none'' to unparent)')
+            [CompletionResult]::new('tree', 'tree', [CompletionResultType]::ParameterValue, 'Render item parent/location hierarchy as a tree')
             [CompletionResult]::new('help', 'help', [CompletionResultType]::ParameterValue, 'Print this message or the help of the given subcommand(s)')
             break
         }
@@ -399,6 +487,12 @@ Register-ArgumentCompleter -Native -CommandName 'hbctl' -ScriptBlock {
         'hbctl;item;help;dedup' {
             break
         }
+        'hbctl;item;help;move' {
+            break
+        }
+        'hbctl;item;help;tree' {
+            break
+        }
         'hbctl;item;help;help' {
             break
         }
@@ -409,6 +503,8 @@ Register-ArgumentCompleter -Native -CommandName 'hbctl' -ScriptBlock {
             [CompletionResult]::new('--select', '--select', [CompletionResultType]::ParameterName, 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)')
             [CompletionResult]::new('-C', '-C ', [CompletionResultType]::ParameterName, 'Path to explicit TOML configuration file')
             [CompletionResult]::new('--config', '--config', [CompletionResultType]::ParameterName, 'Path to explicit TOML configuration file')
+            [CompletionResult]::new('-P', '-P ', [CompletionResultType]::ParameterName, 'Named configuration profile (env: HBCTL_PROFILE)')
+            [CompletionResult]::new('--profile', '--profile', [CompletionResultType]::ParameterName, 'Named configuration profile (env: HBCTL_PROFILE)')
             [CompletionResult]::new('--json', '--json', [CompletionResultType]::ParameterName, 'Shorthand for --output json (emits compact JSON)')
             [CompletionResult]::new('--dry-run', '--dry-run', [CompletionResultType]::ParameterName, 'Preview mutating requests without hitting the server (redacts Authorization)')
             [CompletionResult]::new('-q', '-q', [CompletionResultType]::ParameterName, 'Output only created/affected IDs for shell piping')
@@ -417,18 +513,21 @@ Register-ArgumentCompleter -Native -CommandName 'hbctl' -ScriptBlock {
             [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
             [CompletionResult]::new('upload', 'upload', [CompletionResultType]::ParameterValue, 'Upload one or more files as item attachments')
             [CompletionResult]::new('list', 'list', [CompletionResultType]::ParameterValue, 'List attachments on an item')
-            [CompletionResult]::new('download', 'download', [CompletionResultType]::ParameterValue, 'Stream-download one or all attachments from an item')
+            [CompletionResult]::new('download', 'download', [CompletionResultType]::ParameterValue, 'Stream-download attachments from one or multiple items')
             [CompletionResult]::new('delete', 'delete', [CompletionResultType]::ParameterValue, 'Delete an attachment from an item')
             [CompletionResult]::new('help', 'help', [CompletionResultType]::ParameterValue, 'Print this message or the help of the given subcommand(s)')
             break
         }
         'hbctl;attachment;upload' {
+            [CompletionResult]::new('--name', '--name', [CompletionResultType]::ParameterName, 'Override remote filename/title (for single-file or stdin ''-'' uploads)')
             [CompletionResult]::new('--url', '--url', [CompletionResultType]::ParameterName, 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)')
             [CompletionResult]::new('--api-key', '--api-key', [CompletionResultType]::ParameterName, 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)')
             [CompletionResult]::new('--output', '--output', [CompletionResultType]::ParameterName, 'Output format (table, json, plain) [env: HBCTL_OUTPUT]')
             [CompletionResult]::new('--select', '--select', [CompletionResultType]::ParameterName, 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)')
             [CompletionResult]::new('-C', '-C ', [CompletionResultType]::ParameterName, 'Path to explicit TOML configuration file')
             [CompletionResult]::new('--config', '--config', [CompletionResultType]::ParameterName, 'Path to explicit TOML configuration file')
+            [CompletionResult]::new('-P', '-P ', [CompletionResultType]::ParameterName, 'Named configuration profile (env: HBCTL_PROFILE)')
+            [CompletionResult]::new('--profile', '--profile', [CompletionResultType]::ParameterName, 'Named configuration profile (env: HBCTL_PROFILE)')
             [CompletionResult]::new('--skip-existing', '--skip-existing', [CompletionResultType]::ParameterName, 'Skip files that already exist on the item (default behavior)')
             [CompletionResult]::new('--overwrite', '--overwrite', [CompletionResultType]::ParameterName, 'Delete and re-upload files that already exist on the item')
             [CompletionResult]::new('--force', '--force', [CompletionResultType]::ParameterName, 'Allow uploading images larger than 500KB')
@@ -447,6 +546,8 @@ Register-ArgumentCompleter -Native -CommandName 'hbctl' -ScriptBlock {
             [CompletionResult]::new('--select', '--select', [CompletionResultType]::ParameterName, 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)')
             [CompletionResult]::new('-C', '-C ', [CompletionResultType]::ParameterName, 'Path to explicit TOML configuration file')
             [CompletionResult]::new('--config', '--config', [CompletionResultType]::ParameterName, 'Path to explicit TOML configuration file')
+            [CompletionResult]::new('-P', '-P ', [CompletionResultType]::ParameterName, 'Named configuration profile (env: HBCTL_PROFILE)')
+            [CompletionResult]::new('--profile', '--profile', [CompletionResultType]::ParameterName, 'Named configuration profile (env: HBCTL_PROFILE)')
             [CompletionResult]::new('--json', '--json', [CompletionResultType]::ParameterName, 'Shorthand for --output json (emits compact JSON)')
             [CompletionResult]::new('--dry-run', '--dry-run', [CompletionResultType]::ParameterName, 'Preview mutating requests without hitting the server (redacts Authorization)')
             [CompletionResult]::new('-q', '-q', [CompletionResultType]::ParameterName, 'Output only created/affected IDs for shell piping')
@@ -456,16 +557,21 @@ Register-ArgumentCompleter -Native -CommandName 'hbctl' -ScriptBlock {
             break
         }
         'hbctl;attachment;download' {
+            [CompletionResult]::new('--tag', '--tag', [CompletionResultType]::ParameterName, 'Download matching attachments across items matching this tag name or UUID')
+            [CompletionResult]::new('--items-from', '--items-from', [CompletionResultType]::ParameterName, 'Download matching attachments for newline-delimited entity IDs from a file or ''-'' (stdin)')
             [CompletionResult]::new('--mime', '--mime', [CompletionResultType]::ParameterName, 'Filter attachments by MIME type (e.g. application/pdf)')
             [CompletionResult]::new('--ext', '--ext', [CompletionResultType]::ParameterName, 'Filter attachments by file extension (e.g. pdf)')
-            [CompletionResult]::new('--out', '--out', [CompletionResultType]::ParameterName, 'Output file path (single download) or directory (multi-download / --all)')
+            [CompletionResult]::new('--out', '--out', [CompletionResultType]::ParameterName, 'Output file path (single download) or directory (multi-download / --all / bulk)')
             [CompletionResult]::new('--url', '--url', [CompletionResultType]::ParameterName, 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)')
             [CompletionResult]::new('--api-key', '--api-key', [CompletionResultType]::ParameterName, 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)')
             [CompletionResult]::new('--output', '--output', [CompletionResultType]::ParameterName, 'Output format (table, json, plain) [env: HBCTL_OUTPUT]')
             [CompletionResult]::new('--select', '--select', [CompletionResultType]::ParameterName, 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)')
             [CompletionResult]::new('-C', '-C ', [CompletionResultType]::ParameterName, 'Path to explicit TOML configuration file')
             [CompletionResult]::new('--config', '--config', [CompletionResultType]::ParameterName, 'Path to explicit TOML configuration file')
+            [CompletionResult]::new('-P', '-P ', [CompletionResultType]::ParameterName, 'Named configuration profile (env: HBCTL_PROFILE)')
+            [CompletionResult]::new('--profile', '--profile', [CompletionResultType]::ParameterName, 'Named configuration profile (env: HBCTL_PROFILE)')
             [CompletionResult]::new('--all', '--all', [CompletionResultType]::ParameterName, 'Download all matching attachments on the item')
+            [CompletionResult]::new('--all-items', '--all-items', [CompletionResultType]::ParameterName, 'Download matching attachments across all items')
             [CompletionResult]::new('--overwrite', '--overwrite', [CompletionResultType]::ParameterName, 'Overwrite existing local files instead of skipping')
             [CompletionResult]::new('--json', '--json', [CompletionResultType]::ParameterName, 'Shorthand for --output json (emits compact JSON)')
             [CompletionResult]::new('--dry-run', '--dry-run', [CompletionResultType]::ParameterName, 'Preview mutating requests without hitting the server (redacts Authorization)')
@@ -482,6 +588,8 @@ Register-ArgumentCompleter -Native -CommandName 'hbctl' -ScriptBlock {
             [CompletionResult]::new('--select', '--select', [CompletionResultType]::ParameterName, 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)')
             [CompletionResult]::new('-C', '-C ', [CompletionResultType]::ParameterName, 'Path to explicit TOML configuration file')
             [CompletionResult]::new('--config', '--config', [CompletionResultType]::ParameterName, 'Path to explicit TOML configuration file')
+            [CompletionResult]::new('-P', '-P ', [CompletionResultType]::ParameterName, 'Named configuration profile (env: HBCTL_PROFILE)')
+            [CompletionResult]::new('--profile', '--profile', [CompletionResultType]::ParameterName, 'Named configuration profile (env: HBCTL_PROFILE)')
             [CompletionResult]::new('--json', '--json', [CompletionResultType]::ParameterName, 'Shorthand for --output json (emits compact JSON)')
             [CompletionResult]::new('--dry-run', '--dry-run', [CompletionResultType]::ParameterName, 'Preview mutating requests without hitting the server (redacts Authorization)')
             [CompletionResult]::new('-q', '-q', [CompletionResultType]::ParameterName, 'Output only created/affected IDs for shell piping')
@@ -493,7 +601,7 @@ Register-ArgumentCompleter -Native -CommandName 'hbctl' -ScriptBlock {
         'hbctl;attachment;help' {
             [CompletionResult]::new('upload', 'upload', [CompletionResultType]::ParameterValue, 'Upload one or more files as item attachments')
             [CompletionResult]::new('list', 'list', [CompletionResultType]::ParameterValue, 'List attachments on an item')
-            [CompletionResult]::new('download', 'download', [CompletionResultType]::ParameterValue, 'Stream-download one or all attachments from an item')
+            [CompletionResult]::new('download', 'download', [CompletionResultType]::ParameterValue, 'Stream-download attachments from one or multiple items')
             [CompletionResult]::new('delete', 'delete', [CompletionResultType]::ParameterValue, 'Delete an attachment from an item')
             [CompletionResult]::new('help', 'help', [CompletionResultType]::ParameterValue, 'Print this message or the help of the given subcommand(s)')
             break
@@ -518,12 +626,15 @@ Register-ArgumentCompleter -Native -CommandName 'hbctl' -ScriptBlock {
             [CompletionResult]::new('--model', '--model', [CompletionResultType]::ParameterName, 'Filter by model number (exact or substring, case-insensitive)')
             [CompletionResult]::new('--serial', '--serial', [CompletionResultType]::ParameterName, 'Filter by serial number (exact or substring, case-insensitive)')
             [CompletionResult]::new('--manufacturer', '--manufacturer', [CompletionResultType]::ParameterName, 'Filter by manufacturer (exact or substring, case-insensitive)')
+            [CompletionResult]::new('--field', '--field', [CompletionResultType]::ParameterName, 'Filter by custom field existence (KEY) or substring value (KEY=VAL), case-insensitive (repeatable)')
             [CompletionResult]::new('--url', '--url', [CompletionResultType]::ParameterName, 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)')
             [CompletionResult]::new('--api-key', '--api-key', [CompletionResultType]::ParameterName, 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)')
             [CompletionResult]::new('--output', '--output', [CompletionResultType]::ParameterName, 'Output format (table, json, plain) [env: HBCTL_OUTPUT]')
             [CompletionResult]::new('--select', '--select', [CompletionResultType]::ParameterName, 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)')
             [CompletionResult]::new('-C', '-C ', [CompletionResultType]::ParameterName, 'Path to explicit TOML configuration file')
             [CompletionResult]::new('--config', '--config', [CompletionResultType]::ParameterName, 'Path to explicit TOML configuration file')
+            [CompletionResult]::new('-P', '-P ', [CompletionResultType]::ParameterName, 'Named configuration profile (env: HBCTL_PROFILE)')
+            [CompletionResult]::new('--profile', '--profile', [CompletionResultType]::ParameterName, 'Named configuration profile (env: HBCTL_PROFILE)')
             [CompletionResult]::new('--json', '--json', [CompletionResultType]::ParameterName, 'Shorthand for --output json (emits compact JSON)')
             [CompletionResult]::new('--dry-run', '--dry-run', [CompletionResultType]::ParameterName, 'Preview mutating requests without hitting the server (redacts Authorization)')
             [CompletionResult]::new('-q', '-q', [CompletionResultType]::ParameterName, 'Output only created/affected IDs for shell piping')
@@ -539,6 +650,8 @@ Register-ArgumentCompleter -Native -CommandName 'hbctl' -ScriptBlock {
             [CompletionResult]::new('--select', '--select', [CompletionResultType]::ParameterName, 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)')
             [CompletionResult]::new('-C', '-C ', [CompletionResultType]::ParameterName, 'Path to explicit TOML configuration file')
             [CompletionResult]::new('--config', '--config', [CompletionResultType]::ParameterName, 'Path to explicit TOML configuration file')
+            [CompletionResult]::new('-P', '-P ', [CompletionResultType]::ParameterName, 'Named configuration profile (env: HBCTL_PROFILE)')
+            [CompletionResult]::new('--profile', '--profile', [CompletionResultType]::ParameterName, 'Named configuration profile (env: HBCTL_PROFILE)')
             [CompletionResult]::new('--json', '--json', [CompletionResultType]::ParameterName, 'Shorthand for --output json (emits compact JSON)')
             [CompletionResult]::new('--dry-run', '--dry-run', [CompletionResultType]::ParameterName, 'Preview mutating requests without hitting the server (redacts Authorization)')
             [CompletionResult]::new('-q', '-q', [CompletionResultType]::ParameterName, 'Output only created/affected IDs for shell piping')
@@ -559,6 +672,8 @@ Register-ArgumentCompleter -Native -CommandName 'hbctl' -ScriptBlock {
             [CompletionResult]::new('--select', '--select', [CompletionResultType]::ParameterName, 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)')
             [CompletionResult]::new('-C', '-C ', [CompletionResultType]::ParameterName, 'Path to explicit TOML configuration file')
             [CompletionResult]::new('--config', '--config', [CompletionResultType]::ParameterName, 'Path to explicit TOML configuration file')
+            [CompletionResult]::new('-P', '-P ', [CompletionResultType]::ParameterName, 'Named configuration profile (env: HBCTL_PROFILE)')
+            [CompletionResult]::new('--profile', '--profile', [CompletionResultType]::ParameterName, 'Named configuration profile (env: HBCTL_PROFILE)')
             [CompletionResult]::new('--json', '--json', [CompletionResultType]::ParameterName, 'Shorthand for --output json (emits compact JSON)')
             [CompletionResult]::new('--dry-run', '--dry-run', [CompletionResultType]::ParameterName, 'Preview mutating requests without hitting the server (redacts Authorization)')
             [CompletionResult]::new('-q', '-q', [CompletionResultType]::ParameterName, 'Output only created/affected IDs for shell piping')
@@ -574,6 +689,8 @@ Register-ArgumentCompleter -Native -CommandName 'hbctl' -ScriptBlock {
             [CompletionResult]::new('--select', '--select', [CompletionResultType]::ParameterName, 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)')
             [CompletionResult]::new('-C', '-C ', [CompletionResultType]::ParameterName, 'Path to explicit TOML configuration file')
             [CompletionResult]::new('--config', '--config', [CompletionResultType]::ParameterName, 'Path to explicit TOML configuration file')
+            [CompletionResult]::new('-P', '-P ', [CompletionResultType]::ParameterName, 'Named configuration profile (env: HBCTL_PROFILE)')
+            [CompletionResult]::new('--profile', '--profile', [CompletionResultType]::ParameterName, 'Named configuration profile (env: HBCTL_PROFILE)')
             [CompletionResult]::new('--json', '--json', [CompletionResultType]::ParameterName, 'Shorthand for --output json (emits compact JSON)')
             [CompletionResult]::new('--dry-run', '--dry-run', [CompletionResultType]::ParameterName, 'Preview mutating requests without hitting the server (redacts Authorization)')
             [CompletionResult]::new('-q', '-q', [CompletionResultType]::ParameterName, 'Output only created/affected IDs for shell piping')
@@ -590,6 +707,8 @@ Register-ArgumentCompleter -Native -CommandName 'hbctl' -ScriptBlock {
             [CompletionResult]::new('--select', '--select', [CompletionResultType]::ParameterName, 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)')
             [CompletionResult]::new('-C', '-C ', [CompletionResultType]::ParameterName, 'Path to explicit TOML configuration file')
             [CompletionResult]::new('--config', '--config', [CompletionResultType]::ParameterName, 'Path to explicit TOML configuration file')
+            [CompletionResult]::new('-P', '-P ', [CompletionResultType]::ParameterName, 'Named configuration profile (env: HBCTL_PROFILE)')
+            [CompletionResult]::new('--profile', '--profile', [CompletionResultType]::ParameterName, 'Named configuration profile (env: HBCTL_PROFILE)')
             [CompletionResult]::new('--json', '--json', [CompletionResultType]::ParameterName, 'Shorthand for --output json (emits compact JSON)')
             [CompletionResult]::new('--dry-run', '--dry-run', [CompletionResultType]::ParameterName, 'Preview mutating requests without hitting the server (redacts Authorization)')
             [CompletionResult]::new('-q', '-q', [CompletionResultType]::ParameterName, 'Output only created/affected IDs for shell piping')
@@ -605,6 +724,8 @@ Register-ArgumentCompleter -Native -CommandName 'hbctl' -ScriptBlock {
             [CompletionResult]::new('--select', '--select', [CompletionResultType]::ParameterName, 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)')
             [CompletionResult]::new('-C', '-C ', [CompletionResultType]::ParameterName, 'Path to explicit TOML configuration file')
             [CompletionResult]::new('--config', '--config', [CompletionResultType]::ParameterName, 'Path to explicit TOML configuration file')
+            [CompletionResult]::new('-P', '-P ', [CompletionResultType]::ParameterName, 'Named configuration profile (env: HBCTL_PROFILE)')
+            [CompletionResult]::new('--profile', '--profile', [CompletionResultType]::ParameterName, 'Named configuration profile (env: HBCTL_PROFILE)')
             [CompletionResult]::new('--json', '--json', [CompletionResultType]::ParameterName, 'Shorthand for --output json (emits compact JSON)')
             [CompletionResult]::new('--dry-run', '--dry-run', [CompletionResultType]::ParameterName, 'Preview mutating requests without hitting the server (redacts Authorization)')
             [CompletionResult]::new('-q', '-q', [CompletionResultType]::ParameterName, 'Output only created/affected IDs for shell piping')
@@ -643,6 +764,8 @@ Register-ArgumentCompleter -Native -CommandName 'hbctl' -ScriptBlock {
             [CompletionResult]::new('--select', '--select', [CompletionResultType]::ParameterName, 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)')
             [CompletionResult]::new('-C', '-C ', [CompletionResultType]::ParameterName, 'Path to explicit TOML configuration file')
             [CompletionResult]::new('--config', '--config', [CompletionResultType]::ParameterName, 'Path to explicit TOML configuration file')
+            [CompletionResult]::new('-P', '-P ', [CompletionResultType]::ParameterName, 'Named configuration profile (env: HBCTL_PROFILE)')
+            [CompletionResult]::new('--profile', '--profile', [CompletionResultType]::ParameterName, 'Named configuration profile (env: HBCTL_PROFILE)')
             [CompletionResult]::new('--json', '--json', [CompletionResultType]::ParameterName, 'Shorthand for --output json (emits compact JSON)')
             [CompletionResult]::new('--dry-run', '--dry-run', [CompletionResultType]::ParameterName, 'Preview mutating requests without hitting the server (redacts Authorization)')
             [CompletionResult]::new('-q', '-q', [CompletionResultType]::ParameterName, 'Output only created/affected IDs for shell piping')
@@ -663,6 +786,8 @@ Register-ArgumentCompleter -Native -CommandName 'hbctl' -ScriptBlock {
             [CompletionResult]::new('--select', '--select', [CompletionResultType]::ParameterName, 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)')
             [CompletionResult]::new('-C', '-C ', [CompletionResultType]::ParameterName, 'Path to explicit TOML configuration file')
             [CompletionResult]::new('--config', '--config', [CompletionResultType]::ParameterName, 'Path to explicit TOML configuration file')
+            [CompletionResult]::new('-P', '-P ', [CompletionResultType]::ParameterName, 'Named configuration profile (env: HBCTL_PROFILE)')
+            [CompletionResult]::new('--profile', '--profile', [CompletionResultType]::ParameterName, 'Named configuration profile (env: HBCTL_PROFILE)')
             [CompletionResult]::new('--json', '--json', [CompletionResultType]::ParameterName, 'Shorthand for --output json (emits compact JSON)')
             [CompletionResult]::new('--dry-run', '--dry-run', [CompletionResultType]::ParameterName, 'Preview mutating requests without hitting the server (redacts Authorization)')
             [CompletionResult]::new('-q', '-q', [CompletionResultType]::ParameterName, 'Output only created/affected IDs for shell piping')
@@ -678,6 +803,8 @@ Register-ArgumentCompleter -Native -CommandName 'hbctl' -ScriptBlock {
             [CompletionResult]::new('--select', '--select', [CompletionResultType]::ParameterName, 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)')
             [CompletionResult]::new('-C', '-C ', [CompletionResultType]::ParameterName, 'Path to explicit TOML configuration file')
             [CompletionResult]::new('--config', '--config', [CompletionResultType]::ParameterName, 'Path to explicit TOML configuration file')
+            [CompletionResult]::new('-P', '-P ', [CompletionResultType]::ParameterName, 'Named configuration profile (env: HBCTL_PROFILE)')
+            [CompletionResult]::new('--profile', '--profile', [CompletionResultType]::ParameterName, 'Named configuration profile (env: HBCTL_PROFILE)')
             [CompletionResult]::new('--json', '--json', [CompletionResultType]::ParameterName, 'Shorthand for --output json (emits compact JSON)')
             [CompletionResult]::new('--dry-run', '--dry-run', [CompletionResultType]::ParameterName, 'Preview mutating requests without hitting the server (redacts Authorization)')
             [CompletionResult]::new('-q', '-q', [CompletionResultType]::ParameterName, 'Output only created/affected IDs for shell piping')
@@ -696,6 +823,8 @@ Register-ArgumentCompleter -Native -CommandName 'hbctl' -ScriptBlock {
             [CompletionResult]::new('--select', '--select', [CompletionResultType]::ParameterName, 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)')
             [CompletionResult]::new('-C', '-C ', [CompletionResultType]::ParameterName, 'Path to explicit TOML configuration file')
             [CompletionResult]::new('--config', '--config', [CompletionResultType]::ParameterName, 'Path to explicit TOML configuration file')
+            [CompletionResult]::new('-P', '-P ', [CompletionResultType]::ParameterName, 'Named configuration profile (env: HBCTL_PROFILE)')
+            [CompletionResult]::new('--profile', '--profile', [CompletionResultType]::ParameterName, 'Named configuration profile (env: HBCTL_PROFILE)')
             [CompletionResult]::new('--json', '--json', [CompletionResultType]::ParameterName, 'Shorthand for --output json (emits compact JSON)')
             [CompletionResult]::new('--dry-run', '--dry-run', [CompletionResultType]::ParameterName, 'Preview mutating requests without hitting the server (redacts Authorization)')
             [CompletionResult]::new('-q', '-q', [CompletionResultType]::ParameterName, 'Output only created/affected IDs for shell piping')
@@ -711,6 +840,8 @@ Register-ArgumentCompleter -Native -CommandName 'hbctl' -ScriptBlock {
             [CompletionResult]::new('--select', '--select', [CompletionResultType]::ParameterName, 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)')
             [CompletionResult]::new('-C', '-C ', [CompletionResultType]::ParameterName, 'Path to explicit TOML configuration file')
             [CompletionResult]::new('--config', '--config', [CompletionResultType]::ParameterName, 'Path to explicit TOML configuration file')
+            [CompletionResult]::new('-P', '-P ', [CompletionResultType]::ParameterName, 'Named configuration profile (env: HBCTL_PROFILE)')
+            [CompletionResult]::new('--profile', '--profile', [CompletionResultType]::ParameterName, 'Named configuration profile (env: HBCTL_PROFILE)')
             [CompletionResult]::new('--force', '--force', [CompletionResultType]::ParameterName, 'Skip interactive confirmation prompt')
             [CompletionResult]::new('--json', '--json', [CompletionResultType]::ParameterName, 'Shorthand for --output json (emits compact JSON)')
             [CompletionResult]::new('--dry-run', '--dry-run', [CompletionResultType]::ParameterName, 'Preview mutating requests without hitting the server (redacts Authorization)')
@@ -750,6 +881,8 @@ Register-ArgumentCompleter -Native -CommandName 'hbctl' -ScriptBlock {
             [CompletionResult]::new('--select', '--select', [CompletionResultType]::ParameterName, 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)')
             [CompletionResult]::new('-C', '-C ', [CompletionResultType]::ParameterName, 'Path to explicit TOML configuration file')
             [CompletionResult]::new('--config', '--config', [CompletionResultType]::ParameterName, 'Path to explicit TOML configuration file')
+            [CompletionResult]::new('-P', '-P ', [CompletionResultType]::ParameterName, 'Named configuration profile (env: HBCTL_PROFILE)')
+            [CompletionResult]::new('--profile', '--profile', [CompletionResultType]::ParameterName, 'Named configuration profile (env: HBCTL_PROFILE)')
             [CompletionResult]::new('--json', '--json', [CompletionResultType]::ParameterName, 'Shorthand for --output json (emits compact JSON)')
             [CompletionResult]::new('--dry-run', '--dry-run', [CompletionResultType]::ParameterName, 'Preview mutating requests without hitting the server (redacts Authorization)')
             [CompletionResult]::new('-q', '-q', [CompletionResultType]::ParameterName, 'Output only created/affected IDs for shell piping')
@@ -757,6 +890,8 @@ Register-ArgumentCompleter -Native -CommandName 'hbctl' -ScriptBlock {
             [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
             [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
             [CompletionResult]::new('list', 'list', [CompletionResultType]::ParameterValue, 'List all entity types')
+            [CompletionResult]::new('create', 'create', [CompletionResultType]::ParameterValue, 'Create a new entity type')
+            [CompletionResult]::new('delete', 'delete', [CompletionResultType]::ParameterValue, 'Delete an entity type by ID')
             [CompletionResult]::new('help', 'help', [CompletionResultType]::ParameterValue, 'Print this message or the help of the given subcommand(s)')
             break
         }
@@ -767,6 +902,8 @@ Register-ArgumentCompleter -Native -CommandName 'hbctl' -ScriptBlock {
             [CompletionResult]::new('--select', '--select', [CompletionResultType]::ParameterName, 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)')
             [CompletionResult]::new('-C', '-C ', [CompletionResultType]::ParameterName, 'Path to explicit TOML configuration file')
             [CompletionResult]::new('--config', '--config', [CompletionResultType]::ParameterName, 'Path to explicit TOML configuration file')
+            [CompletionResult]::new('-P', '-P ', [CompletionResultType]::ParameterName, 'Named configuration profile (env: HBCTL_PROFILE)')
+            [CompletionResult]::new('--profile', '--profile', [CompletionResultType]::ParameterName, 'Named configuration profile (env: HBCTL_PROFILE)')
             [CompletionResult]::new('--json', '--json', [CompletionResultType]::ParameterName, 'Shorthand for --output json (emits compact JSON)')
             [CompletionResult]::new('--dry-run', '--dry-run', [CompletionResultType]::ParameterName, 'Preview mutating requests without hitting the server (redacts Authorization)')
             [CompletionResult]::new('-q', '-q', [CompletionResultType]::ParameterName, 'Output only created/affected IDs for shell piping')
@@ -774,6 +911,8 @@ Register-ArgumentCompleter -Native -CommandName 'hbctl' -ScriptBlock {
             [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
             [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
             [CompletionResult]::new('list', 'list', [CompletionResultType]::ParameterValue, 'List all entity types')
+            [CompletionResult]::new('create', 'create', [CompletionResultType]::ParameterValue, 'Create a new entity type')
+            [CompletionResult]::new('delete', 'delete', [CompletionResultType]::ParameterValue, 'Delete an entity type by ID')
             [CompletionResult]::new('help', 'help', [CompletionResultType]::ParameterValue, 'Print this message or the help of the given subcommand(s)')
             break
         }
@@ -784,6 +923,8 @@ Register-ArgumentCompleter -Native -CommandName 'hbctl' -ScriptBlock {
             [CompletionResult]::new('--select', '--select', [CompletionResultType]::ParameterName, 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)')
             [CompletionResult]::new('-C', '-C ', [CompletionResultType]::ParameterName, 'Path to explicit TOML configuration file')
             [CompletionResult]::new('--config', '--config', [CompletionResultType]::ParameterName, 'Path to explicit TOML configuration file')
+            [CompletionResult]::new('-P', '-P ', [CompletionResultType]::ParameterName, 'Named configuration profile (env: HBCTL_PROFILE)')
+            [CompletionResult]::new('--profile', '--profile', [CompletionResultType]::ParameterName, 'Named configuration profile (env: HBCTL_PROFILE)')
             [CompletionResult]::new('--json', '--json', [CompletionResultType]::ParameterName, 'Shorthand for --output json (emits compact JSON)')
             [CompletionResult]::new('--dry-run', '--dry-run', [CompletionResultType]::ParameterName, 'Preview mutating requests without hitting the server (redacts Authorization)')
             [CompletionResult]::new('-q', '-q', [CompletionResultType]::ParameterName, 'Output only created/affected IDs for shell piping')
@@ -799,6 +940,82 @@ Register-ArgumentCompleter -Native -CommandName 'hbctl' -ScriptBlock {
             [CompletionResult]::new('--select', '--select', [CompletionResultType]::ParameterName, 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)')
             [CompletionResult]::new('-C', '-C ', [CompletionResultType]::ParameterName, 'Path to explicit TOML configuration file')
             [CompletionResult]::new('--config', '--config', [CompletionResultType]::ParameterName, 'Path to explicit TOML configuration file')
+            [CompletionResult]::new('-P', '-P ', [CompletionResultType]::ParameterName, 'Named configuration profile (env: HBCTL_PROFILE)')
+            [CompletionResult]::new('--profile', '--profile', [CompletionResultType]::ParameterName, 'Named configuration profile (env: HBCTL_PROFILE)')
+            [CompletionResult]::new('--json', '--json', [CompletionResultType]::ParameterName, 'Shorthand for --output json (emits compact JSON)')
+            [CompletionResult]::new('--dry-run', '--dry-run', [CompletionResultType]::ParameterName, 'Preview mutating requests without hitting the server (redacts Authorization)')
+            [CompletionResult]::new('-q', '-q', [CompletionResultType]::ParameterName, 'Output only created/affected IDs for shell piping')
+            [CompletionResult]::new('--quiet', '--quiet', [CompletionResultType]::ParameterName, 'Output only created/affected IDs for shell piping')
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'hbctl;entity-types;create' {
+            [CompletionResult]::new('--description', '--description', [CompletionResultType]::ParameterName, 'Optional description')
+            [CompletionResult]::new('--url', '--url', [CompletionResultType]::ParameterName, 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)')
+            [CompletionResult]::new('--api-key', '--api-key', [CompletionResultType]::ParameterName, 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)')
+            [CompletionResult]::new('--output', '--output', [CompletionResultType]::ParameterName, 'Output format (table, json, plain) [env: HBCTL_OUTPUT]')
+            [CompletionResult]::new('--select', '--select', [CompletionResultType]::ParameterName, 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)')
+            [CompletionResult]::new('-C', '-C ', [CompletionResultType]::ParameterName, 'Path to explicit TOML configuration file')
+            [CompletionResult]::new('--config', '--config', [CompletionResultType]::ParameterName, 'Path to explicit TOML configuration file')
+            [CompletionResult]::new('-P', '-P ', [CompletionResultType]::ParameterName, 'Named configuration profile (env: HBCTL_PROFILE)')
+            [CompletionResult]::new('--profile', '--profile', [CompletionResultType]::ParameterName, 'Named configuration profile (env: HBCTL_PROFILE)')
+            [CompletionResult]::new('--is-location', '--is-location', [CompletionResultType]::ParameterName, 'Mark this entity type as a location/container')
+            [CompletionResult]::new('--json', '--json', [CompletionResultType]::ParameterName, 'Shorthand for --output json (emits compact JSON)')
+            [CompletionResult]::new('--dry-run', '--dry-run', [CompletionResultType]::ParameterName, 'Preview mutating requests without hitting the server (redacts Authorization)')
+            [CompletionResult]::new('-q', '-q', [CompletionResultType]::ParameterName, 'Output only created/affected IDs for shell piping')
+            [CompletionResult]::new('--quiet', '--quiet', [CompletionResultType]::ParameterName, 'Output only created/affected IDs for shell piping')
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'hbctl;entity-type;create' {
+            [CompletionResult]::new('--description', '--description', [CompletionResultType]::ParameterName, 'Optional description')
+            [CompletionResult]::new('--url', '--url', [CompletionResultType]::ParameterName, 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)')
+            [CompletionResult]::new('--api-key', '--api-key', [CompletionResultType]::ParameterName, 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)')
+            [CompletionResult]::new('--output', '--output', [CompletionResultType]::ParameterName, 'Output format (table, json, plain) [env: HBCTL_OUTPUT]')
+            [CompletionResult]::new('--select', '--select', [CompletionResultType]::ParameterName, 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)')
+            [CompletionResult]::new('-C', '-C ', [CompletionResultType]::ParameterName, 'Path to explicit TOML configuration file')
+            [CompletionResult]::new('--config', '--config', [CompletionResultType]::ParameterName, 'Path to explicit TOML configuration file')
+            [CompletionResult]::new('-P', '-P ', [CompletionResultType]::ParameterName, 'Named configuration profile (env: HBCTL_PROFILE)')
+            [CompletionResult]::new('--profile', '--profile', [CompletionResultType]::ParameterName, 'Named configuration profile (env: HBCTL_PROFILE)')
+            [CompletionResult]::new('--is-location', '--is-location', [CompletionResultType]::ParameterName, 'Mark this entity type as a location/container')
+            [CompletionResult]::new('--json', '--json', [CompletionResultType]::ParameterName, 'Shorthand for --output json (emits compact JSON)')
+            [CompletionResult]::new('--dry-run', '--dry-run', [CompletionResultType]::ParameterName, 'Preview mutating requests without hitting the server (redacts Authorization)')
+            [CompletionResult]::new('-q', '-q', [CompletionResultType]::ParameterName, 'Output only created/affected IDs for shell piping')
+            [CompletionResult]::new('--quiet', '--quiet', [CompletionResultType]::ParameterName, 'Output only created/affected IDs for shell piping')
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'hbctl;entity-types;delete' {
+            [CompletionResult]::new('--url', '--url', [CompletionResultType]::ParameterName, 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)')
+            [CompletionResult]::new('--api-key', '--api-key', [CompletionResultType]::ParameterName, 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)')
+            [CompletionResult]::new('--output', '--output', [CompletionResultType]::ParameterName, 'Output format (table, json, plain) [env: HBCTL_OUTPUT]')
+            [CompletionResult]::new('--select', '--select', [CompletionResultType]::ParameterName, 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)')
+            [CompletionResult]::new('-C', '-C ', [CompletionResultType]::ParameterName, 'Path to explicit TOML configuration file')
+            [CompletionResult]::new('--config', '--config', [CompletionResultType]::ParameterName, 'Path to explicit TOML configuration file')
+            [CompletionResult]::new('-P', '-P ', [CompletionResultType]::ParameterName, 'Named configuration profile (env: HBCTL_PROFILE)')
+            [CompletionResult]::new('--profile', '--profile', [CompletionResultType]::ParameterName, 'Named configuration profile (env: HBCTL_PROFILE)')
+            [CompletionResult]::new('--force', '--force', [CompletionResultType]::ParameterName, 'Skip interactive confirmation prompt')
+            [CompletionResult]::new('--json', '--json', [CompletionResultType]::ParameterName, 'Shorthand for --output json (emits compact JSON)')
+            [CompletionResult]::new('--dry-run', '--dry-run', [CompletionResultType]::ParameterName, 'Preview mutating requests without hitting the server (redacts Authorization)')
+            [CompletionResult]::new('-q', '-q', [CompletionResultType]::ParameterName, 'Output only created/affected IDs for shell piping')
+            [CompletionResult]::new('--quiet', '--quiet', [CompletionResultType]::ParameterName, 'Output only created/affected IDs for shell piping')
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
+            break
+        }
+        'hbctl;entity-type;delete' {
+            [CompletionResult]::new('--url', '--url', [CompletionResultType]::ParameterName, 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)')
+            [CompletionResult]::new('--api-key', '--api-key', [CompletionResultType]::ParameterName, 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)')
+            [CompletionResult]::new('--output', '--output', [CompletionResultType]::ParameterName, 'Output format (table, json, plain) [env: HBCTL_OUTPUT]')
+            [CompletionResult]::new('--select', '--select', [CompletionResultType]::ParameterName, 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)')
+            [CompletionResult]::new('-C', '-C ', [CompletionResultType]::ParameterName, 'Path to explicit TOML configuration file')
+            [CompletionResult]::new('--config', '--config', [CompletionResultType]::ParameterName, 'Path to explicit TOML configuration file')
+            [CompletionResult]::new('-P', '-P ', [CompletionResultType]::ParameterName, 'Named configuration profile (env: HBCTL_PROFILE)')
+            [CompletionResult]::new('--profile', '--profile', [CompletionResultType]::ParameterName, 'Named configuration profile (env: HBCTL_PROFILE)')
+            [CompletionResult]::new('--force', '--force', [CompletionResultType]::ParameterName, 'Skip interactive confirmation prompt')
             [CompletionResult]::new('--json', '--json', [CompletionResultType]::ParameterName, 'Shorthand for --output json (emits compact JSON)')
             [CompletionResult]::new('--dry-run', '--dry-run', [CompletionResultType]::ParameterName, 'Preview mutating requests without hitting the server (redacts Authorization)')
             [CompletionResult]::new('-q', '-q', [CompletionResultType]::ParameterName, 'Output only created/affected IDs for shell piping')
@@ -809,10 +1026,18 @@ Register-ArgumentCompleter -Native -CommandName 'hbctl' -ScriptBlock {
         }
         'hbctl;entity-types;help' {
             [CompletionResult]::new('list', 'list', [CompletionResultType]::ParameterValue, 'List all entity types')
+            [CompletionResult]::new('create', 'create', [CompletionResultType]::ParameterValue, 'Create a new entity type')
+            [CompletionResult]::new('delete', 'delete', [CompletionResultType]::ParameterValue, 'Delete an entity type by ID')
             [CompletionResult]::new('help', 'help', [CompletionResultType]::ParameterValue, 'Print this message or the help of the given subcommand(s)')
             break
         }
         'hbctl;entity-types;help;list' {
+            break
+        }
+        'hbctl;entity-types;help;create' {
+            break
+        }
+        'hbctl;entity-types;help;delete' {
             break
         }
         'hbctl;entity-types;help;help' {
@@ -820,13 +1045,38 @@ Register-ArgumentCompleter -Native -CommandName 'hbctl' -ScriptBlock {
         }
         'hbctl;entity-type;help' {
             [CompletionResult]::new('list', 'list', [CompletionResultType]::ParameterValue, 'List all entity types')
+            [CompletionResult]::new('create', 'create', [CompletionResultType]::ParameterValue, 'Create a new entity type')
+            [CompletionResult]::new('delete', 'delete', [CompletionResultType]::ParameterValue, 'Delete an entity type by ID')
             [CompletionResult]::new('help', 'help', [CompletionResultType]::ParameterValue, 'Print this message or the help of the given subcommand(s)')
             break
         }
         'hbctl;entity-type;help;list' {
             break
         }
+        'hbctl;entity-type;help;create' {
+            break
+        }
+        'hbctl;entity-type;help;delete' {
+            break
+        }
         'hbctl;entity-type;help;help' {
+            break
+        }
+        'hbctl;status' {
+            [CompletionResult]::new('--url', '--url', [CompletionResultType]::ParameterName, 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)')
+            [CompletionResult]::new('--api-key', '--api-key', [CompletionResultType]::ParameterName, 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)')
+            [CompletionResult]::new('--output', '--output', [CompletionResultType]::ParameterName, 'Output format (table, json, plain) [env: HBCTL_OUTPUT]')
+            [CompletionResult]::new('--select', '--select', [CompletionResultType]::ParameterName, 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)')
+            [CompletionResult]::new('-C', '-C ', [CompletionResultType]::ParameterName, 'Path to explicit TOML configuration file')
+            [CompletionResult]::new('--config', '--config', [CompletionResultType]::ParameterName, 'Path to explicit TOML configuration file')
+            [CompletionResult]::new('-P', '-P ', [CompletionResultType]::ParameterName, 'Named configuration profile (env: HBCTL_PROFILE)')
+            [CompletionResult]::new('--profile', '--profile', [CompletionResultType]::ParameterName, 'Named configuration profile (env: HBCTL_PROFILE)')
+            [CompletionResult]::new('--json', '--json', [CompletionResultType]::ParameterName, 'Shorthand for --output json (emits compact JSON)')
+            [CompletionResult]::new('--dry-run', '--dry-run', [CompletionResultType]::ParameterName, 'Preview mutating requests without hitting the server (redacts Authorization)')
+            [CompletionResult]::new('-q', '-q', [CompletionResultType]::ParameterName, 'Output only created/affected IDs for shell piping')
+            [CompletionResult]::new('--quiet', '--quiet', [CompletionResultType]::ParameterName, 'Output only created/affected IDs for shell piping')
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
             break
         }
         'hbctl;export' {
@@ -835,12 +1085,17 @@ Register-ArgumentCompleter -Native -CommandName 'hbctl' -ScriptBlock {
             [CompletionResult]::new('--field', '--field', [CompletionResultType]::ParameterName, 'Custom field column(s) to include in export (repeatable)')
             [CompletionResult]::new('--sort', '--sort', [CompletionResultType]::ParameterName, 'Sort exported items by name or id')
             [CompletionResult]::new('--format', '--format', [CompletionResultType]::ParameterName, 'Export format (json, csv, markdown)')
+            [CompletionResult]::new('--columns', '--columns', [CompletionResultType]::ParameterName, 'Custom column list and order (comma-separated or repeatable; supports ''key=Header Alias'')')
+            [CompletionResult]::new('--align', '--align', [CompletionResultType]::ParameterName, 'Markdown table column alignment (default, left, right, center)')
+            [CompletionResult]::new('--empty', '--empty', [CompletionResultType]::ParameterName, 'Placeholder string for empty/missing cells')
             [CompletionResult]::new('--url', '--url', [CompletionResultType]::ParameterName, 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)')
             [CompletionResult]::new('--api-key', '--api-key', [CompletionResultType]::ParameterName, 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)')
             [CompletionResult]::new('--output', '--output', [CompletionResultType]::ParameterName, 'Output format (table, json, plain) [env: HBCTL_OUTPUT]')
             [CompletionResult]::new('--select', '--select', [CompletionResultType]::ParameterName, 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)')
             [CompletionResult]::new('-C', '-C ', [CompletionResultType]::ParameterName, 'Path to explicit TOML configuration file')
             [CompletionResult]::new('--config', '--config', [CompletionResultType]::ParameterName, 'Path to explicit TOML configuration file')
+            [CompletionResult]::new('-P', '-P ', [CompletionResultType]::ParameterName, 'Named configuration profile (env: HBCTL_PROFILE)')
+            [CompletionResult]::new('--profile', '--profile', [CompletionResultType]::ParameterName, 'Named configuration profile (env: HBCTL_PROFILE)')
             [CompletionResult]::new('--json', '--json', [CompletionResultType]::ParameterName, 'Shorthand for --output json (emits compact JSON)')
             [CompletionResult]::new('--dry-run', '--dry-run', [CompletionResultType]::ParameterName, 'Preview mutating requests without hitting the server (redacts Authorization)')
             [CompletionResult]::new('-q', '-q', [CompletionResultType]::ParameterName, 'Output only created/affected IDs for shell piping')
@@ -856,6 +1111,8 @@ Register-ArgumentCompleter -Native -CommandName 'hbctl' -ScriptBlock {
             [CompletionResult]::new('--select', '--select', [CompletionResultType]::ParameterName, 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)')
             [CompletionResult]::new('-C', '-C ', [CompletionResultType]::ParameterName, 'Path to explicit TOML configuration file')
             [CompletionResult]::new('--config', '--config', [CompletionResultType]::ParameterName, 'Path to explicit TOML configuration file')
+            [CompletionResult]::new('-P', '-P ', [CompletionResultType]::ParameterName, 'Named configuration profile (env: HBCTL_PROFILE)')
+            [CompletionResult]::new('--profile', '--profile', [CompletionResultType]::ParameterName, 'Named configuration profile (env: HBCTL_PROFILE)')
             [CompletionResult]::new('--json', '--json', [CompletionResultType]::ParameterName, 'Shorthand for --output json (emits compact JSON)')
             [CompletionResult]::new('--dry-run', '--dry-run', [CompletionResultType]::ParameterName, 'Preview mutating requests without hitting the server (redacts Authorization)')
             [CompletionResult]::new('-q', '-q', [CompletionResultType]::ParameterName, 'Output only created/affected IDs for shell piping')
@@ -871,6 +1128,8 @@ Register-ArgumentCompleter -Native -CommandName 'hbctl' -ScriptBlock {
             [CompletionResult]::new('--select', '--select', [CompletionResultType]::ParameterName, 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)')
             [CompletionResult]::new('-C', '-C ', [CompletionResultType]::ParameterName, 'Path to explicit TOML configuration file')
             [CompletionResult]::new('--config', '--config', [CompletionResultType]::ParameterName, 'Path to explicit TOML configuration file')
+            [CompletionResult]::new('-P', '-P ', [CompletionResultType]::ParameterName, 'Named configuration profile (env: HBCTL_PROFILE)')
+            [CompletionResult]::new('--profile', '--profile', [CompletionResultType]::ParameterName, 'Named configuration profile (env: HBCTL_PROFILE)')
             [CompletionResult]::new('--json', '--json', [CompletionResultType]::ParameterName, 'Shorthand for --output json (emits compact JSON)')
             [CompletionResult]::new('--dry-run', '--dry-run', [CompletionResultType]::ParameterName, 'Preview mutating requests without hitting the server (redacts Authorization)')
             [CompletionResult]::new('-q', '-q', [CompletionResultType]::ParameterName, 'Output only created/affected IDs for shell piping')
@@ -887,6 +1146,8 @@ Register-ArgumentCompleter -Native -CommandName 'hbctl' -ScriptBlock {
             [CompletionResult]::new('--select', '--select', [CompletionResultType]::ParameterName, 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)')
             [CompletionResult]::new('-C', '-C ', [CompletionResultType]::ParameterName, 'Path to explicit TOML configuration file')
             [CompletionResult]::new('--config', '--config', [CompletionResultType]::ParameterName, 'Path to explicit TOML configuration file')
+            [CompletionResult]::new('-P', '-P ', [CompletionResultType]::ParameterName, 'Named configuration profile (env: HBCTL_PROFILE)')
+            [CompletionResult]::new('--profile', '--profile', [CompletionResultType]::ParameterName, 'Named configuration profile (env: HBCTL_PROFILE)')
             [CompletionResult]::new('--check', '--check', [CompletionResultType]::ParameterName, 'Check for available updates without installing')
             [CompletionResult]::new('-y', '-y', [CompletionResultType]::ParameterName, 'Skip confirmation prompt before installing')
             [CompletionResult]::new('--yes', '--yes', [CompletionResultType]::ParameterName, 'Skip confirmation prompt before installing')
@@ -906,6 +1167,8 @@ Register-ArgumentCompleter -Native -CommandName 'hbctl' -ScriptBlock {
             [CompletionResult]::new('--select', '--select', [CompletionResultType]::ParameterName, 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)')
             [CompletionResult]::new('-C', '-C ', [CompletionResultType]::ParameterName, 'Path to explicit TOML configuration file')
             [CompletionResult]::new('--config', '--config', [CompletionResultType]::ParameterName, 'Path to explicit TOML configuration file')
+            [CompletionResult]::new('-P', '-P ', [CompletionResultType]::ParameterName, 'Named configuration profile (env: HBCTL_PROFILE)')
+            [CompletionResult]::new('--profile', '--profile', [CompletionResultType]::ParameterName, 'Named configuration profile (env: HBCTL_PROFILE)')
             [CompletionResult]::new('--check', '--check', [CompletionResultType]::ParameterName, 'Check for available updates without installing')
             [CompletionResult]::new('-y', '-y', [CompletionResultType]::ParameterName, 'Skip confirmation prompt before installing')
             [CompletionResult]::new('--yes', '--yes', [CompletionResultType]::ParameterName, 'Skip confirmation prompt before installing')
@@ -924,7 +1187,8 @@ Register-ArgumentCompleter -Native -CommandName 'hbctl' -ScriptBlock {
             [CompletionResult]::new('search', 'search', [CompletionResultType]::ParameterValue, 'Full-text and structured item search')
             [CompletionResult]::new('field', 'field', [CompletionResultType]::ParameterValue, 'List, get, set, or delete typed custom fields on an item')
             [CompletionResult]::new('tag', 'tag', [CompletionResultType]::ParameterValue, 'Manage tags (/api/v1/tags)')
-            [CompletionResult]::new('entity-types', 'entity-types', [CompletionResultType]::ParameterValue, 'List Homebox entity types (/api/v1/entity-types)')
+            [CompletionResult]::new('entity-types', 'entity-types', [CompletionResultType]::ParameterValue, 'Manage Homebox entity types (/api/v1/entity-types)')
+            [CompletionResult]::new('status', 'status', [CompletionResultType]::ParameterValue, 'Check remote Homebox server connectivity and version (/api/v1/status)')
             [CompletionResult]::new('export', 'export', [CompletionResultType]::ParameterValue, 'Export filtered items to JSON, CSV, or Markdown')
             [CompletionResult]::new('completions', 'completions', [CompletionResultType]::ParameterValue, 'Generate shell completion scripts')
             [CompletionResult]::new('man', 'man', [CompletionResultType]::ParameterValue, 'Generate UNIX roff man page')
@@ -960,6 +1224,8 @@ Register-ArgumentCompleter -Native -CommandName 'hbctl' -ScriptBlock {
             [CompletionResult]::new('delete', 'delete', [CompletionResultType]::ParameterValue, 'Delete an item by ID')
             [CompletionResult]::new('import', 'import', [CompletionResultType]::ParameterValue, 'Bulk import items from JSON or CSV (file or ''-'' for stdin)')
             [CompletionResult]::new('dedup', 'dedup', [CompletionResultType]::ParameterValue, 'Detect (and optionally delete or merge) duplicate items')
+            [CompletionResult]::new('move', 'move', [CompletionResultType]::ParameterValue, 'Move an item under a parent item/location (or ''none'' to unparent)')
+            [CompletionResult]::new('tree', 'tree', [CompletionResultType]::ParameterValue, 'Render item parent/location hierarchy as a tree')
             break
         }
         'hbctl;help;item;list' {
@@ -986,10 +1252,16 @@ Register-ArgumentCompleter -Native -CommandName 'hbctl' -ScriptBlock {
         'hbctl;help;item;dedup' {
             break
         }
+        'hbctl;help;item;move' {
+            break
+        }
+        'hbctl;help;item;tree' {
+            break
+        }
         'hbctl;help;attachment' {
             [CompletionResult]::new('upload', 'upload', [CompletionResultType]::ParameterValue, 'Upload one or more files as item attachments')
             [CompletionResult]::new('list', 'list', [CompletionResultType]::ParameterValue, 'List attachments on an item')
-            [CompletionResult]::new('download', 'download', [CompletionResultType]::ParameterValue, 'Stream-download one or all attachments from an item')
+            [CompletionResult]::new('download', 'download', [CompletionResultType]::ParameterValue, 'Stream-download attachments from one or multiple items')
             [CompletionResult]::new('delete', 'delete', [CompletionResultType]::ParameterValue, 'Delete an attachment from an item')
             break
         }
@@ -1048,9 +1320,20 @@ Register-ArgumentCompleter -Native -CommandName 'hbctl' -ScriptBlock {
         }
         'hbctl;help;entity-types' {
             [CompletionResult]::new('list', 'list', [CompletionResultType]::ParameterValue, 'List all entity types')
+            [CompletionResult]::new('create', 'create', [CompletionResultType]::ParameterValue, 'Create a new entity type')
+            [CompletionResult]::new('delete', 'delete', [CompletionResultType]::ParameterValue, 'Delete an entity type by ID')
             break
         }
         'hbctl;help;entity-types;list' {
+            break
+        }
+        'hbctl;help;entity-types;create' {
+            break
+        }
+        'hbctl;help;entity-types;delete' {
+            break
+        }
+        'hbctl;help;status' {
             break
         }
         'hbctl;help;export' {

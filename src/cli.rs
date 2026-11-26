@@ -1,11 +1,14 @@
+use std::fmt;
 use std::io::Write;
 use std::path::PathBuf;
+use std::str::FromStr;
 
 pub use clap::{Args, CommandFactory, Parser, Subcommand, ValueEnum};
 pub use clap_complete::Shell;
 
 use crate::client::models::FieldValueType;
 use crate::config::{CliConfigOverrides, OutputFormat};
+use crate::output::MarkdownAlign;
 
 #[derive(Parser, Debug, Clone)]
 #[command(name = "hbctl")]
@@ -48,6 +51,10 @@ pub struct Cli {
     #[arg(short = 'C', long, global = true)]
     pub config: Option<PathBuf>,
 
+    /// Named configuration profile (env: HBCTL_PROFILE)
+    #[arg(short = 'P', long, global = true, value_name = "NAME")]
+    pub profile: Option<String>,
+
     #[command(subcommand)]
     pub command: Commands,
 }
@@ -60,6 +67,7 @@ impl Cli {
             output: self.output,
             json: self.json,
             config_path: self.config.clone(),
+            profile: self.profile.clone(),
         }
     }
 }
@@ -85,9 +93,12 @@ pub enum Commands {
     /// Manage tags (/api/v1/tags)
     Tag(TagArgs),
 
-    /// List Homebox entity types (/api/v1/entity-types)
+    /// Manage Homebox entity types (/api/v1/entity-types)
     #[command(name = "entity-types", visible_alias = "entity-type")]
     EntityTypes(EntityTypeArgs),
+
+    /// Check remote Homebox server connectivity and version (/api/v1/status)
+    Status,
 
     /// Export filtered items to JSON, CSV, or Markdown
     Export(ExportArgs),
@@ -200,6 +211,10 @@ pub enum ItemCommands {
     Import(ItemImportArgs),
     /// Detect (and optionally delete or merge) duplicate items
     Dedup(ItemDedupArgs),
+    /// Move an item under a parent item/location (or 'none' to unparent)
+    Move(ItemMoveArgs),
+    /// Render item parent/location hierarchy as a tree
+    Tree(ItemTreeArgs),
 }
 
 #[derive(Args, Debug, Clone)]
@@ -211,6 +226,10 @@ pub struct ItemListArgs {
     /// Filter by entity type name or UUID
     #[arg(long = "type")]
     pub entity_type: Option<String>,
+
+    /// Filter by parent item name, ID, or 'none' for top-level items
+    #[arg(long)]
+    pub parent: Option<String>,
 
     /// Only include items having the named custom field (hydrates details if missing)
     #[arg(long)]
@@ -244,6 +263,10 @@ pub struct ItemCreateArgs {
     /// Entity type name or UUID
     #[arg(long = "type")]
     pub entity_type: Option<String>,
+
+    /// Parent item/location name, ID, or 'none'
+    #[arg(long)]
+    pub parent: Option<String>,
 
     /// Tag name or UUID (repeatable; missing tags auto-created)
     #[arg(long = "tag")]
@@ -292,6 +315,14 @@ pub struct ItemCreateArgs {
     /// Load initial item JSON from file path or '-' for stdin
     #[arg(long)]
     pub from_json: Option<String>,
+
+    /// Local file path(s) to attach after creating the item (repeatable)
+    #[arg(long = "attach", value_name = "FILE")]
+    pub attach: Vec<PathBuf>,
+
+    /// Allow attaching images larger than 500KB
+    #[arg(long)]
+    pub force: bool,
 }
 
 #[derive(Args, Debug, Clone)]
@@ -310,6 +341,10 @@ pub struct ItemUpdateArgs {
     /// Entity type name or UUID
     #[arg(long = "type")]
     pub entity_type: Option<String>,
+
+    /// Parent item/location name, ID, or 'none' to unparent
+    #[arg(long)]
+    pub parent: Option<String>,
 
     /// Tag name or UUID to merge (repeatable)
     #[arg(long = "tag")]
@@ -366,13 +401,67 @@ pub struct ItemUpdateArgs {
     /// Load patch JSON from file path or '-' for stdin
     #[arg(long)]
     pub from_json: Option<String>,
+
+    /// Only populate blank/missing/zero fields; preserve existing non-empty values
+    #[arg(long)]
+    pub fill_missing: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum MatchKey {
+    Name,
+    Model,
+    Serial,
+    Field(String),
+}
+
+impl FromStr for MatchKey {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let trimmed = s.trim();
+        if trimmed.eq_ignore_ascii_case("name") {
+            return Ok(Self::Name);
+        }
+        if trimmed.eq_ignore_ascii_case("model") {
+            return Ok(Self::Model);
+        }
+        if trimmed.eq_ignore_ascii_case("serial") {
+            return Ok(Self::Serial);
+        }
+        if let Some((prefix, key)) = trimmed.split_once(':') {
+            if prefix.eq_ignore_ascii_case("field") {
+                let key = key.trim();
+                if key.is_empty() {
+                    return Err(
+                        "invalid --match-by 'field:': field key cannot be empty".to_string()
+                    );
+                }
+                return Ok(Self::Field(key.to_string()));
+            }
+        }
+        Err(format!(
+            "invalid --match-by '{s}': expected name, model, serial, or field:KEY"
+        ))
+    }
+}
+
+impl fmt::Display for MatchKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Name => f.write_str("name"),
+            Self::Model => f.write_str("model"),
+            Self::Serial => f.write_str("serial"),
+            Self::Field(k) => write!(f, "field:{k}"),
+        }
+    }
 }
 
 #[derive(Args, Debug, Clone)]
 pub struct ItemUpsertArgs {
-    /// Item name to match or create
+    /// Item name to match or create (required unless supplied via --from-json)
     #[arg(long)]
-    pub name: String,
+    pub name: Option<String>,
 
     /// Item description
     #[arg(long)]
@@ -381,6 +470,10 @@ pub struct ItemUpsertArgs {
     /// Entity type name or UUID
     #[arg(long = "type")]
     pub entity_type: Option<String>,
+
+    /// Parent item/location name, ID, or 'none'
+    #[arg(long)]
+    pub parent: Option<String>,
 
     /// Tag name or UUID (repeatable; missing tags auto-created)
     #[arg(long = "tag")]
@@ -425,6 +518,26 @@ pub struct ItemUpsertArgs {
     /// Value type for --field entries
     #[arg(long, value_enum, default_value_t = FieldValueType::Text)]
     pub field_type: FieldValueType,
+
+    /// When updating an existing item, only populate blank/missing/zero fields
+    #[arg(long)]
+    pub fill_missing: bool,
+
+    /// Load item JSON from file path or '-' for stdin
+    #[arg(long)]
+    pub from_json: Option<String>,
+
+    /// Match existing items by key in priority order: name, model, serial, or field:KEY (repeatable; defaults to name)
+    #[arg(long = "match-by", value_name = "KEY", value_delimiter = ',')]
+    pub match_by: Vec<MatchKey>,
+
+    /// Local file path(s) to attach after upserting the item (repeatable)
+    #[arg(long = "attach", value_name = "FILE")]
+    pub attach: Vec<PathBuf>,
+
+    /// Allow attaching images larger than 500KB
+    #[arg(long)]
+    pub force: bool,
 }
 
 #[derive(Args, Debug, Clone)]
@@ -459,6 +572,46 @@ pub struct ItemImportArgs {
     /// Update items whose name already exists in Homebox
     #[arg(long, conflicts_with = "skip_existing")]
     pub update_existing: bool,
+
+    /// With --update-existing, only populate blank/missing/zero fields on existing items
+    #[arg(long, requires = "update_existing", conflicts_with = "skip_existing")]
+    pub fill_missing: bool,
+
+    /// Match existing items by key in priority order: name, model, serial, or field:KEY (repeatable; defaults to name)
+    #[arg(long = "match-by", value_name = "KEY", value_delimiter = ',')]
+    pub match_by: Vec<MatchKey>,
+
+    /// Default parent item/location name, ID, or 'none' for imported records without one
+    #[arg(long)]
+    pub parent: Option<String>,
+
+    /// Local file path(s) to attach to each imported item (repeatable)
+    #[arg(long = "attach", value_name = "FILE")]
+    pub attach: Vec<PathBuf>,
+
+    /// Allow attaching images larger than 500KB
+    #[arg(long)]
+    pub force: bool,
+}
+
+#[derive(Args, Debug, Clone)]
+pub struct ItemMoveArgs {
+    /// Entity ID to move
+    pub id: String,
+
+    /// Target parent item name, ID, or 'none' to unparent
+    pub parent: String,
+}
+
+#[derive(Args, Debug, Clone)]
+pub struct ItemTreeArgs {
+    /// Optional root item name or ID to start the tree from
+    #[arg(long)]
+    pub root: Option<String>,
+
+    /// Optional maximum depth to display (0 = roots only)
+    #[arg(long)]
+    pub max_depth: Option<usize>,
 }
 
 #[derive(Args, Debug, Clone)]
@@ -492,7 +645,7 @@ pub enum AttachmentCommands {
     Upload(AttachmentUploadArgs),
     /// List attachments on an item
     List(AttachmentListArgs),
-    /// Stream-download one or all attachments from an item
+    /// Stream-download attachments from one or multiple items
     Download(AttachmentDownloadArgs),
     /// Delete an attachment from an item
     Delete(AttachmentDeleteArgs),
@@ -503,9 +656,13 @@ pub struct AttachmentUploadArgs {
     /// Target entity ID
     pub item_id: String,
 
-    /// Local file path(s) to upload
+    /// Local file path(s) to upload (or '-' for stdin when combined with --name)
     #[arg(required = true)]
     pub files: Vec<PathBuf>,
+
+    /// Override remote filename/title (for single-file or stdin '-' uploads)
+    #[arg(long)]
+    pub name: Option<String>,
 
     /// Skip files that already exist on the item (default behavior)
     #[arg(long, conflicts_with = "overwrite")]
@@ -528,15 +685,27 @@ pub struct AttachmentListArgs {
 
 #[derive(Args, Debug, Clone)]
 pub struct AttachmentDownloadArgs {
-    /// Target entity ID
-    pub item_id: String,
+    /// Target entity ID (omit when using --all-items, --tag, or --items-from)
+    pub item_id: Option<String>,
 
-    /// Specific attachment ID to download (omit when using --all)
+    /// Specific attachment ID to download (omit when using --all or bulk selectors)
     pub attachment_id: Option<String>,
 
     /// Download all matching attachments on the item
     #[arg(long)]
     pub all: bool,
+
+    /// Download matching attachments across all items
+    #[arg(long, conflicts_with_all = ["item_id", "attachment_id", "tag", "items_from"])]
+    pub all_items: bool,
+
+    /// Download matching attachments across items matching this tag name or UUID
+    #[arg(long, value_name = "TAG", conflicts_with_all = ["item_id", "attachment_id", "all_items", "items_from"])]
+    pub tag: Option<String>,
+
+    /// Download matching attachments for newline-delimited entity IDs from a file or '-' (stdin)
+    #[arg(long, value_name = "FILE|-", conflicts_with_all = ["item_id", "attachment_id", "all_items", "tag"])]
+    pub items_from: Option<PathBuf>,
 
     /// Filter attachments by MIME type (e.g. application/pdf)
     #[arg(long)]
@@ -546,7 +715,7 @@ pub struct AttachmentDownloadArgs {
     #[arg(long)]
     pub ext: Option<String>,
 
-    /// Output file path (single download) or directory (multi-download / --all)
+    /// Output file path (single download) or directory (multi-download / --all / bulk)
     #[arg(long)]
     pub out: Option<PathBuf>,
 
@@ -588,6 +757,10 @@ pub struct SearchArgs {
     /// Filter by manufacturer (exact or substring, case-insensitive)
     #[arg(long)]
     pub manufacturer: Option<String>,
+
+    /// Filter by custom field existence (KEY) or substring value (KEY=VAL), case-insensitive (repeatable)
+    #[arg(long = "field", value_name = "KEY[=VAL]")]
+    pub fields: Vec<String>,
 }
 
 // -----------------------------------------------------------------------------
@@ -692,6 +865,25 @@ pub struct EntityTypeArgs {
 pub enum EntityTypeCommands {
     /// List all entity types
     List,
+    /// Create a new entity type
+    Create {
+        /// Entity type name
+        name: String,
+        /// Optional description
+        #[arg(long)]
+        description: Option<String>,
+        /// Mark this entity type as a location/container
+        #[arg(long)]
+        is_location: bool,
+    },
+    /// Delete an entity type by ID
+    Delete {
+        /// Entity type ID
+        id: String,
+        /// Skip interactive confirmation prompt
+        #[arg(long)]
+        force: bool,
+    },
 }
 
 // -----------------------------------------------------------------------------
@@ -734,6 +926,18 @@ pub struct ExportArgs {
     /// Export format (json, csv, markdown)
     #[arg(long, value_enum, default_value_t = ExportFormat::Json)]
     pub format: ExportFormat,
+
+    /// Custom column list and order (comma-separated or repeatable; supports 'key=Header Alias')
+    #[arg(long = "columns", value_name = "COL[=ALIAS]", value_delimiter = ',')]
+    pub columns: Vec<String>,
+
+    /// Markdown table column alignment (default, left, right, center)
+    #[arg(long, value_enum, default_value_t = MarkdownAlign::Default)]
+    pub align: MarkdownAlign,
+
+    /// Placeholder string for empty/missing cells
+    #[arg(long, value_name = "STR", default_value = "")]
+    pub empty: String,
 }
 
 // -----------------------------------------------------------------------------
@@ -904,5 +1108,610 @@ mod tests {
             }) => assert_eq!(a.serial.as_deref(), Some("SN-3")),
             other => panic!("unexpected command: {other:?}"),
         }
+    }
+
+    #[test]
+    fn test_cli_parse_fill_missing_flags() {
+        let cli = Cli::try_parse_from([
+            "hbctl",
+            "item",
+            "update",
+            "ent-1",
+            "--fill-missing",
+            "--description",
+            "Desc",
+        ])
+        .unwrap();
+        match cli.command {
+            Commands::Item(ItemArgs {
+                command: ItemCommands::Update(a),
+            }) => assert!(a.fill_missing),
+            other => panic!("unexpected command: {other:?}"),
+        }
+
+        let cli = Cli::try_parse_from([
+            "hbctl",
+            "item",
+            "upsert",
+            "--name",
+            "Scope",
+            "--fill-missing",
+        ])
+        .unwrap();
+        match cli.command {
+            Commands::Item(ItemArgs {
+                command: ItemCommands::Upsert(a),
+            }) => assert!(a.fill_missing),
+            other => panic!("unexpected command: {other:?}"),
+        }
+
+        let cli = Cli::try_parse_from([
+            "hbctl",
+            "item",
+            "import",
+            "items.json",
+            "--update-existing",
+            "--fill-missing",
+        ])
+        .unwrap();
+        match cli.command {
+            Commands::Item(ItemArgs {
+                command: ItemCommands::Import(a),
+            }) => {
+                assert!(a.update_existing);
+                assert!(a.fill_missing);
+            }
+            other => panic!("unexpected command: {other:?}"),
+        }
+
+        assert!(
+            Cli::try_parse_from(["hbctl", "item", "import", "items.json", "--fill-missing"])
+                .is_err()
+        );
+        assert!(Cli::try_parse_from([
+            "hbctl",
+            "item",
+            "import",
+            "items.json",
+            "--skip-existing",
+            "--fill-missing",
+        ])
+        .is_err());
+    }
+
+    #[test]
+    fn test_cli_parse_match_by_and_upsert_from_json() {
+        let cli = Cli::try_parse_from([
+            "hbctl",
+            "item",
+            "upsert",
+            "--from-json",
+            "item.json",
+            "--match-by",
+            "serial",
+            "--match-by",
+            "model",
+            "--match-by",
+            "field:SKU",
+        ])
+        .unwrap();
+        match cli.command {
+            Commands::Item(ItemArgs {
+                command: ItemCommands::Upsert(a),
+            }) => {
+                assert!(a.name.is_none());
+                assert_eq!(a.from_json.as_deref(), Some("item.json"));
+                assert_eq!(
+                    a.match_by,
+                    vec![
+                        MatchKey::Serial,
+                        MatchKey::Model,
+                        MatchKey::Field("SKU".into()),
+                    ]
+                );
+            }
+            other => panic!("unexpected command: {other:?}"),
+        }
+
+        let cli = Cli::try_parse_from([
+            "hbctl",
+            "item",
+            "upsert",
+            "--name",
+            "Scope",
+            "--match-by",
+            "serial,model,name",
+        ])
+        .unwrap();
+        match cli.command {
+            Commands::Item(ItemArgs {
+                command: ItemCommands::Upsert(a),
+            }) => {
+                assert_eq!(a.name.as_deref(), Some("Scope"));
+                assert_eq!(
+                    a.match_by,
+                    vec![MatchKey::Serial, MatchKey::Model, MatchKey::Name]
+                );
+            }
+            other => panic!("unexpected command: {other:?}"),
+        }
+
+        let cli = Cli::try_parse_from([
+            "hbctl",
+            "item",
+            "import",
+            "items.json",
+            "--update-existing",
+            "--match-by",
+            "field:Asset Tag",
+            "--match-by",
+            "name",
+        ])
+        .unwrap();
+        match cli.command {
+            Commands::Item(ItemArgs {
+                command: ItemCommands::Import(a),
+            }) => {
+                assert_eq!(
+                    a.match_by,
+                    vec![MatchKey::Field("Asset Tag".into()), MatchKey::Name]
+                );
+            }
+            other => panic!("unexpected command: {other:?}"),
+        }
+
+        assert!(Cli::try_parse_from([
+            "hbctl",
+            "item",
+            "upsert",
+            "--name",
+            "Scope",
+            "--match-by",
+            "bogus",
+        ])
+        .is_err());
+        assert!(Cli::try_parse_from([
+            "hbctl",
+            "item",
+            "upsert",
+            "--name",
+            "Scope",
+            "--match-by",
+            "field:",
+        ])
+        .is_err());
+    }
+
+    #[test]
+    fn test_cli_parse_search_field_filters() {
+        let cli = Cli::try_parse_from([
+            "hbctl",
+            "search",
+            "meter",
+            "--tag",
+            "electronics",
+            "--manufacturer",
+            "Fluke",
+            "--model",
+            "87V",
+            "--serial",
+            "SN-1",
+            "--field",
+            "ASIN",
+            "--field",
+            "Order Number=112-99",
+        ])
+        .unwrap();
+        match cli.command {
+            Commands::Search(a) => {
+                assert_eq!(a.query.as_deref(), Some("meter"));
+                assert_eq!(a.tag.as_deref(), Some("electronics"));
+                assert_eq!(a.manufacturer.as_deref(), Some("Fluke"));
+                assert_eq!(a.model.as_deref(), Some("87V"));
+                assert_eq!(a.serial.as_deref(), Some("SN-1"));
+                assert_eq!(
+                    a.fields,
+                    vec!["ASIN".to_string(), "Order Number=112-99".to_string()]
+                );
+            }
+            other => panic!("unexpected command: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_cli_parse_export_columns_align_empty() {
+        let cli = Cli::try_parse_from([
+            "hbctl",
+            "--select",
+            "id,name",
+            "export",
+            "--format",
+            "markdown",
+            "--columns",
+            "name=Container / Item,Tare Weight (g)",
+            "--align",
+            "right",
+            "--empty",
+            "—",
+        ])
+        .unwrap();
+        assert_eq!(cli.select, Some(vec!["id".to_string(), "name".to_string()]));
+        match cli.command {
+            Commands::Export(a) => {
+                assert_eq!(a.format, ExportFormat::Markdown);
+                assert_eq!(
+                    a.columns,
+                    vec![
+                        "name=Container / Item".to_string(),
+                        "Tare Weight (g)".to_string(),
+                    ]
+                );
+                assert_eq!(a.align, MarkdownAlign::Right);
+                assert_eq!(a.empty, "—");
+            }
+            other => panic!("unexpected command: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_cli_parse_parent_move_and_tree() {
+        let list_cli =
+            Cli::try_parse_from(["hbctl", "item", "list", "--parent", "Shelf A"]).unwrap();
+        match list_cli.command {
+            Commands::Item(ItemArgs {
+                command: ItemCommands::List(a),
+            }) => assert_eq!(a.parent.as_deref(), Some("Shelf A")),
+            other => panic!("unexpected command: {other:?}"),
+        }
+
+        let create_cli = Cli::try_parse_from([
+            "hbctl", "item", "create", "--name", "Sensor", "--parent", "Shelf A",
+        ])
+        .unwrap();
+        match create_cli.command {
+            Commands::Item(ItemArgs {
+                command: ItemCommands::Create(a),
+            }) => assert_eq!(a.parent.as_deref(), Some("Shelf A")),
+            other => panic!("unexpected command: {other:?}"),
+        }
+
+        let update_cli =
+            Cli::try_parse_from(["hbctl", "item", "update", "ent-1", "--parent", "none"]).unwrap();
+        match update_cli.command {
+            Commands::Item(ItemArgs {
+                command: ItemCommands::Update(a),
+            }) => assert_eq!(a.parent.as_deref(), Some("none")),
+            other => panic!("unexpected command: {other:?}"),
+        }
+
+        let upsert_cli = Cli::try_parse_from([
+            "hbctl", "item", "upsert", "--name", "Sensor", "--parent", "Bin 1",
+        ])
+        .unwrap();
+        match upsert_cli.command {
+            Commands::Item(ItemArgs {
+                command: ItemCommands::Upsert(a),
+            }) => assert_eq!(a.parent.as_deref(), Some("Bin 1")),
+            other => panic!("unexpected command: {other:?}"),
+        }
+
+        let import_cli = Cli::try_parse_from([
+            "hbctl",
+            "item",
+            "import",
+            "items.json",
+            "--parent",
+            "Garage",
+        ])
+        .unwrap();
+        match import_cli.command {
+            Commands::Item(ItemArgs {
+                command: ItemCommands::Import(a),
+            }) => assert_eq!(a.parent.as_deref(), Some("Garage")),
+            other => panic!("unexpected command: {other:?}"),
+        }
+
+        let move_cli = Cli::try_parse_from(["hbctl", "item", "move", "ent-1", "Garage"]).unwrap();
+        match move_cli.command {
+            Commands::Item(ItemArgs {
+                command: ItemCommands::Move(a),
+            }) => {
+                assert_eq!(a.id, "ent-1");
+                assert_eq!(a.parent, "Garage");
+            }
+            other => panic!("unexpected command: {other:?}"),
+        }
+
+        let tree_cli = Cli::try_parse_from([
+            "hbctl",
+            "item",
+            "tree",
+            "--root",
+            "Garage",
+            "--max-depth",
+            "2",
+        ])
+        .unwrap();
+        match tree_cli.command {
+            Commands::Item(ItemArgs {
+                command: ItemCommands::Tree(a),
+            }) => {
+                assert_eq!(a.root.as_deref(), Some("Garage"));
+                assert_eq!(a.max_depth, Some(2));
+            }
+            other => panic!("unexpected command: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_cli_parse_attach_and_upload_name_stdin() {
+        let create_cli = Cli::try_parse_from([
+            "hbctl",
+            "item",
+            "create",
+            "--name",
+            "Board",
+            "--attach",
+            "photo.jpg",
+            "--attach",
+            "manual.pdf",
+            "--force",
+        ])
+        .unwrap();
+        match create_cli.command {
+            Commands::Item(ItemArgs {
+                command: ItemCommands::Create(a),
+            }) => {
+                assert_eq!(
+                    a.attach,
+                    vec![PathBuf::from("photo.jpg"), PathBuf::from("manual.pdf")]
+                );
+                assert!(a.force);
+            }
+            other => panic!("unexpected command: {other:?}"),
+        }
+
+        let upsert_cli = Cli::try_parse_from([
+            "hbctl",
+            "item",
+            "upsert",
+            "--name",
+            "Board",
+            "--attach",
+            "photo.jpg",
+            "--force",
+        ])
+        .unwrap();
+        match upsert_cli.command {
+            Commands::Item(ItemArgs {
+                command: ItemCommands::Upsert(a),
+            }) => {
+                assert_eq!(a.attach, vec![PathBuf::from("photo.jpg")]);
+                assert!(a.force);
+            }
+            other => panic!("unexpected command: {other:?}"),
+        }
+
+        let import_cli = Cli::try_parse_from([
+            "hbctl",
+            "item",
+            "import",
+            "items.json",
+            "--attach",
+            "invoice.pdf",
+            "--force",
+        ])
+        .unwrap();
+        match import_cli.command {
+            Commands::Item(ItemArgs {
+                command: ItemCommands::Import(a),
+            }) => {
+                assert_eq!(a.attach, vec![PathBuf::from("invoice.pdf")]);
+                assert!(a.force);
+            }
+            other => panic!("unexpected command: {other:?}"),
+        }
+
+        let upload_cli = Cli::try_parse_from([
+            "hbctl",
+            "attachment",
+            "upload",
+            "ent-1",
+            "-",
+            "--name",
+            "receipt.pdf",
+        ])
+        .unwrap();
+        match upload_cli.command {
+            Commands::Attachment(AttachmentArgs {
+                command: AttachmentCommands::Upload(a),
+            }) => {
+                assert_eq!(a.item_id, "ent-1");
+                assert_eq!(a.files, vec![PathBuf::from("-")]);
+                assert_eq!(a.name.as_deref(), Some("receipt.pdf"));
+            }
+            other => panic!("unexpected command: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_cli_parse_bulk_attachment_download() {
+        let all_cli = Cli::try_parse_from([
+            "hbctl",
+            "attachment",
+            "download",
+            "--all-items",
+            "--ext",
+            "pdf",
+            "--out",
+            "./dir",
+        ])
+        .unwrap();
+        match all_cli.command {
+            Commands::Attachment(AttachmentArgs {
+                command: AttachmentCommands::Download(a),
+            }) => {
+                assert!(a.item_id.is_none());
+                assert!(a.attachment_id.is_none());
+                assert!(a.all_items);
+                assert_eq!(a.ext.as_deref(), Some("pdf"));
+                assert_eq!(a.out, Some(PathBuf::from("./dir")));
+            }
+            other => panic!("unexpected command: {other:?}"),
+        }
+
+        let tag_cli = Cli::try_parse_from([
+            "hbctl",
+            "attachment",
+            "download",
+            "--tag",
+            "appliances",
+            "--mime",
+            "application/pdf",
+            "--overwrite",
+        ])
+        .unwrap();
+        match tag_cli.command {
+            Commands::Attachment(AttachmentArgs {
+                command: AttachmentCommands::Download(a),
+            }) => {
+                assert!(a.item_id.is_none());
+                assert_eq!(a.tag.as_deref(), Some("appliances"));
+                assert_eq!(a.mime.as_deref(), Some("application/pdf"));
+                assert!(a.overwrite);
+            }
+            other => panic!("unexpected command: {other:?}"),
+        }
+
+        let file_cli =
+            Cli::try_parse_from(["hbctl", "attachment", "download", "--items-from", "ids.txt"])
+                .unwrap();
+        match file_cli.command {
+            Commands::Attachment(AttachmentArgs {
+                command: AttachmentCommands::Download(a),
+            }) => {
+                assert!(a.item_id.is_none());
+                assert_eq!(a.items_from, Some(PathBuf::from("ids.txt")));
+            }
+            other => panic!("unexpected command: {other:?}"),
+        }
+
+        let stdin_cli =
+            Cli::try_parse_from(["hbctl", "attachment", "download", "--items-from", "-"]).unwrap();
+        match stdin_cli.command {
+            Commands::Attachment(AttachmentArgs {
+                command: AttachmentCommands::Download(a),
+            }) => {
+                assert!(a.item_id.is_none());
+                assert_eq!(a.items_from, Some(PathBuf::from("-")));
+            }
+            other => panic!("unexpected command: {other:?}"),
+        }
+
+        // Parse-time conflict rejections
+        assert!(
+            Cli::try_parse_from(["hbctl", "attachment", "download", "ent-1", "--all-items"])
+                .is_err()
+        );
+        assert!(Cli::try_parse_from([
+            "hbctl",
+            "attachment",
+            "download",
+            "--all-items",
+            "--tag",
+            "x"
+        ])
+        .is_err());
+        assert!(Cli::try_parse_from([
+            "hbctl",
+            "attachment",
+            "download",
+            "--tag",
+            "x",
+            "--items-from",
+            "ids.txt"
+        ])
+        .is_err());
+        assert!(Cli::try_parse_from([
+            "hbctl",
+            "attachment",
+            "download",
+            "ent-1",
+            "--items-from",
+            "ids.txt"
+        ])
+        .is_err());
+    }
+
+    #[test]
+    fn test_cli_parse_status_and_entity_types_crud() {
+        let status_cli = Cli::try_parse_from(["hbctl", "status"]).unwrap();
+        assert!(matches!(status_cli.command, Commands::Status));
+
+        let bare_et = Cli::try_parse_from(["hbctl", "entity-types"]).unwrap();
+        match bare_et.command {
+            Commands::EntityTypes(EntityTypeArgs { command }) => assert!(command.is_none()),
+            other => panic!("unexpected command: {other:?}"),
+        }
+
+        let list_et = Cli::try_parse_from(["hbctl", "entity-types", "list"]).unwrap();
+        match list_et.command {
+            Commands::EntityTypes(EntityTypeArgs { command }) => {
+                assert!(matches!(command, Some(EntityTypeCommands::List)));
+            }
+            other => panic!("unexpected command: {other:?}"),
+        }
+
+        let create_et = Cli::try_parse_from([
+            "hbctl",
+            "entity-types",
+            "create",
+            "Bin",
+            "--description",
+            "Container",
+            "--is-location",
+        ])
+        .unwrap();
+        match create_et.command {
+            Commands::EntityTypes(EntityTypeArgs {
+                command:
+                    Some(EntityTypeCommands::Create {
+                        name,
+                        description,
+                        is_location,
+                    }),
+            }) => {
+                assert_eq!(name, "Bin");
+                assert_eq!(description.as_deref(), Some("Container"));
+                assert!(is_location);
+            }
+            other => panic!("unexpected command: {other:?}"),
+        }
+
+        let delete_et =
+            Cli::try_parse_from(["hbctl", "entity-types", "delete", "et-1", "--force"]).unwrap();
+        match delete_et.command {
+            Commands::EntityTypes(EntityTypeArgs {
+                command: Some(EntityTypeCommands::Delete { id, force }),
+            }) => {
+                assert_eq!(id, "et-1");
+                assert!(force);
+            }
+            other => panic!("unexpected command: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_cli_parse_profile_flag() {
+        let before =
+            Cli::try_parse_from(["hbctl", "--profile", "staging", "item", "list"]).unwrap();
+        assert_eq!(before.profile.as_deref(), Some("staging"));
+        assert_eq!(
+            before.config_overrides().profile.as_deref(),
+            Some("staging")
+        );
+
+        let after = Cli::try_parse_from(["hbctl", "auth", "status", "-P", "homelab"]).unwrap();
+        assert_eq!(after.profile.as_deref(), Some("homelab"));
     }
 }

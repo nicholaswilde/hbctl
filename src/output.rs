@@ -226,12 +226,60 @@ fn json_cell_string(val: &Value) -> String {
     }
 }
 
+/// Markdown table column alignment option for exports.
+#[derive(clap::ValueEnum, Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum MarkdownAlign {
+    #[default]
+    Default,
+    Left,
+    Right,
+    Center,
+}
+
+impl MarkdownAlign {
+    pub fn separator(self) -> &'static str {
+        match self {
+            Self::Default => "---",
+            Self::Left => ":---",
+            Self::Right => "---:",
+            Self::Center => ":---:",
+        }
+    }
+}
+
+/// Options controlling CSV and Markdown table export formatting.
+#[derive(Debug, Clone, Default)]
+pub struct TableExportOptions<'a> {
+    pub align: MarkdownAlign,
+    pub empty: &'a str,
+}
+
 /// Render CSV rows to `out`.
 pub fn write_csv(headers: &[String], rows: &[Vec<String>], out: &mut dyn Write) -> Result<()> {
+    write_csv_with_options(headers, rows, &TableExportOptions::default(), out)
+}
+
+/// Render CSV rows to `out` with custom empty-cell placeholder options.
+pub fn write_csv_with_options(
+    headers: &[String],
+    rows: &[Vec<String>],
+    opts: &TableExportOptions<'_>,
+    out: &mut dyn Write,
+) -> Result<()> {
     let mut wtr = csv::Writer::from_writer(out);
     wtr.write_record(headers)?;
     for row in rows {
-        wtr.write_record(row)?;
+        let cells: Vec<&str> = (0..headers.len())
+            .map(|i| {
+                let raw = row.get(i).map(String::as_str).unwrap_or("");
+                if raw.trim().is_empty() {
+                    opts.empty
+                } else {
+                    raw
+                }
+            })
+            .collect();
+        wtr.write_record(cells)?;
     }
     wtr.flush()?;
     Ok(())
@@ -243,17 +291,35 @@ pub fn write_markdown_table(
     rows: &[Vec<String>],
     out: &mut dyn Write,
 ) -> Result<()> {
+    write_markdown_table_with_options(headers, rows, &TableExportOptions::default(), out)
+}
+
+/// Render a GitHub Flavored Markdown table to `out` with alignment and empty-cell options.
+pub fn write_markdown_table_with_options(
+    headers: &[String],
+    rows: &[Vec<String>],
+    opts: &TableExportOptions<'_>,
+    out: &mut dyn Write,
+) -> Result<()> {
     let escape = |s: &str| s.replace('|', "\\|").replace(['\r', '\n'], " ");
 
     let header_line: Vec<String> = headers.iter().map(|h| escape(h)).collect();
     writeln!(out, "| {} |", header_line.join(" | "))?;
 
-    let sep: Vec<&str> = headers.iter().map(|_| "---").collect();
+    let sep: Vec<&str> = headers.iter().map(|_| opts.align.separator()).collect();
     writeln!(out, "| {} |", sep.join(" | "))?;
 
     for row in rows {
         let cells: Vec<String> = (0..headers.len())
-            .map(|i| escape(row.get(i).map(String::as_str).unwrap_or("")))
+            .map(|i| {
+                let raw = row.get(i).map(String::as_str).unwrap_or("");
+                let cell = if raw.trim().is_empty() {
+                    opts.empty
+                } else {
+                    raw
+                };
+                escape(cell)
+            })
             .collect();
         writeln!(out, "| {} |", cells.join(" | "))?;
     }
@@ -342,5 +408,50 @@ mod tests {
         assert!(s.contains("| Name | Manufacturer |"));
         assert!(s.contains("| --- | --- |"));
         assert!(s.contains("| ESP32 | Espressif \\| Dev |"));
+    }
+
+    #[test]
+    fn test_write_markdown_table_alignment_and_empty_placeholder() {
+        for (align, sep) in [
+            (MarkdownAlign::Default, "| --- | --- |"),
+            (MarkdownAlign::Left, "| :--- | :--- |"),
+            (MarkdownAlign::Right, "| ---: | ---: |"),
+            (MarkdownAlign::Center, "| :---: | :---: |"),
+        ] {
+            let mut buf = Vec::new();
+            let opts = TableExportOptions {
+                align, empty: "—"
+            };
+            write_markdown_table_with_options(
+                &["Item".into(), "Tare (g)".into()],
+                &[vec!["Bin A".into(), "".into()], vec!["  ".into()]],
+                &opts,
+                &mut buf,
+            )
+            .unwrap();
+            let s = String::from_utf8(buf).unwrap();
+            assert!(s.contains("| Item | Tare (g) |"));
+            assert!(s.contains(sep));
+            assert!(s.contains("| Bin A | — |"));
+            assert!(s.contains("| — | — |"));
+        }
+    }
+
+    #[test]
+    fn test_write_csv_with_empty_placeholder() {
+        let mut buf = Vec::new();
+        let opts = TableExportOptions {
+            align: MarkdownAlign::Default,
+            empty: "N/A",
+        };
+        write_csv_with_options(
+            &["Item".into(), "Tare".into()],
+            &[vec!["Bin A".into(), "  ".into()], vec!["Bin B".into()]],
+            &opts,
+            &mut buf,
+        )
+        .unwrap();
+        let s = String::from_utf8(buf).unwrap();
+        assert_eq!(s, "Item,Tare\nBin A,N/A\nBin B,N/A\n");
     }
 }

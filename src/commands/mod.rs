@@ -5,6 +5,7 @@ pub mod export;
 pub mod field;
 pub mod item;
 pub mod search;
+pub mod status;
 pub mod tag;
 
 use std::fs;
@@ -40,8 +41,11 @@ pub fn dispatch(
         Commands::Search(args) => search::handle(args, config, ctx, out, err),
         Commands::Field(args) => field::handle(args, cli.dry_run, config, ctx, out, err),
         Commands::Tag(args) => tag::handle(args, cli.dry_run, config, ctx, out, err),
-        Commands::EntityTypes(args) => entity_type::handle(args, config, ctx, out, err),
+        Commands::EntityTypes(args) => {
+            entity_type::handle(args, cli.dry_run, config, ctx, out, err)
+        }
         Commands::Export(args) => export::handle(args, config, ctx, out, err),
+        Commands::Status => status::handle(cli.dry_run, config, ctx, out),
         Commands::Completions { .. } | Commands::Man | Commands::Update { .. } => Ok(()),
     }
 }
@@ -129,6 +133,11 @@ pub fn render_entity(entity: &Entity, ctx: &OutputContext, out: &mut dyn Write) 
 
     if !entity.description.is_empty() {
         rows.push(vec!["description".to_string(), entity.description.clone()]);
+    }
+    if let Some(ref pid) = entity.parent_id {
+        if !pid.trim().is_empty() {
+            rows.push(vec!["parentId".to_string(), pid.clone()]);
+        }
     }
     if !entity.tags.is_empty() {
         let names = entity

@@ -337,6 +337,48 @@ pub struct EntityType {
     pub extra: BTreeMap<String, Value>,
 }
 
+/// Payload for `POST /api/v1/entity-types`.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+pub struct CreateEntityTypeRequest {
+    pub name: String,
+
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+
+    #[serde(rename = "isLocation")]
+    pub is_location: bool,
+}
+
+/// Homebox server status response (`GET /api/v1/status`).
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+pub struct ServerStatus {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub version: Option<String>,
+
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub commit: Option<String>,
+
+    #[serde(
+        rename = "buildTime",
+        alias = "build_time",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub build_time: Option<String>,
+
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub title: Option<String>,
+
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub health: Option<bool>,
+
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub message: Option<String>,
+
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
 /// Homebox entity attachment (`title` / `name` / `mimeType`).
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct Attachment {
@@ -678,6 +720,9 @@ pub struct EntityPatch {
     #[serde(rename = "entityTypeId", skip_serializing_if = "Option::is_none")]
     pub entity_type_id: Option<String>,
 
+    #[serde(default, rename = "parentId", skip_serializing_if = "Option::is_none")]
+    pub parent_id: Option<Option<String>>,
+
     #[serde(rename = "tagIds", skip_serializing_if = "Option::is_none")]
     pub tag_ids: Option<Vec<String>>,
 
@@ -709,6 +754,13 @@ pub struct EntityPatch {
 
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub fields: Vec<CustomField>,
+
+    #[serde(
+        default,
+        rename = "fillMissing",
+        skip_serializing_if = "std::ops::Not::not"
+    )]
+    pub fill_missing: bool,
 }
 
 /// Upsert a slice of custom fields into `existing` by case-insensitive field name
@@ -730,32 +782,130 @@ pub fn upsert_custom_fields(existing: &mut Vec<CustomField>, updates: &[CustomFi
     }
 }
 
+fn is_blank_opt_str(val: Option<&str>) -> bool {
+    match val {
+        None => true,
+        Some(s) => s.trim().is_empty(),
+    }
+}
+
+fn is_blank_date(val: Option<&str>) -> bool {
+    match val {
+        None => true,
+        Some(s) => {
+            let trimmed = s.trim();
+            trimmed.is_empty() || trimmed.starts_with("0001-01-01")
+        }
+    }
+}
+
+fn is_empty_opt_price(val: Option<f64>) -> bool {
+    match val {
+        None => true,
+        Some(v) => v == 0.0,
+    }
+}
+
+fn has_non_empty_top_level_alias(entity: &Entity, key: &str) -> bool {
+    let fallback = match key.trim().to_ascii_lowercase().as_str() {
+        "manufacturer" => entity.manufacturer.as_deref(),
+        "model" | "modelnumber" | "model_number" | "model number" => entity.model_number.as_deref(),
+        "serial" | "serialnumber" | "serial_number" | "serial number" => {
+            entity.serial_number.as_deref()
+        }
+        "notes" => entity.notes.as_deref(),
+        _ => None,
+    };
+    !is_blank_opt_str(fallback)
+}
+
+/// Fill missing/blank custom fields without overwriting existing non-empty values.
+fn fill_missing_custom_fields(
+    existing_fields: &mut Vec<CustomField>,
+    updates: &[CustomField],
+    existing_entity: &Entity,
+    removed_fields: &[String],
+) {
+    for upd in updates {
+        if let Some(slot) = existing_fields
+            .iter_mut()
+            .find(|f| f.name.trim().eq_ignore_ascii_case(upd.name.trim()))
+        {
+            if !slot.display_value().trim().is_empty() {
+                continue;
+            }
+            let preserved_id = slot.id.clone();
+            *slot = upd.clone();
+            if slot.id.is_none() {
+                slot.id = preserved_id;
+            }
+        } else {
+            let was_removed = removed_fields
+                .iter()
+                .any(|rm| upd.name.trim().eq_ignore_ascii_case(rm.trim()));
+            if was_removed || !has_non_empty_top_level_alias(existing_entity, &upd.name) {
+                existing_fields.push(upd.clone());
+            }
+        }
+    }
+}
+
 /// Merge an `EntityPatch` onto an existing `Entity` for safe `GET -> Merge -> PUT`.
 pub fn merge_entity_patch(existing: &Entity, patch: &EntityPatch) -> Entity {
     let mut merged = existing.clone();
 
     if let Some(ref name) = patch.name {
-        merged.name = name.clone();
+        if !patch.fill_missing || merged.name.trim().is_empty() {
+            merged.name = name.clone();
+        }
     }
     if let Some(ref desc) = patch.description {
-        merged.description = desc.clone();
+        if !patch.fill_missing || merged.description.trim().is_empty() {
+            merged.description = desc.clone();
+        }
     }
     if let Some(qty) = patch.quantity {
-        merged.quantity = qty;
+        if !patch.fill_missing || merged.quantity == 0 {
+            merged.quantity = qty;
+        }
     }
     if let Some(ref et_id) = patch.entity_type_id {
-        merged.entity_type_id = Some(et_id.clone());
+        if !patch.fill_missing || existing.effective_entity_type_id().is_none() {
+            merged.entity_type_id = Some(et_id.clone());
+        } else if merged.entity_type_id.is_none() {
+            merged.entity_type_id = existing.effective_entity_type_id().map(ToOwned::to_owned);
+        }
     } else if merged.entity_type_id.is_none() {
         merged.entity_type_id = existing.effective_entity_type_id().map(ToOwned::to_owned);
     }
+    if let Some(ref parent_opt) = patch.parent_id {
+        match parent_opt {
+            Some(pid) => {
+                if !patch.fill_missing || is_blank_opt_str(merged.parent_id.as_deref()) {
+                    merged.parent_id = Some(pid.clone());
+                }
+            }
+            None => {
+                if !patch.fill_missing {
+                    merged.parent_id = None;
+                }
+            }
+        }
+    }
     if let Some(price) = patch.purchase_price {
-        merged.purchase_price = Some(price);
+        if !patch.fill_missing || is_empty_opt_price(merged.purchase_price) {
+            merged.purchase_price = Some(price);
+        }
     }
     if let Some(ref date) = patch.purchase_date {
-        merged.purchase_date = Some(date.clone());
+        if !patch.fill_missing || is_blank_date(merged.purchase_date.as_deref()) {
+            merged.purchase_date = Some(date.clone());
+        }
     }
     if let Some(ref from) = patch.purchase_from {
-        merged.purchase_from = Some(from.clone());
+        if !patch.fill_missing || is_blank_opt_str(merged.purchase_from.as_deref()) {
+            merged.purchase_from = Some(from.clone());
+        }
     }
 
     // Preserve existing tag IDs, merge additive tags, and apply explicit removals
@@ -788,7 +938,11 @@ pub fn merge_entity_patch(existing: &Entity, patch: &EntityPatch) -> Entity {
                 .any(|rm| f.name.trim().eq_ignore_ascii_case(rm.trim()))
         });
     }
-    upsert_custom_fields(&mut fields, &patch.fields);
+    if patch.fill_missing {
+        fill_missing_custom_fields(&mut fields, &patch.fields, existing, &patch.remove_fields);
+    } else {
+        upsert_custom_fields(&mut fields, &patch.fields);
+    }
     merged.fields = Some(fields);
 
     merged
@@ -1127,5 +1281,236 @@ mod tests {
         assert_eq!(fields2.len(), 1);
         assert_eq!(fields2[0].name, "Serial Number");
         assert_eq!(fields2[0].display_value(), "SN-456");
+    }
+
+    #[test]
+    fn test_merge_entity_patch_fill_missing_preserves_existing_and_populates_blanks() {
+        let existing = Entity {
+            id: "ent-1".into(),
+            name: "Sensor".into(),
+            description: "Existing desc".into(),
+            quantity: 3,
+            entity_type_id: Some("et-item".into()),
+            purchase_price: Some(12.5),
+            purchase_date: Some("2026-01-10".into()),
+            purchase_from: Some("Mouser".into()),
+            tags: vec![Tag {
+                id: "tag-1".into(),
+                name: "electronics".into(),
+                ..Default::default()
+            }],
+            tag_ids: vec!["tag-1".into()],
+            fields: Some(vec![
+                CustomField::new_typed("Manufacturer", FieldValueType::Text, "Bosch").unwrap(),
+                CustomField::new_typed("Voltage", FieldValueType::Number, "3.3").unwrap(),
+                CustomField {
+                    id: Some("fld-model".into()),
+                    name: "Model Number".into(),
+                    field_type: "text".into(),
+                    value: Some(Value::String(String::new())),
+                    text_value: Some(String::new()),
+                    ..Default::default()
+                },
+            ]),
+            ..Default::default()
+        };
+
+        let patch = EntityPatch {
+            name: Some("New Name".into()),
+            description: Some("New Desc".into()),
+            quantity: Some(9),
+            entity_type_id: Some("et-other".into()),
+            tag_ids: Some(vec!["tag-2".into()]),
+            add_tag_ids: vec!["tag-3".into()],
+            purchase_price: Some(99.0),
+            purchase_date: Some("2026-05-01".into()),
+            purchase_from: Some("DigiKey".into()),
+            fields: vec![
+                CustomField::new_typed("Manufacturer", FieldValueType::Text, "Fluke").unwrap(),
+                CustomField::new_typed("voltage", FieldValueType::Number, "5").unwrap(),
+                CustomField::new_typed("Model Number", FieldValueType::Text, "M-200").unwrap(),
+                CustomField::new_typed("Notes", FieldValueType::Text, "Backfilled").unwrap(),
+            ],
+            fill_missing: true,
+            ..Default::default()
+        };
+
+        let merged = merge_entity_patch(&existing, &patch);
+        assert_eq!(merged.name, "Sensor");
+        assert_eq!(merged.description, "Existing desc");
+        assert_eq!(merged.quantity, 3);
+        assert_eq!(merged.entity_type_id.as_deref(), Some("et-item"));
+        assert_eq!(merged.purchase_price, Some(12.5));
+        assert_eq!(merged.purchase_date.as_deref(), Some("2026-01-10"));
+        assert_eq!(merged.purchase_from.as_deref(), Some("Mouser"));
+        assert_eq!(merged.tag_ids, vec!["tag-1", "tag-2", "tag-3"]);
+
+        let fields = merged.fields.unwrap();
+        assert_eq!(fields.len(), 4);
+        assert_eq!(fields[0].name, "Manufacturer");
+        assert_eq!(fields[0].display_value(), "Bosch");
+        assert_eq!(fields[1].name, "Voltage");
+        assert_eq!(fields[1].display_value(), "3.3");
+        assert_eq!(fields[2].name, "Model Number");
+        assert_eq!(fields[2].id.as_deref(), Some("fld-model"));
+        assert_eq!(fields[2].display_value(), "M-200");
+        assert_eq!(fields[3].name, "Notes");
+        assert_eq!(fields[3].display_value(), "Backfilled");
+    }
+
+    #[test]
+    fn test_merge_entity_patch_fill_missing_populates_missing_and_zero_fields() {
+        let existing_nested_type = Entity {
+            id: "ent-2".into(),
+            name: String::new(),
+            description: "   ".into(),
+            quantity: 0,
+            entity_type_id: None,
+            entity_type: Some(EntityType {
+                id: "et-nested".into(),
+                name: "Item".into(),
+                ..Default::default()
+            }),
+            purchase_price: Some(0.0),
+            purchase_date: Some("0001-01-01T00:00:00Z".into()),
+            purchase_from: Some("  ".into()),
+            manufacturer: Some("LegacyMfg".into()),
+            fields: Some(vec![]),
+            ..Default::default()
+        };
+
+        let patch = EntityPatch {
+            name: Some("Filled Name".into()),
+            description: Some("Filled Desc".into()),
+            quantity: Some(4),
+            entity_type_id: Some("et-new".into()),
+            purchase_price: Some(42.0),
+            purchase_date: Some("2026-04-01".into()),
+            purchase_from: Some("DigiKey".into()),
+            fields: vec![
+                CustomField::new_typed("Manufacturer", FieldValueType::Text, "OverrideMfg")
+                    .unwrap(),
+                CustomField::new_typed("Serial Number", FieldValueType::Text, "SN-9").unwrap(),
+            ],
+            fill_missing: true,
+            ..Default::default()
+        };
+
+        let merged = merge_entity_patch(&existing_nested_type, &patch);
+        assert_eq!(merged.name, "Filled Name");
+        assert_eq!(merged.description, "Filled Desc");
+        assert_eq!(merged.quantity, 4);
+        assert_eq!(merged.entity_type_id.as_deref(), Some("et-nested"));
+        assert_eq!(merged.purchase_price, Some(42.0));
+        assert_eq!(merged.purchase_date.as_deref(), Some("2026-04-01"));
+        assert_eq!(merged.purchase_from.as_deref(), Some("DigiKey"));
+        let fields = merged.fields.unwrap();
+        assert_eq!(fields.len(), 1);
+        assert_eq!(fields[0].name, "Serial Number");
+        assert_eq!(fields[0].display_value(), "SN-9");
+
+        let existing_no_type = Entity {
+            id: "ent-3".into(),
+            name: "Item".into(),
+            quantity: 1,
+            ..Default::default()
+        };
+        let merged_no_type = merge_entity_patch(&existing_no_type, &patch);
+        assert_eq!(merged_no_type.entity_type_id.as_deref(), Some("et-new"));
+        assert_eq!(merged_no_type.purchase_price, Some(42.0));
+        assert_eq!(merged_no_type.purchase_date.as_deref(), Some("2026-04-01"));
+        assert_eq!(merged_no_type.purchase_from.as_deref(), Some("DigiKey"));
+    }
+
+    #[test]
+    fn test_merge_entity_patch_parent_id_set_unparent_and_fill_missing() {
+        let existing_no_parent = Entity {
+            id: "ent-1".into(),
+            name: "Sensor".into(),
+            quantity: 1,
+            ..Default::default()
+        };
+
+        // Set parent_id
+        let set_patch = EntityPatch {
+            parent_id: Some(Some("parent-a".into())),
+            ..Default::default()
+        };
+        let set_merged = merge_entity_patch(&existing_no_parent, &set_patch);
+        assert_eq!(set_merged.parent_id.as_deref(), Some("parent-a"));
+
+        // Untouched when patch.parent_id is None
+        let untouched = merge_entity_patch(&set_merged, &EntityPatch::default());
+        assert_eq!(untouched.parent_id.as_deref(), Some("parent-a"));
+
+        // fill_missing preserves existing non-empty parent_id and populates blank parent_id
+        let fill_overwrite = EntityPatch {
+            parent_id: Some(Some("parent-b".into())),
+            fill_missing: true,
+            ..Default::default()
+        };
+        let preserved = merge_entity_patch(&set_merged, &fill_overwrite);
+        assert_eq!(preserved.parent_id.as_deref(), Some("parent-a"));
+
+        let blank_parent = Entity {
+            id: "ent-1".into(),
+            name: "Sensor".into(),
+            quantity: 1,
+            parent_id: Some("  ".into()),
+            ..Default::default()
+        };
+        let backfilled = merge_entity_patch(&blank_parent, &fill_overwrite);
+        assert_eq!(backfilled.parent_id.as_deref(), Some("parent-b"));
+
+        // fill_missing does not unparent when patch.parent_id is Some(None)
+        let unparent_patch_fill = EntityPatch {
+            parent_id: Some(None),
+            fill_missing: true,
+            ..Default::default()
+        };
+        let kept = merge_entity_patch(&set_merged, &unparent_patch_fill);
+        assert_eq!(kept.parent_id.as_deref(), Some("parent-a"));
+
+        // Explicit unparent (Some(None)) clears parent_id
+        let unparent_patch = EntityPatch {
+            parent_id: Some(None),
+            ..Default::default()
+        };
+        let cleared = merge_entity_patch(&set_merged, &unparent_patch);
+        assert_eq!(cleared.parent_id, None);
+    }
+
+    #[test]
+    fn test_server_status_and_create_entity_type_serde() {
+        let raw = json!({
+            "version": "v0.26.2",
+            "commit": "deadbeef",
+            "build_time": "2026-01-10T00:00:00Z",
+            "title": "Homebox",
+            "health": true,
+            "extraField": 42
+        });
+        let status: ServerStatus = serde_json::from_value(raw).unwrap();
+        assert_eq!(status.version.as_deref(), Some("v0.26.2"));
+        assert_eq!(status.commit.as_deref(), Some("deadbeef"));
+        assert_eq!(status.build_time.as_deref(), Some("2026-01-10T00:00:00Z"));
+        assert_eq!(status.title.as_deref(), Some("Homebox"));
+        assert_eq!(status.health, Some(true));
+        assert_eq!(status.extra.get("extraField"), Some(&json!(42)));
+
+        let req = CreateEntityTypeRequest {
+            name: "Storage Bin".into(),
+            description: Some("Container".into()),
+            is_location: true,
+        };
+        let serialized = serde_json::to_value(&req).unwrap();
+        assert_eq!(
+            serialized,
+            json!({
+                "name": "Storage Bin",
+                "description": "Container",
+                "isLocation": true
+            })
+        );
     }
 }

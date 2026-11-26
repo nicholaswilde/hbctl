@@ -1,5 +1,6 @@
+use std::collections::{HashMap, HashSet};
 use std::fs;
-use std::io::Write;
+use std::io::{self, Read, Write};
 use std::path::{Path, PathBuf};
 
 use serde::Serialize;
@@ -9,8 +10,9 @@ use crate::cli::{
     AttachmentArgs, AttachmentCommands, AttachmentDeleteArgs, AttachmentDownloadArgs,
     AttachmentListArgs, AttachmentUploadArgs,
 };
-use crate::client::models::Attachment;
-use crate::client::{DryRunRequest, HomeboxClient};
+use crate::client::models::{Attachment, Entity};
+use crate::client::resolve::Resolver;
+use crate::client::{DryRunRequest, HomeboxClient, ListEntitiesQuery};
 use crate::config::{AppConfig, OutputFormat};
 use crate::error::{HbctlError, Result};
 use crate::output::{
@@ -45,6 +47,144 @@ struct UploadResult {
     id: Option<String>,
 }
 
+enum UploadSource {
+    File(PathBuf),
+    Stdin(Option<Vec<u8>>),
+}
+
+struct PreparedUpload {
+    remote_name: String,
+    source_label: String,
+    source: UploadSource,
+}
+
+/// Enforce the >500KB image upload size guard unless `--force` is set.
+pub fn check_image_size_guard(
+    display_path: &str,
+    remote_name: &str,
+    size_bytes: u64,
+    force: bool,
+    err: &mut dyn Write,
+) -> Result<()> {
+    let mime = mime_guess::from_path(remote_name).first_or_octet_stream();
+    if mime.type_() == "image" && size_bytes > MAX_IMAGE_SIZE_BYTES {
+        if force {
+            writeln!(
+                err,
+                "warning: uploading oversized image '{}' ({} bytes > {} bytes) due to --force",
+                display_path, size_bytes, MAX_IMAGE_SIZE_BYTES
+            )?;
+        } else {
+            return Err(HbctlError::ImageTooLarge {
+                path: display_path.to_string(),
+                size_bytes,
+                max_bytes: MAX_IMAGE_SIZE_BYTES,
+            });
+        }
+    }
+    Ok(())
+}
+
+/// Validate local attachment paths and enforce the >500KB image size guard before mutating items.
+pub fn validate_local_attachment_paths(
+    paths: &[PathBuf],
+    force: bool,
+    err: &mut dyn Write,
+) -> Result<()> {
+    for path in paths {
+        let meta = fs::metadata(path).map_err(|e| {
+            HbctlError::InvalidInput(format!("cannot read file '{}': {e}", path.display()))
+        })?;
+        let basename = path
+            .file_name()
+            .and_then(|n| n.to_str())
+            .filter(|s| !s.trim().is_empty())
+            .ok_or_else(|| {
+                HbctlError::InvalidInput(format!("invalid file path '{}'", path.display()))
+            })?;
+        check_image_size_guard(
+            &path.display().to_string(),
+            basename,
+            meta.len(),
+            force,
+            err,
+        )?;
+    }
+    Ok(())
+}
+
+/// Build a redacted dry-run preview for uploading an attachment to `item_id`.
+pub fn build_attachment_dry_run(
+    base_url: &str,
+    item_id: &str,
+    remote_name: &str,
+    source_label: &str,
+) -> DryRunRequest {
+    let mime = mime_guess::from_path(remote_name).first_or_octet_stream();
+    HomeboxClient::build_dry_run(
+        base_url,
+        "POST",
+        &format!("entities/{item_id}/attachments"),
+        Some(json!({
+            "name": remote_name,
+            "mimeType": mime.essence_str(),
+            "file": source_label,
+        })),
+    )
+}
+
+/// Attach local files to an item idempotently, skipping attachments that already exist by name.
+pub fn attach_files_to_item(
+    client: &HomeboxClient,
+    item_id: &str,
+    existing_attachments: &[Attachment],
+    files: &[PathBuf],
+    err: &mut dyn Write,
+) -> Result<Vec<Attachment>> {
+    let mut known: Vec<Attachment> = existing_attachments.to_vec();
+    let mut uploaded_all = Vec::new();
+
+    for path in files {
+        let basename = path
+            .file_name()
+            .and_then(|n| n.to_str())
+            .ok_or_else(|| {
+                HbctlError::InvalidInput(format!("invalid file path '{}'", path.display()))
+            })?
+            .to_string();
+
+        if let Some(prev) = known.iter().find(|a| a.matches_filename(&basename)) {
+            writeln!(
+                err,
+                "skipping existing attachment '{}' (id: {})",
+                basename, prev.id
+            )?;
+            continue;
+        }
+
+        let uploaded = client.upload_attachment(item_id, path)?;
+        known.push(uploaded.clone());
+        uploaded_all.push(uploaded);
+    }
+
+    Ok(uploaded_all)
+}
+
+fn validate_custom_name(raw: &str) -> Result<String> {
+    let trimmed = raw.trim();
+    if trimmed.is_empty() {
+        return Err(HbctlError::InvalidInput(
+            "--name cannot be empty".to_string(),
+        ));
+    }
+    if trimmed.contains(['/', '\\']) {
+        return Err(HbctlError::InvalidInput(
+            "--name must be a filename without path separators".to_string(),
+        ));
+    }
+    Ok(trimmed.to_string())
+}
+
 fn handle_upload(
     args: &AttachmentUploadArgs,
     dry_run: bool,
@@ -53,51 +193,86 @@ fn handle_upload(
     out: &mut dyn Write,
     err: &mut dyn Write,
 ) -> Result<()> {
-    // Validate files and enforce the >500KB image guard before touching the server
-    for path in &args.files {
-        let meta = fs::metadata(path).map_err(|e| {
-            HbctlError::InvalidInput(format!("cannot read file '{}': {e}", path.display()))
-        })?;
-        let mime = mime_guess::from_path(path).first_or_octet_stream();
-        if mime.type_() == "image" && meta.len() > MAX_IMAGE_SIZE_BYTES {
-            if args.force {
-                writeln!(
-                    err,
-                    "warning: uploading oversized image '{}' ({} bytes > {} bytes) due to --force",
-                    path.display(),
-                    meta.len(),
-                    MAX_IMAGE_SIZE_BYTES
-                )?;
-            } else {
-                return Err(HbctlError::ImageTooLarge {
-                    path: path.display().to_string(),
-                    size_bytes: meta.len(),
-                    max_bytes: MAX_IMAGE_SIZE_BYTES,
-                });
+    let custom_name = match args.name {
+        Some(ref raw) => {
+            if args.files.len() > 1 {
+                return Err(HbctlError::InvalidInput(
+                    "--name can only be used when uploading a single file or stdin".to_string(),
+                ));
             }
+            Some(validate_custom_name(raw)?)
+        }
+        None => None,
+    };
+
+    let has_stdin = args.files.iter().any(|p| p.as_os_str() == "-");
+    if has_stdin && args.files.len() > 1 {
+        return Err(HbctlError::InvalidInput(
+            "'-' (stdin) cannot be combined with multiple file arguments".to_string(),
+        ));
+    }
+
+    let mut prepared: Vec<PreparedUpload> = Vec::with_capacity(args.files.len());
+    for path in &args.files {
+        if path.as_os_str() == "-" {
+            let remote_name = custom_name.clone().ok_or_else(|| {
+                HbctlError::InvalidInput(
+                    "--name <FILENAME> is required when uploading from stdin ('-')".to_string(),
+                )
+            })?;
+            let bytes = if dry_run {
+                None
+            } else {
+                let mut buf = Vec::new();
+                io::stdin().read_to_end(&mut buf)?;
+                check_image_size_guard("-", &remote_name, buf.len() as u64, args.force, err)?;
+                Some(buf)
+            };
+            prepared.push(PreparedUpload {
+                remote_name,
+                source_label: "-".to_string(),
+                source: UploadSource::Stdin(bytes),
+            });
+        } else {
+            let meta = fs::metadata(path).map_err(|e| {
+                HbctlError::InvalidInput(format!("cannot read file '{}': {e}", path.display()))
+            })?;
+            let basename = path
+                .file_name()
+                .and_then(|n| n.to_str())
+                .ok_or_else(|| {
+                    HbctlError::InvalidInput(format!("invalid file path '{}'", path.display()))
+                })?
+                .to_string();
+            let remote_name = custom_name.clone().unwrap_or(basename);
+            check_image_size_guard(
+                &path.display().to_string(),
+                &remote_name,
+                meta.len(),
+                args.force,
+                err,
+            )?;
+            prepared.push(PreparedUpload {
+                remote_name,
+                source_label: path.display().to_string(),
+                source: UploadSource::File(path.clone()),
+            });
         }
     }
 
     if dry_run {
         let base_url = config.require_base_url()?;
-        let mut previews: Vec<DryRunRequest> = Vec::new();
-        for path in &args.files {
-            let basename = path
-                .file_name()
-                .and_then(|n| n.to_str())
-                .unwrap_or("attachment");
-            let mime = mime_guess::from_path(path).first_or_octet_stream();
-            previews.push(HomeboxClient::build_dry_run(
-                base_url,
-                "POST",
-                &format!("entities/{}/attachments", args.item_id),
-                Some(json!({
-                    "name": basename,
-                    "mimeType": mime.essence_str(),
-                    "file": path.display().to_string(),
-                })),
-            ));
-        }
+        let previews: Vec<DryRunRequest> = prepared
+            .iter()
+            .map(|item| {
+                build_attachment_dry_run(
+                    base_url,
+                    &args.item_id,
+                    &item.remote_name,
+                    &item.source_label,
+                )
+            })
+            .collect();
         return write_dry_run(&previews, ctx, out);
     }
 
@@ -108,18 +283,10 @@ fn handle_upload(
     let mut results = Vec::new();
     let mut uploaded_ids = Vec::new();
 
-    for path in &args.files {
-        let basename = path
-            .file_name()
-            .and_then(|n| n.to_str())
-            .ok_or_else(|| {
-                HbctlError::InvalidInput(format!("invalid file path '{}'", path.display()))
-            })?
-            .to_string();
-
+    for item in prepared {
         let existing = existing_attachments
             .iter()
-            .find(|a| a.matches_filename(&basename));
+            .find(|a| a.matches_filename(&item.remote_name));
 
         if let Some(prev) = existing {
             if args.overwrite {
@@ -129,10 +296,10 @@ fn handle_upload(
                 writeln!(
                     err,
                     "skipping existing attachment '{}' (id: {})",
-                    basename, prev.id
+                    item.remote_name, prev.id
                 )?;
                 results.push(UploadResult {
-                    file: basename,
+                    file: item.remote_name,
                     status: "skipped".to_string(),
                     id: Some(prev.id.clone()),
                 });
@@ -140,10 +307,18 @@ fn handle_upload(
             }
         }
 
-        let uploaded = client.upload_attachment(&args.item_id, path)?;
+        let uploaded = match item.source {
+            UploadSource::File(ref path) => {
+                client.upload_attachment_as(&args.item_id, path, Some(&item.remote_name))?
+            }
+            UploadSource::Stdin(Some(bytes)) => {
+                client.upload_attachment_bytes(&args.item_id, &item.remote_name, bytes)?
+            }
+            UploadSource::Stdin(None) => unreachable!("live stdin upload always buffers bytes"),
+        };
         uploaded_ids.push(uploaded.id.clone());
         results.push(UploadResult {
-            file: basename,
+            file: item.remote_name,
             status: "uploaded".to_string(),
             id: Some(uploaded.id),
         });
@@ -212,11 +387,132 @@ fn handle_list(
 }
 
 #[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
 struct DownloadResult {
+    entity_id: String,
+    entity_name: String,
     id: String,
     path: String,
     status: String,
     bytes: u64,
+}
+
+fn parse_item_ids(input: &str) -> Vec<String> {
+    let mut seen = HashSet::new();
+    let mut ids = Vec::new();
+    for raw in input.lines() {
+        let trimmed = raw.trim();
+        if trimmed.is_empty() || trimmed.starts_with('#') {
+            continue;
+        }
+        if seen.insert(trimmed.to_string()) {
+            ids.push(trimmed.to_string());
+        }
+    }
+    ids
+}
+
+fn read_item_ids(path: &Path) -> Result<Vec<String>> {
+    let raw = if path.as_os_str() == "-" {
+        let mut buf = String::new();
+        io::stdin().read_to_string(&mut buf)?;
+        buf
+    } else {
+        fs::read_to_string(path).map_err(|e| {
+            HbctlError::InvalidInput(format!(
+                "cannot read item IDs file '{}': {e}",
+                path.display()
+            ))
+        })?
+    };
+    Ok(parse_item_ids(&raw))
+}
+
+fn collision_key(path: &Path) -> String {
+    path.to_string_lossy().to_ascii_lowercase()
+}
+
+fn prepend_filename_prefix(path: &Path, prefix: &str) -> PathBuf {
+    let fname = path
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or("attachment");
+    let prefixed = format!("{prefix}{fname}");
+    match path.parent() {
+        Some(parent) if !parent.as_os_str().is_empty() => parent.join(prefixed),
+        _ => PathBuf::from(prefixed),
+    }
+}
+
+fn count_path_collisions(paths: &[PathBuf]) -> HashMap<String, usize> {
+    let mut counts = HashMap::with_capacity(paths.len());
+    for path in paths {
+        *counts.entry(collision_key(path)).or_insert(0) += 1;
+    }
+    counts
+}
+
+fn disambiguate_download_paths(
+    targets: &[(&Entity, &Attachment)],
+    out_opt: Option<&Path>,
+    multi_mode: bool,
+) -> Vec<PathBuf> {
+    let initial: Vec<PathBuf> = targets
+        .iter()
+        .map(|(entity, att)| resolve_download_path(&entity.name, att, out_opt, multi_mode))
+        .collect();
+
+    let counts1 = count_path_collisions(&initial);
+    let mut paths: Vec<PathBuf> = targets
+        .iter()
+        .enumerate()
+        .map(|(idx, (entity, _))| {
+            let base = &initial[idx];
+            if counts1.get(&collision_key(base)).copied().unwrap_or(0) <= 1 {
+                return base.clone();
+            }
+            let slug = slugify(&entity.name);
+            let prefix = if slug.is_empty() {
+                format!("{}_", entity.id)
+            } else {
+                format!("{slug}_")
+            };
+            prepend_filename_prefix(base, &prefix)
+        })
+        .collect();
+
+    let counts2 = count_path_collisions(&paths);
+    for (idx, (entity, _)) in targets.iter().enumerate() {
+        if counts2
+            .get(&collision_key(&paths[idx]))
+            .copied()
+            .unwrap_or(0)
+            > 1
+        {
+            let slug = slugify(&entity.name);
+            let prefix = if slug.is_empty() {
+                format!("{}_", entity.id)
+            } else {
+                format!("{slug}_{}_", entity.id)
+            };
+            paths[idx] = prepend_filename_prefix(&initial[idx], &prefix);
+        }
+    }
+
+    let counts3 = count_path_collisions(&paths);
+    for (idx, (entity, att)) in targets.iter().enumerate() {
+        if counts3
+            .get(&collision_key(&paths[idx]))
+            .copied()
+            .unwrap_or(0)
+            > 1
+        {
+            let prefix = format!("{}_{}_", entity.id, att.id);
+            paths[idx] = prepend_filename_prefix(&initial[idx], &prefix);
+        }
+    }
+
+    paths
 }
 
 fn handle_download(
@@ -227,47 +523,94 @@ fn handle_download(
     out: &mut dyn Write,
     err: &mut dyn Write,
 ) -> Result<()> {
-    if args.attachment_id.is_none() && !args.all {
+    let bulk_mode = args.all_items || args.tag.is_some() || args.items_from.is_some();
+
+    if !bulk_mode && args.item_id.is_none() {
+        return Err(HbctlError::InvalidInput(
+            "specify an <ITEM_ID> or one of --all-items, --tag, or --items-from".to_string(),
+        ));
+    }
+    if !bulk_mode && args.attachment_id.is_none() && !args.all {
         return Err(HbctlError::InvalidInput(
             "specify an <ATTACHMENT_ID> or pass --all".to_string(),
         ));
     }
 
     let client = HomeboxClient::from_config(config)?;
-    let entity = client.get_entity(&args.item_id)?;
-
-    let targets: Vec<&Attachment> = if let Some(ref att_id) = args.attachment_id {
-        let found = entity
-            .attachments
-            .iter()
-            .find(|a| a.id == *att_id)
-            .ok_or_else(|| HbctlError::NotFound {
-                kind: "attachment".to_string(),
-                query: att_id.clone(),
-            })?;
-        vec![found]
+    let entities: Vec<Entity> = if let Some(ref item_id) = args.item_id {
+        vec![client.get_entity(item_id)?]
+    } else if args.all_items {
+        let summary = client.list_entities(&ListEntitiesQuery::default(), true)?;
+        client.hydrate_entity_attachments(summary)?
+    } else if let Some(ref tag) = args.tag {
+        let mut resolver = Resolver::new(&client);
+        let tag_id = resolver.resolve_tag_id(tag, false)?;
+        let query = ListEntitiesQuery {
+            tag_ids: vec![tag_id],
+            ..Default::default()
+        };
+        let summary = client.list_entities(&query, true)?;
+        client.hydrate_entity_attachments(summary)?
+    } else if let Some(ref items_path) = args.items_from {
+        let ids = read_item_ids(items_path)?;
+        client.get_entities_by_ids(&ids)?
     } else {
-        entity
-            .attachments
+        unreachable!("validated single-item or bulk selector above");
+    };
+
+    let targets: Vec<(&Entity, &Attachment)> = if !bulk_mode {
+        let entity = &entities[0];
+        if let Some(ref att_id) = args.attachment_id {
+            let found = entity
+                .attachments
+                .iter()
+                .find(|a| a.id == *att_id)
+                .ok_or_else(|| HbctlError::NotFound {
+                    kind: "attachment".to_string(),
+                    query: att_id.clone(),
+                })?;
+            vec![(entity, found)]
+        } else {
+            entity
+                .attachments
+                .iter()
+                .filter(|a| matches_download_filters(a, args.mime.as_deref(), args.ext.as_deref()))
+                .map(|a| (entity, a))
+                .collect()
+        }
+    } else {
+        entities
             .iter()
-            .filter(|a| matches_download_filters(a, args.mime.as_deref(), args.ext.as_deref()))
+            .flat_map(|entity| {
+                entity
+                    .attachments
+                    .iter()
+                    .filter(|a| {
+                        matches_download_filters(a, args.mime.as_deref(), args.ext.as_deref())
+                    })
+                    .map(move |a| (entity, a))
+            })
             .collect()
     };
 
-    let multi_mode = args.all || targets.len() > 1;
+    let multi_mode = bulk_mode || args.all || targets.len() > 1;
+    let dest_paths = disambiguate_download_paths(&targets, args.out.as_deref(), multi_mode);
 
     if dry_run {
         let base_url = client.base_url();
         let previews: Vec<DryRunRequest> = targets
             .iter()
-            .map(|att| {
-                let dest =
-                    resolve_download_path(&entity.name, att, args.out.as_deref(), multi_mode);
+            .zip(dest_paths.iter())
+            .map(|((entity, att), dest)| {
                 HomeboxClient::build_dry_run(
                     base_url,
                     "GET",
-                    &format!("entities/{}/attachments/{}", args.item_id, att.id),
-                    Some(json!({ "out": dest.display().to_string() })),
+                    &format!("entities/{}/attachments/{}", entity.id, att.id),
+                    Some(json!({
+                        "entityId": entity.id,
+                        "entityName": entity.name,
+                        "out": dest.display().to_string(),
+                    })),
                 )
             })
             .collect();
@@ -277,8 +620,7 @@ fn handle_download(
     let mut results = Vec::new();
     let mut downloaded_ids = Vec::new();
 
-    for att in targets {
-        let dest = resolve_download_path(&entity.name, att, args.out.as_deref(), multi_mode);
+    for ((entity, att), dest) in targets.into_iter().zip(dest_paths) {
         if dest.exists() && !args.overwrite {
             writeln!(
                 err,
@@ -286,6 +628,8 @@ fn handle_download(
                 dest.display()
             )?;
             results.push(DownloadResult {
+                entity_id: entity.id.clone(),
+                entity_name: entity.name.clone(),
                 id: att.id.clone(),
                 path: dest.display().to_string(),
                 status: "skipped".to_string(),
@@ -294,9 +638,11 @@ fn handle_download(
             continue;
         }
 
-        let bytes = client.download_attachment(&args.item_id, &att.id, &dest)?;
+        let bytes = client.download_attachment(&entity.id, &att.id, &dest)?;
         downloaded_ids.push(att.id.clone());
         results.push(DownloadResult {
+            entity_id: entity.id.clone(),
+            entity_name: entity.name.clone(),
             id: att.id.clone(),
             path: dest.display().to_string(),
             status: "downloaded".to_string(),
@@ -310,25 +656,53 @@ fn handle_download(
     if ctx.format == OutputFormat::Json {
         return write_compact_json(&results, ctx.select.as_deref(), out);
     }
+    if let Some(ref select) = ctx.select {
+        return write_selected_table(&results, select, ctx.format, out);
+    }
 
-    let headers = vec![
-        "ID".to_string(),
-        "PATH".to_string(),
-        "STATUS".to_string(),
-        "BYTES".to_string(),
-    ];
-    let rows: Vec<Vec<String>> = results
-        .iter()
-        .map(|r| {
-            vec![
-                r.id.clone(),
-                r.path.clone(),
-                r.status.clone(),
-                r.bytes.to_string(),
-            ]
-        })
-        .collect();
-    write_table_or_plain(&headers, &rows, ctx.format, out)
+    if bulk_mode {
+        let headers = vec![
+            "ENTITY_ID".to_string(),
+            "ENTITY".to_string(),
+            "ID".to_string(),
+            "PATH".to_string(),
+            "STATUS".to_string(),
+            "BYTES".to_string(),
+        ];
+        let rows: Vec<Vec<String>> = results
+            .iter()
+            .map(|r| {
+                vec![
+                    r.entity_id.clone(),
+                    r.entity_name.clone(),
+                    r.id.clone(),
+                    r.path.clone(),
+                    r.status.clone(),
+                    r.bytes.to_string(),
+                ]
+            })
+            .collect();
+        write_table_or_plain(&headers, &rows, ctx.format, out)
+    } else {
+        let headers = vec![
+            "ID".to_string(),
+            "PATH".to_string(),
+            "STATUS".to_string(),
+            "BYTES".to_string(),
+        ];
+        let rows: Vec<Vec<String>> = results
+            .iter()
+            .map(|r| {
+                vec![
+                    r.id.clone(),
+                    r.path.clone(),
+                    r.status.clone(),
+                    r.bytes.to_string(),
+                ]
+            })
+            .collect();
+        write_table_or_plain(&headers, &rows, ctx.format, out)
+    }
 }
 
 fn handle_delete(
@@ -518,5 +892,109 @@ mod tests {
         ));
         assert!(matches_download_filters(&pdf, None, Some(".PDF")));
         assert!(!matches_download_filters(&pdf, Some("image/png"), None));
+    }
+
+    #[test]
+    fn test_check_image_size_guard_and_dry_run_preview() {
+        let mut err = Vec::new();
+        // Under limit succeeds without --force
+        check_image_size_guard("small.png", "small.png", 1024, false, &mut err).unwrap();
+
+        // Over limit fails without --force
+        let too_big = check_image_size_guard(
+            "big.png",
+            "big.png",
+            MAX_IMAGE_SIZE_BYTES + 1,
+            false,
+            &mut err,
+        );
+        assert!(matches!(too_big, Err(HbctlError::ImageTooLarge { .. })));
+
+        // Over limit succeeds with warning when --force is set
+        check_image_size_guard(
+            "big.png",
+            "big.png",
+            MAX_IMAGE_SIZE_BYTES + 1,
+            true,
+            &mut err,
+        )
+        .unwrap();
+        let warn = String::from_utf8(err).unwrap();
+        assert!(warn.contains("due to --force"));
+
+        let preview =
+            build_attachment_dry_run("http://127.0.0.1:7745/api/v1", "ent-1", "doc.pdf", "-");
+        assert_eq!(preview.method, "POST");
+        assert_eq!(
+            preview.url,
+            "http://127.0.0.1:7745/api/v1/entities/ent-1/attachments"
+        );
+        let body = preview.body.unwrap();
+        assert_eq!(body["name"], "doc.pdf");
+        assert_eq!(body["mimeType"], "application/pdf");
+        assert_eq!(body["file"], "-");
+    }
+
+    #[test]
+    fn test_parse_item_ids_dedup_trim_and_comments() {
+        let parsed = parse_item_ids(
+            "\n  # appliance manuals\n  ent-1 \n\nent-2\n# comment\nent-1\n  ent-3  \n",
+        );
+        assert_eq!(parsed, vec!["ent-1", "ent-2", "ent-3"]);
+    }
+
+    #[test]
+    fn test_disambiguate_download_paths_preserves_unique_and_resolves_collisions() {
+        let e1 = Entity {
+            id: "ent-1".into(),
+            name: "Washer".into(),
+            ..Default::default()
+        };
+        let e2 = Entity {
+            id: "ent-2".into(),
+            name: "Dryer".into(),
+            ..Default::default()
+        };
+        let e3 = Entity {
+            id: "ent-3".into(),
+            name: "Dryer".into(),
+            ..Default::default()
+        };
+
+        let a1 = Attachment {
+            id: "att-1".into(),
+            title: Some("manual.pdf".into()),
+            mime_type: Some("application/pdf".into()),
+            ..Default::default()
+        };
+        let a2 = Attachment {
+            id: "att-2".into(),
+            title: Some("manual.pdf".into()),
+            mime_type: Some("application/pdf".into()),
+            ..Default::default()
+        };
+        let a3 = Attachment {
+            id: "att-3".into(),
+            title: Some("manual.pdf".into()),
+            mime_type: Some("application/pdf".into()),
+            ..Default::default()
+        };
+        let unique = Attachment {
+            id: "att-4".into(),
+            title: Some("wiring.png".into()),
+            mime_type: Some("image/png".into()),
+            ..Default::default()
+        };
+
+        let out_dir = Path::new("/tmp/downloads");
+        let targets = vec![(&e1, &a1), (&e2, &a2), (&e3, &a3), (&e1, &unique)];
+        let resolved = disambiguate_download_paths(&targets, Some(out_dir), true);
+
+        assert_eq!(resolved[0], out_dir.join("washer_manual.pdf"));
+        // e2 and e3 share slug "dryer", so disambiguate falls back to slug + entity_id
+        assert_eq!(resolved[1], out_dir.join("dryer_ent-2_manual.pdf"));
+        assert_eq!(resolved[2], out_dir.join("dryer_ent-3_manual.pdf"));
+        // Non-colliding filename keeps its original name
+        assert_eq!(resolved[3], out_dir.join("wiring.png"));
     }
 }

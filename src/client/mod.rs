@@ -16,8 +16,9 @@ use serde::Serialize;
 use serde_json::{json, Value};
 
 use crate::client::models::{
-    merge_entity_patch, upsert_custom_fields, Attachment, CreateEntityRequest, Entity, EntityPatch,
-    EntityType, ListResponse, LoginResponse, Tag, UserProfile, UserSelfResponse,
+    merge_entity_patch, upsert_custom_fields, Attachment, CreateEntityRequest,
+    CreateEntityTypeRequest, Entity, EntityPatch, EntityType, ListResponse, LoginResponse,
+    ServerStatus, Tag, UserProfile, UserSelfResponse,
 };
 use crate::config::{
     normalize_auth_header, normalize_base_url, redact_auth_header, redact_secret, AppConfig,
@@ -436,24 +437,17 @@ impl HomeboxClient {
         self.handle_response(resp)
     }
 
-    /// Hydrate entities whose `fields` were omitted or `null` in list summaries.
-    pub fn hydrate_entity_fields(&self, mut entities: Vec<Entity>) -> Result<Vec<Entity>> {
-        let work: Vec<(usize, String)> = entities
-            .iter()
-            .enumerate()
-            .filter(|(_, e)| e.needs_field_hydration() && !e.id.is_empty())
-            .map(|(idx, e)| (idx, e.id.clone()))
-            .collect();
-
+    fn fetch_entities_indexed(&self, work: &[(usize, String)]) -> Result<Vec<(usize, Entity)>> {
         if work.is_empty() {
-            return Ok(entities);
+            return Ok(Vec::new());
         }
 
         if work.len() == 1 || self.hydrate_concurrency <= 1 {
+            let mut out = Vec::with_capacity(work.len());
             for (idx, id) in work {
-                entities[idx] = self.get_entity(&id)?;
+                out.push((*idx, self.get_entity(id)?));
             }
-            return Ok(entities);
+            return Ok(out);
         }
 
         let worker_count = self.hydrate_concurrency.max(1).min(work.len());
@@ -503,10 +497,10 @@ impl HomeboxClient {
         });
 
         let mut first_err: Option<(usize, HbctlError)> = None;
-        let mut hydrated_items = Vec::with_capacity(work.len());
+        let mut fetched = Vec::with_capacity(work.len());
         for outcome in outcomes {
             match outcome {
-                Ok(local) => hydrated_items.extend(local),
+                Ok(local) => fetched.extend(local),
                 Err((idx, err)) => match &first_err {
                     Some((best_idx, _)) if idx >= *best_idx => {}
                     _ => first_err = Some((idx, err)),
@@ -518,10 +512,45 @@ impl HomeboxClient {
             return Err(err);
         }
 
-        for (orig_idx, ent) in hydrated_items {
+        Ok(fetched)
+    }
+
+    /// Hydrate entities whose `fields` were omitted or `null` in list summaries.
+    pub fn hydrate_entity_fields(&self, mut entities: Vec<Entity>) -> Result<Vec<Entity>> {
+        let work: Vec<(usize, String)> = entities
+            .iter()
+            .enumerate()
+            .filter(|(_, e)| e.needs_field_hydration() && !e.id.is_empty())
+            .map(|(idx, e)| (idx, e.id.clone()))
+            .collect();
+
+        for (orig_idx, ent) in self.fetch_entities_indexed(&work)? {
             entities[orig_idx] = ent;
         }
         Ok(entities)
+    }
+
+    /// Hydrate entities whose `attachments` were omitted or `null` in list summaries.
+    pub fn hydrate_entity_attachments(&self, mut entities: Vec<Entity>) -> Result<Vec<Entity>> {
+        let work: Vec<(usize, String)> = entities
+            .iter()
+            .enumerate()
+            .filter(|(_, e)| e.attachments.is_empty() && !e.id.is_empty())
+            .map(|(idx, e)| (idx, e.id.clone()))
+            .collect();
+
+        for (orig_idx, ent) in self.fetch_entities_indexed(&work)? {
+            entities[orig_idx] = ent;
+        }
+        Ok(entities)
+    }
+
+    /// Fetch multiple entities by ID concurrently, preserving input order.
+    pub fn get_entities_by_ids(&self, ids: &[String]) -> Result<Vec<Entity>> {
+        let work: Vec<(usize, String)> = ids.iter().cloned().enumerate().collect();
+        let mut fetched = self.fetch_entities_indexed(&work)?;
+        fetched.sort_by_key(|(idx, _)| *idx);
+        Ok(fetched.into_iter().map(|(_, e)| e).collect())
     }
 
     /// Create an entity via `POST /api/v1/entities`.
@@ -556,6 +585,9 @@ impl HomeboxClient {
                     .effective_entity_type_id()
                     .map(ToOwned::to_owned)
                     .or_else(|| req.entity_type_id.clone());
+            }
+            if merged.parent_id.is_none() {
+                merged.parent_id = req.parent_id.clone();
             }
             if merged.purchase_price.is_none() {
                 merged.purchase_price = req.purchase_price;
@@ -681,21 +713,83 @@ impl HomeboxClient {
         Ok(parsed.into_parts().0)
     }
 
+    pub fn create_entity_type(&self, req: &CreateEntityTypeRequest) -> Result<EntityType> {
+        let url = self.endpoint("entity-types");
+        let resp = self.send_with_retry(RetryMode::SafeMutation, || {
+            Ok(self
+                .http
+                .post(&url)
+                .header(AUTHORIZATION, &self.auth_header)
+                .header(CONTENT_TYPE, "application/json")
+                .json(req))
+        })?;
+        self.handle_response(resp)
+    }
+
+    pub fn delete_entity_type(&self, id: &str) -> Result<()> {
+        let url = self.endpoint(&format!("entity-types/{id}"));
+        let resp = self.send_with_retry(RetryMode::Idempotent, || {
+            Ok(self
+                .http
+                .delete(&url)
+                .header(AUTHORIZATION, &self.auth_header))
+        })?;
+        self.handle_empty_response(resp)
+    }
+
     // -------------------------------------------------------------------------
     // Attachments (`/api/v1/entities/{id}/attachments`)
     // -------------------------------------------------------------------------
 
     pub fn upload_attachment(&self, entity_id: &str, file_path: &Path) -> Result<Attachment> {
-        let basename = file_path
-            .file_name()
-            .and_then(|n| n.to_str())
-            .ok_or_else(|| {
-                HbctlError::InvalidInput(format!("invalid file path '{}'", file_path.display()))
-            })?
-            .to_string();
+        self.upload_attachment_as(entity_id, file_path, None)
+    }
 
-        let mime = mime_guess::from_path(file_path).first_or_octet_stream();
+    /// Upload a local file as an attachment with an optional overridden remote filename.
+    pub fn upload_attachment_as(
+        &self,
+        entity_id: &str,
+        file_path: &Path,
+        remote_name: Option<&str>,
+    ) -> Result<Attachment> {
+        let effective_name = match remote_name {
+            Some(name) => {
+                let trimmed = name.trim();
+                if trimmed.is_empty() {
+                    return Err(HbctlError::InvalidInput(
+                        "attachment filename cannot be empty".to_string(),
+                    ));
+                }
+                trimmed.to_string()
+            }
+            None => file_path
+                .file_name()
+                .and_then(|n| n.to_str())
+                .ok_or_else(|| {
+                    HbctlError::InvalidInput(format!("invalid file path '{}'", file_path.display()))
+                })?
+                .to_string(),
+        };
+
         let bytes = fs::read(file_path)?;
+        self.upload_attachment_bytes(entity_id, &effective_name, bytes)
+    }
+
+    /// Upload raw attachment bytes under the given `remote_name`.
+    pub fn upload_attachment_bytes(
+        &self,
+        entity_id: &str,
+        remote_name: &str,
+        bytes: Vec<u8>,
+    ) -> Result<Attachment> {
+        let effective_name = remote_name.trim();
+        if effective_name.is_empty() {
+            return Err(HbctlError::InvalidInput(
+                "attachment filename cannot be empty".to_string(),
+            ));
+        }
+
+        let mime = mime_guess::from_path(effective_name).first_or_octet_stream();
         let att_type = if mime.type_() == "image" {
             "photo"
         } else {
@@ -705,13 +799,13 @@ impl HomeboxClient {
 
         let resp = self.send_with_retry(RetryMode::SafeMutation, || {
             let file_part = multipart::Part::bytes(bytes.clone())
-                .file_name(basename.clone())
+                .file_name(effective_name.to_string())
                 .mime_str(mime.essence_str())
                 .map_err(|e| HbctlError::InvalidInput(format!("invalid MIME type: {e}")))?;
 
             let form = multipart::Form::new()
                 .part("file", file_part)
-                .text("name", basename.clone())
+                .text("name", effective_name.to_string())
                 .text("type", att_type);
 
             Ok(self
@@ -793,8 +887,34 @@ impl HomeboxClient {
     }
 
     // -------------------------------------------------------------------------
-    // Authentication (`/api/v1/users/login`, `/users/self`, `/users/refresh`)
+    // Status (`/api/v1/status`) & Authentication (`/api/v1/users/login`, `/users/self`, `/users/refresh`)
     // -------------------------------------------------------------------------
+
+    /// Fetch remote Homebox server status without authentication (`GET /api/v1/status`).
+    pub fn get_status(base_url: &str, timeout_secs: u64) -> Result<ServerStatus> {
+        let normalized = normalize_base_url(base_url)?;
+        let http = Client::builder()
+            .timeout(Duration::from_secs(timeout_secs.max(1)))
+            .build()?;
+
+        let url = format!("{normalized}/status");
+        let resp = send_request_with_retry(RetryPolicy::default(), RetryMode::Idempotent, || {
+            Ok(http.get(&url))
+        })?;
+
+        let status = resp.status();
+        let text = resp.text()?;
+        if !status.is_success() {
+            return Err(HbctlError::Http {
+                status: status.as_u16(),
+                message: text,
+            });
+        }
+        if text.trim().is_empty() {
+            return Ok(ServerStatus::default());
+        }
+        serde_json::from_str(&text).map_err(HbctlError::from)
+    }
 
     /// Authenticate with email/username and password via `POST /api/v1/users/login`.
     pub fn login(
@@ -1503,6 +1623,59 @@ mod tests {
             .expect(1)
             .create();
         client.delete_tag("tag-1").expect("delete tag");
+        m_del.assert();
+    }
+
+    #[test]
+    fn test_status_and_entity_type_create_delete() {
+        let mut server = Server::new();
+
+        let m_status = server
+            .mock("GET", "/api/v1/status")
+            .match_header("authorization", Matcher::Missing)
+            .with_status(200)
+            .with_body(r#"{"version":"v0.26.2","commit":"abc1234","health":true}"#)
+            .expect(1)
+            .create();
+        let st = HomeboxClient::get_status(&server.url(), 10).expect("get status");
+        assert_eq!(st.version.as_deref(), Some("v0.26.2"));
+        assert_eq!(st.commit.as_deref(), Some("abc1234"));
+        assert_eq!(st.health, Some(true));
+        m_status.assert();
+
+        let client = test_client(&server.url());
+        let m_create = server
+            .mock("POST", "/api/v1/entity-types")
+            .match_body(Matcher::PartialJson(json!({
+                "name": "Storage Bin",
+                "description": "Container",
+                "isLocation": true
+            })))
+            .with_status(201)
+            .with_body(
+                r#"{"id":"et-bin","name":"Storage Bin","description":"Container","isLocation":true}"#,
+            )
+            .expect(1)
+            .create();
+        let created = client
+            .create_entity_type(&CreateEntityTypeRequest {
+                name: "Storage Bin".into(),
+                description: Some("Container".into()),
+                is_location: true,
+            })
+            .expect("create entity type");
+        assert_eq!(created.id, "et-bin");
+        assert!(created.is_location);
+        m_create.assert();
+
+        let m_del = server
+            .mock("DELETE", "/api/v1/entity-types/et-bin")
+            .with_status(204)
+            .expect(1)
+            .create();
+        client
+            .delete_entity_type("et-bin")
+            .expect("delete entity type");
         m_del.assert();
     }
 }
