@@ -27,12 +27,25 @@ fn can_execute_binary() -> bool {
 
 fn hbx(server_url: &str) -> Command {
     let mut cmd = Command::new(env!("CARGO_BIN_EXE_hbx"));
-    cmd.env_clear()
-        .env("PATH", std::env::var("PATH").unwrap_or_default())
-        .arg("--url")
-        .arg(server_url)
-        .arg("--api-key")
-        .arg("hb_test_secret_token_999");
+    for var in [
+        "HBX_URL",
+        "HBX_API_KEY",
+        "HBX_OUTPUT",
+        "HBX_CONFIG",
+        "HOMEBOX_URL",
+        "HOMEBOX_IP",
+        "HOMEBOX_API_KEY",
+    ] {
+        cmd.env_remove(var);
+    }
+    cmd.env(
+        "XDG_CONFIG_HOME",
+        std::env::temp_dir().join("hbx-test-empty-xdg"),
+    )
+    .arg("--url")
+    .arg(server_url)
+    .arg("--api-key")
+    .arg("hb_test_secret_token_999");
     cmd
 }
 
@@ -908,4 +921,669 @@ fn test_csv_import_attachment_ops_and_csv_export() {
             "ent-1,ESP32 DevKitC,3,electronics,3.3",
         ));
     list_csv.assert();
+}
+
+#[test]
+fn test_item_get_list_pagination_from_json_upsert_new_and_dry_runs() {
+    if !can_execute_binary() {
+        return;
+    }
+    let mut server = Server::new();
+    let tmp = tempdir().unwrap();
+
+    // 1. item get in table, plain, and projected table (--select)
+    let get_detail = server
+        .mock("GET", "/api/v1/entities/ent-1")
+        .with_status(200)
+        .with_body(fixture("entity_detail.json"))
+        .expect(3)
+        .create();
+
+    hbx(&server.url())
+        .args(["item", "get", "ent-1"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("ESP32 DevKitC"))
+        .stdout(predicate::str::contains("purchasePrice"))
+        .stdout(predicate::str::contains("field:Voltage"));
+
+    hbx(&server.url())
+        .args(["--output", "plain", "item", "get", "ent-1"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("id\tent-1"));
+
+    hbx(&server.url())
+        .args(["--select", "id,name,Voltage", "item", "get", "ent-1"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("3.3"));
+    get_detail.assert();
+
+    // 2. item list with --tag, --type, and multi-page --all pagination
+    let tags_mock = server
+        .mock("GET", "/api/v1/tags")
+        .with_status(200)
+        .with_body(fixture("tags.json"))
+        .expect_at_least(2)
+        .create();
+
+    let types_mock = server
+        .mock("GET", "/api/v1/entity-types")
+        .with_status(200)
+        .with_body(fixture("entity_types.json"))
+        .expect_at_least(2)
+        .create();
+
+    let page1 = server
+        .mock("GET", "/api/v1/entities")
+        .match_query(Matcher::AllOf(vec![
+            Matcher::UrlEncoded("tags".into(), "tag-elec".into()),
+            Matcher::UrlEncoded("entityTypeId".into(), "et-item".into()),
+            Matcher::UrlEncoded("page".into(), "1".into()),
+            Matcher::UrlEncoded("pageSize".into(), "1".into()),
+        ]))
+        .with_status(200)
+        .with_body(
+            json!({
+                "items": [{"id": "ent-1", "name": "ESP32", "quantity": 1, "tags": [{"id": "tag-elec", "name": "electronics"}]}],
+                "page": 1, "pageSize": 1, "total": 2
+            })
+            .to_string(),
+        )
+        .create();
+
+    let page2 = server
+        .mock("GET", "/api/v1/entities")
+        .match_query(Matcher::AllOf(vec![
+            Matcher::UrlEncoded("tags".into(), "tag-elec".into()),
+            Matcher::UrlEncoded("entityTypeId".into(), "et-item".into()),
+            Matcher::UrlEncoded("page".into(), "2".into()),
+            Matcher::UrlEncoded("pageSize".into(), "1".into()),
+        ]))
+        .with_status(200)
+        .with_body(
+            json!({
+                "items": [{"id": "ent-2", "name": "Sensor", "quantity": 2, "tags": []}],
+                "page": 2, "pageSize": 1, "total": 2
+            })
+            .to_string(),
+        )
+        .create();
+
+    hbx(&server.url())
+        .args([
+            "item",
+            "list",
+            "--tag",
+            "electronics",
+            "--type",
+            "Item",
+            "--page-size",
+            "1",
+            "--all",
+        ])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("ESP32"))
+        .stdout(predicate::str::contains("Sensor"));
+    page1.assert();
+    page2.assert();
+
+    // 3. item create --from-json with aliases & entityType object
+    let create_json = tmp.path().join("create.json");
+    fs::write(
+        &create_json,
+        json!({
+            "name": "Json Board",
+            "description": "From JSON",
+            "quantity": 4,
+            "entityType": {"id": "et-item", "name": "Item"},
+            "tags": [{"name": "electronics"}],
+            "manufacturer": "SparkFun",
+            "model_number": "DEV-123",
+            "notes": "Shelf 1",
+            "purchasePrice": 19.99,
+            "purchaseDate": "2026-03-01",
+            "purchaseFrom": "SparkFun"
+        })
+        .to_string(),
+    )
+    .unwrap();
+
+    let post_json = server
+        .mock("POST", "/api/v1/entities")
+        .with_status(201)
+        .with_body(
+            json!({"id": "ent-j1", "name": "Json Board", "quantity": 4, "fields": []}).to_string(),
+        )
+        .create();
+    let put_json = server
+        .mock("PUT", "/api/v1/entities/ent-j1")
+        .with_status(200)
+        .with_body(
+            json!({"id": "ent-j1", "name": "Json Board", "quantity": 4, "fields": []}).to_string(),
+        )
+        .create();
+
+    hbx(&server.url())
+        .args([
+            "item",
+            "create",
+            "--from-json",
+            create_json.to_str().unwrap(),
+        ])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Json Board"));
+    post_json.assert();
+    put_json.assert();
+
+    // 4. item upsert create path with auto-created tag + boolean field
+    let create_tag = server
+        .mock("POST", "/api/v1/tags")
+        .match_body(Matcher::Regex("AutoNewTag".into()))
+        .with_status(201)
+        .with_body(json!({"id": "tag-auto", "name": "AutoNewTag"}).to_string())
+        .create();
+    let empty_search = server
+        .mock("GET", "/api/v1/entities")
+        .match_query(Matcher::AllOf(vec![
+            Matcher::UrlEncoded("q".into(), "Fresh Module".into()),
+            Matcher::UrlEncoded("page".into(), "1".into()),
+            Matcher::UrlEncoded("pageSize".into(), "50".into()),
+        ]))
+        .with_status(200)
+        .with_body(json!({"items": [], "total": 0}).to_string())
+        .create();
+    let post_upsert = server
+        .mock("POST", "/api/v1/entities")
+        .with_status(201)
+        .with_body(
+            json!({"id": "ent-up-1", "name": "Fresh Module", "quantity": 1, "fields": []})
+                .to_string(),
+        )
+        .create();
+    let put_upsert = server
+        .mock("PUT", "/api/v1/entities/ent-up-1")
+        .match_body(Matcher::Regex("\"booleanValue\":true".into()))
+        .with_status(200)
+        .with_body(
+            json!({"id": "ent-up-1", "name": "Fresh Module", "quantity": 1, "fields": []})
+                .to_string(),
+        )
+        .create();
+
+    hbx(&server.url())
+        .args([
+            "-q",
+            "item",
+            "upsert",
+            "--name",
+            "Fresh Module",
+            "--tag",
+            "AutoNewTag",
+            "--field",
+            "Active=true",
+            "--field-type",
+            "boolean",
+        ])
+        .assert()
+        .success()
+        .stdout(predicate::eq("ent-up-1\n"));
+    create_tag.assert();
+    empty_search.assert();
+    post_upsert.assert();
+    put_upsert.assert();
+    tags_mock.assert();
+    types_mock.assert();
+
+    // 5. dry-run previews for update, upsert, delete, import
+    hbx("http://127.0.0.1:1")
+        .args(["item", "update", "ent-1", "--name", "Renamed", "--dry-run"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(
+            "PUT http://127.0.0.1:1/api/v1/entities/ent-1",
+        ))
+        .stdout(predicate::str::contains("Bearer ***"));
+
+    hbx("http://127.0.0.1:1")
+        .args(["item", "upsert", "--name", "Preview", "--dry-run"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Bearer ***"));
+
+    hbx("http://127.0.0.1:1")
+        .args(["item", "delete", "ent-1", "--dry-run"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(
+            "DELETE http://127.0.0.1:1/api/v1/entities/ent-1",
+        ));
+
+    let import_json_path =
+        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/import_items.json");
+    hbx("http://127.0.0.1:1")
+        .args([
+            "item",
+            "import",
+            import_json_path.to_str().unwrap(),
+            "--dry-run",
+        ])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(
+            "POST http://127.0.0.1:1/api/v1/entities",
+        ));
+}
+
+#[test]
+fn test_dedup_report_and_attachment_overwrite_single_download() {
+    if !can_execute_binary() {
+        return;
+    }
+    let mut server = Server::new();
+    let tmp = tempdir().unwrap();
+
+    // 1. dedup report-only (table) + empty result
+    let dedup_list = server
+        .mock("GET", "/api/v1/entities")
+        .match_query(Matcher::Any)
+        .with_status(200)
+        .with_body(fixture("dedup_entities.json"))
+        .create();
+
+    hbx(&server.url())
+        .args(["item", "dedup"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("near"))
+        .stdout(predicate::str::contains("BME280 Sensor Module v1.0"));
+    dedup_list.assert();
+
+    let empty_list = server
+        .mock("GET", "/api/v1/entities")
+        .match_query(Matcher::Any)
+        .with_status(200)
+        .with_body(
+            json!({"items": [{"id": "u1", "name": "Solo Item", "quantity": 1}], "total": 1})
+                .to_string(),
+        )
+        .create();
+
+    hbx(&server.url())
+        .args(["item", "dedup"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("No duplicate items found."));
+    empty_list.assert();
+
+    // 2. attachment upload --overwrite + table output + dry-run
+    let pdf = tmp.path().join("datasheet.pdf");
+    fs::write(&pdf, b"%PDF-1.7 updated").unwrap();
+
+    let get_ent = server
+        .mock("GET", "/api/v1/entities/ent-1")
+        .with_status(200)
+        .with_body(fixture("entity_detail.json"))
+        .expect(5)
+        .create();
+
+    let del_old = server
+        .mock("DELETE", "/api/v1/entities/ent-1/attachments/att-pdf-1")
+        .with_status(204)
+        .create();
+    let post_new = server
+        .mock("POST", "/api/v1/entities/ent-1/attachments")
+        .with_status(201)
+        .with_body(
+            json!({"id": "att-pdf-2", "title": "datasheet.pdf", "mimeType": "application/pdf"})
+                .to_string(),
+        )
+        .create();
+
+    hbx(&server.url())
+        .args([
+            "attachment",
+            "upload",
+            "ent-1",
+            pdf.to_str().unwrap(),
+            "--overwrite",
+        ])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("uploaded"))
+        .stdout(predicate::str::contains("att-pdf-2"));
+    del_old.assert();
+    post_new.assert();
+
+    // attachment list (table)
+    hbx(&server.url())
+        .args(["attachment", "list", "ent-1"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("datasheet.pdf"));
+
+    // single attachment download -> skip existing -> overwrite
+    let out_file = tmp.path().join("saved_manual.pdf");
+    let dl_single = server
+        .mock("GET", "/api/v1/entities/ent-1/attachments/att-pdf-1")
+        .with_status(200)
+        .with_body(b"pdf-body-bytes")
+        .expect(2)
+        .create();
+
+    hbx(&server.url())
+        .args([
+            "attachment",
+            "download",
+            "ent-1",
+            "att-pdf-1",
+            "--out",
+            out_file.to_str().unwrap(),
+        ])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("downloaded"));
+
+    // Second run without --overwrite skips existing file
+    hbx(&server.url())
+        .args([
+            "attachment",
+            "download",
+            "ent-1",
+            "att-pdf-1",
+            "--out",
+            out_file.to_str().unwrap(),
+        ])
+        .assert()
+        .success()
+        .stderr(predicate::str::contains("skipping existing file"))
+        .stdout(predicate::str::contains("skipped"));
+
+    // Third run with --overwrite downloads again
+    hbx(&server.url())
+        .args([
+            "-q",
+            "attachment",
+            "download",
+            "ent-1",
+            "att-pdf-1",
+            "--out",
+            out_file.to_str().unwrap(),
+            "--overwrite",
+        ])
+        .assert()
+        .success()
+        .stdout(predicate::eq("att-pdf-1\n"));
+
+    dl_single.assert();
+    get_ent.assert();
+
+    // attachment dry-runs
+    hbx("http://127.0.0.1:1")
+        .args([
+            "attachment",
+            "upload",
+            "ent-1",
+            pdf.to_str().unwrap(),
+            "--dry-run",
+        ])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(
+            "POST http://127.0.0.1:1/api/v1/entities/ent-1/attachments",
+        ));
+
+    hbx("http://127.0.0.1:1")
+        .args(["attachment", "delete", "ent-1", "att-1", "--dry-run"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(
+            "DELETE http://127.0.0.1:1/api/v1/entities/ent-1/attachments/att-1",
+        ));
+}
+
+#[test]
+fn test_field_tag_entity_types_export_config_completions_and_error_redaction() {
+    if !can_execute_binary() {
+        return;
+    }
+    let mut server = Server::new();
+    let tmp = tempdir().unwrap();
+
+    // 1. field get (table + json + missing field error) & field set (table + json + dry-run)
+    let get_ent = server
+        .mock("GET", "/api/v1/entities/ent-1")
+        .with_status(200)
+        .with_body(fixture("entity_detail.json"))
+        .expect(5)
+        .create();
+    let put_ent = server
+        .mock("PUT", "/api/v1/entities/ent-1")
+        .with_status(200)
+        .with_body(fixture("entity_detail.json"))
+        .expect(2)
+        .create();
+
+    hbx(&server.url())
+        .args(["field", "get", "ent-1", "Voltage"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("3.3"));
+
+    hbx(&server.url())
+        .args(["--json", "field", "get", "ent-1", "Voltage"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"numberValue\":3.3"));
+
+    hbx(&server.url())
+        .args(["field", "get", "ent-1", "NoSuchField"])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("field not found"));
+
+    hbx(&server.url())
+        .args([
+            "field", "set", "ent-1", "Voltage", "3.3", "--type", "number",
+        ])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Voltage"));
+
+    hbx(&server.url())
+        .args([
+            "--json", "field", "set", "ent-1", "Voltage", "3.3", "--type", "number",
+        ])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"name\":\"Voltage\""));
+
+    hbx("http://127.0.0.1:1")
+        .args([
+            "field",
+            "set",
+            "ent-1",
+            "Voltage",
+            "5",
+            "--type",
+            "number",
+            "--dry-run",
+        ])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Bearer ***"));
+
+    get_ent.assert();
+    put_ent.assert();
+
+    // 2. tag list (table + quiet + select) & tag create (table + dry-run)
+    let tags_mock = server
+        .mock("GET", "/api/v1/tags")
+        .with_status(200)
+        .with_body(fixture("tags.json"))
+        .expect(5)
+        .create();
+
+    hbx(&server.url())
+        .args(["tag", "list"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("electronics"));
+
+    hbx(&server.url())
+        .args(["-q", "tag", "list"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("tag-elec"));
+
+    hbx(&server.url())
+        .args(["--select", "id,name", "tag", "list"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("tools"));
+
+    let tag_create = server
+        .mock("POST", "/api/v1/tags")
+        .with_status(201)
+        .with_body(json!({"id": "tag-c", "name": "cables"}).to_string())
+        .create();
+
+    hbx(&server.url())
+        .args(["tag", "create", "cables"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("cables"));
+    tag_create.assert();
+
+    hbx("http://127.0.0.1:1")
+        .args(["tag", "create", "cables", "--dry-run"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(
+            "POST http://127.0.0.1:1/api/v1/tags",
+        ));
+
+    // 3. entity-types (--json + -q)
+    let et_mock = server
+        .mock("GET", "/api/v1/entity-types")
+        .with_status(200)
+        .with_body(fixture("entity_types.json"))
+        .expect(2)
+        .create();
+    hbx(&server.url())
+        .args(["--json", "entity-types"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"isLocation\":true"));
+    hbx(&server.url())
+        .args(["-q", "entity-types"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("et-loc"));
+    et_mock.assert();
+
+    // 4. export --format json (with & without --field, --has-field, --sort id)
+    let exp_list = server
+        .mock("GET", "/api/v1/entities")
+        .match_query(Matcher::Any)
+        .with_status(200)
+        .with_body(
+            json!({
+                "items": [{
+                    "id": "ent-1",
+                    "name": "ESP32",
+                    "quantity": 3,
+                    "tags": [{"id": "tag-elec", "name": "electronics"}],
+                    "fields": [{"name": "Voltage", "type": "number", "numberValue": 3.3}]
+                }],
+                "total": 1
+            })
+            .to_string(),
+        )
+        .expect(2)
+        .create();
+
+    hbx(&server.url())
+        .args([
+            "export",
+            "--tag",
+            "electronics",
+            "--has-field",
+            "Voltage",
+            "--field",
+            "Voltage",
+            "--sort",
+            "id",
+            "--format",
+            "json",
+        ])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"Voltage\":\"3.3\""));
+
+    hbx(&server.url())
+        .args(["export", "--format", "json"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"id\":\"ent-1\""));
+    exp_list.assert();
+
+    // 5. Explicit --config file loading & HTTP error secret redaction
+    let cfg_file = tmp.path().join("custom.toml");
+    fs::write(
+        &cfg_file,
+        format!(
+            "url = \"{}\"\napi_key = \"hb_super_secret_leaked_check\"\noutput = \"json\"\n",
+            server.url()
+        ),
+    )
+    .unwrap();
+
+    let mut cfg_cmd = Command::new(env!("CARGO_BIN_EXE_hbx"));
+    for var in [
+        "HBX_URL",
+        "HBX_API_KEY",
+        "HBX_OUTPUT",
+        "HBX_CONFIG",
+        "HOMEBOX_URL",
+        "HOMEBOX_IP",
+        "HOMEBOX_API_KEY",
+    ] {
+        cfg_cmd.env_remove(var);
+    }
+    cfg_cmd
+        .args(["--config", cfg_file.to_str().unwrap(), "tag", "list"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("electronics"));
+    tags_mock.assert();
+
+    let err_mock = server
+        .mock("GET", "/api/v1/entities/bad-id")
+        .with_status(401)
+        .with_body("unauthorized for Bearer hb_test_secret_token_999")
+        .create();
+    hbx(&server.url())
+        .args(["item", "get", "bad-id"])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("Bearer ***"))
+        .stderr(predicate::str::contains("hb_test_secret_token_999").not());
+    err_mock.assert();
+
+    // 6. completions & man subcommands
+    Command::new(env!("CARGO_BIN_EXE_hbx"))
+        .args(["completions", "bash"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("_hbx"));
+
+    Command::new(env!("CARGO_BIN_EXE_hbx"))
+        .args(["man"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(".TH hbx"));
 }
