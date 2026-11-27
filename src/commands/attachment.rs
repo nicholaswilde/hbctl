@@ -1698,4 +1698,15 @@ mod tests {
             "attachment.bin"
         );
     }
+
+    #[test]
+    fn test_extension_for_mime_variants() {
+        assert_eq!(extension_for_mime("image/jpeg"), Some("jpg"));
+        assert_eq!(extension_for_mime("image/png"), Some("png"));
+        assert_eq!(extension_for_mime("image/webp"), Some("webp"));
+        assert_eq!(extension_for_mime("image/gif"), Some("gif"));
+        assert_eq!(extension_for_mime("application/pdf"), Some("pdf"));
+        assert_eq!(extension_for_mime("text/plain; charset=utf-8"), Some("txt"));
+        assert!(extension_for_mime("application/json").is_some());
+    }
 }

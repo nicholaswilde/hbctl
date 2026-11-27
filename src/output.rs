@@ -454,4 +454,88 @@ mod tests {
         let s = String::from_utf8(buf).unwrap();
         assert_eq!(s, "Item,Tare\nBin A,N/A\nBin B,N/A\n");
     }
+
+    #[test]
+    fn test_output_context_json_projection_and_table_variants() {
+        let empty_ctx = OutputContext::new(
+            OutputFormat::Json,
+            Some(vec![" , ".into(), "".into()]),
+            false,
+        );
+        assert_eq!(empty_ctx.select, None);
+
+        // Scalar passthrough and custom fields (booleanValue, value, textValue, null)
+        assert_eq!(
+            project_json_value(&json!("raw"), &["id".into()]),
+            json!("raw")
+        );
+        let obj = json!({
+            "id": "e1",
+            "fields": [
+                {"name": "Active", "type": "boolean", "booleanValue": true},
+                {"name": "FallbackVal", "type": "text", "value": "v1"},
+                {"name": "FallbackText", "type": "text", "textValue": "t1"},
+                {"name": "Empty", "type": "text"}
+            ]
+        });
+        let proj = project_json_value(
+            &obj,
+            &[
+                "Active".into(),
+                "FallbackVal".into(),
+                "FallbackText".into(),
+                "Empty".into(),
+                "Missing".into(),
+            ],
+        );
+        assert_eq!(proj["Active"], true);
+        assert_eq!(proj["FallbackVal"], "v1");
+        assert_eq!(proj["FallbackText"], "t1");
+        assert_eq!(proj["Empty"], Value::Null);
+        assert!(proj.get("Missing").is_none());
+
+        // write_table_or_plain with OutputFormat::Json
+        let mut buf = Vec::new();
+        write_table_or_plain(
+            &["ID".into(), "NAME".into()],
+            &[vec!["1".into(), "Item".into()]],
+            OutputFormat::Json,
+            &mut buf,
+        )
+        .unwrap();
+        assert_eq!(
+            String::from_utf8(buf).unwrap(),
+            "[{\"ID\":\"1\",\"NAME\":\"Item\"}]\n"
+        );
+
+        // write_selected_table with case-insensitive header and diverse JSON cell types
+        let records = vec![json!({
+            "id": "1",
+            "flag": true,
+            "empty": null,
+            "tags": ["a", "b"]
+        })];
+        let mut buf = Vec::new();
+        write_selected_table(
+            &records,
+            &["ID".into(), "flag".into(), "empty".into(), "tags".into()],
+            OutputFormat::Plain,
+            &mut buf,
+        )
+        .unwrap();
+        assert_eq!(
+            String::from_utf8(buf).unwrap(),
+            "1\ttrue\t\t[\"a\",\"b\"]\n"
+        );
+
+        // write_csv wrapper
+        let mut csv_buf = Vec::new();
+        write_csv(
+            &["A".into(), "B".into()],
+            &[vec!["1".into(), "2".into()]],
+            &mut csv_buf,
+        )
+        .unwrap();
+        assert_eq!(String::from_utf8(csv_buf).unwrap(), "A,B\n1,2\n");
+    }
 }

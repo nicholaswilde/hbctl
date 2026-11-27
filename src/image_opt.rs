@@ -495,4 +495,50 @@ mod tests {
                 .unwrap_err();
         assert!(matches!(corrupt_err, HbctlError::InvalidInput(_)));
     }
+
+    #[test]
+    fn test_optimize_simple_webp_stays_webp_and_impossible_budget_fails() {
+        // Low-entropy oversized WebP that shrinks below max_bytes as WebP after resize
+        let mut img = RgbImage::new(1600, 1200);
+        for (x, y, px) in img.enumerate_pixels_mut() {
+            let v = ((x / 16 + y / 16) % 255) as u8;
+            *px = Rgb([v, v, v]);
+        }
+        let dyn_img = DynamicImage::ImageRgb8(img);
+        let raw = encode_test(&dyn_img, ImageFormat::WebP);
+        let budget = (raw.len() as u64).saturating_sub(128).max(512);
+        let opts = ImageOptOptions {
+            optimize: true,
+            force: false,
+            max_bytes: budget,
+            max_dimension: 600,
+        };
+        let res = optimize_attachment_bytes("diagram.webp", "diagram.webp", raw, opts).unwrap();
+        assert!(res.optimized);
+        assert_eq!(res.remote_name, "diagram.webp");
+        assert!(res.bytes.len() as u64 <= budget);
+
+        // Impossible tiny budget exhausts scaling rounds and returns ImageTooLarge
+        let noisy = noisy_rgb(400, 300);
+        let raw_jpg = encode_test(&noisy, ImageFormat::Jpeg);
+        let err = optimize_attachment_bytes(
+            "tiny.jpg",
+            "tiny.jpg",
+            raw_jpg,
+            ImageOptOptions {
+                optimize: true,
+                force: false,
+                max_bytes: 50,
+                max_dimension: 400,
+            },
+        )
+        .unwrap_err();
+        assert!(matches!(err, HbctlError::ImageTooLarge { .. }));
+
+        // Extensionless remote name gains .jpg
+        assert_eq!(
+            resolve_jpeg_remote_name("photo", Some(ImageFormat::Png)),
+            "photo.jpg"
+        );
+    }
 }

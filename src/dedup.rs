@@ -351,4 +351,23 @@ mod tests {
         assert_eq!(clusters[1].duplicates[0].id, "4");
         assert_eq!(clusters[1].merged_quantity, 4);
     }
+
+    #[test]
+    fn test_dedup_match_kind_display_and_dsu_union_order() {
+        assert_eq!(MatchKind::Exact.to_string(), "exact");
+        assert_eq!(MatchKind::Near.to_string(), "near");
+
+        // Trigger dsu_union when ra > rb (e.g. union(2, 0))
+        let mut parent = vec![0, 1, 2, 3];
+        dsu_union(&mut parent, 2, 0);
+        assert_eq!(dsu_find(&mut parent, 2), dsu_find(&mut parent, 0));
+
+        // Empty-token entities are skipped in Pass 2 without clustering
+        let entities = vec![
+            mk_entity("1", "Sensor Module", 1),
+            mk_entity("2", "Board Kit", 1),
+            mk_entity("3", "UniqueThing", 1),
+        ];
+        assert!(find_duplicates(&entities, 0.8).is_empty());
+    }
 }

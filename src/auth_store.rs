@@ -447,4 +447,32 @@ mod tests {
             Some(("hb_homelab".to_string(), CredentialBackend::File))
         );
     }
+
+    #[test]
+    fn test_display_paths_and_auto_store_set_token() {
+        assert_eq!(CredentialBackend::Keyring.to_string(), "keyring");
+        assert_eq!(CredentialBackend::File.to_string(), "file");
+        assert_eq!(TokenType::ApiKey.to_string(), "api_key");
+        assert_eq!(TokenType::Jwt.to_string(), "jwt");
+
+        let dir = tempdir().unwrap();
+        let path = dir.path().join("creds.json");
+        let file_store = FileSecretStore::new(path.clone());
+        assert_eq!(file_store.path(), path.as_path());
+
+        let auto_store = AutoSecretStore::new(
+            KeyringSecretStore::new("hbctl-test-unused"),
+            file_store,
+            true,
+        );
+        assert_eq!(auto_store.file_path(), path.as_path());
+        let backend = auto_store
+            .set_token("http://box:7745/api/v1", "hb_direct")
+            .unwrap();
+        assert_eq!(backend, CredentialBackend::File);
+        assert_eq!(
+            auto_store.get_token("http://box:7745/api/v1").unwrap(),
+            Some(("hb_direct".to_string(), CredentialBackend::File))
+        );
+    }
 }

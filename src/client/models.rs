@@ -1969,4 +1969,91 @@ mod tests {
             })
         );
     }
+
+    #[test]
+    fn test_models_edge_deserialization_and_display() {
+        assert_eq!(FieldValueType::Text.as_str(), "text");
+        assert_eq!(FieldValueType::Number.as_str(), "number");
+        assert_eq!(FieldValueType::Boolean.as_str(), "boolean");
+
+        // Invalid cost type in MaintenanceEntry fails cleanly
+        let bad_cost: std::result::Result<MaintenanceEntry, _> = serde_json::from_value(json!({
+            "id": "m-bad",
+            "name": "Bad",
+            "cost": true
+        }));
+        assert!(bad_cost.is_err());
+
+        // CustomField omitted `type` defaults to "text"
+        let default_type_cf: CustomField = serde_json::from_value(json!({
+            "name": "Note",
+            "value": 42
+        }))
+        .unwrap();
+        assert_eq!(default_type_cf.field_type, "text");
+        assert_eq!(default_type_cf.display_value(), "42");
+
+        let bool_val_cf: CustomField = serde_json::from_value(json!({
+            "name": "Flag",
+            "type": "text",
+            "value": true
+        }))
+        .unwrap();
+        assert_eq!(bool_val_cf.display_value(), "true");
+
+        let arr_val_cf: CustomField = serde_json::from_value(json!({
+            "name": "Arr",
+            "type": "text",
+            "value": [1, 2]
+        }))
+        .unwrap();
+        assert_eq!(arr_val_cf.display_value(), "[1,2]");
+
+        let text_val_cf: CustomField = serde_json::from_value(json!({
+            "name": "T",
+            "type": "text",
+            "textValue": "hello"
+        }))
+        .unwrap();
+        assert_eq!(text_val_cf.display_value(), "hello");
+
+        let num_only_cf: CustomField = serde_json::from_value(json!({
+            "name": "N",
+            "type": "number",
+            "numberValue": 7
+        }))
+        .unwrap();
+        assert_eq!(num_only_cf.display_value(), "7");
+
+        let bool_only_cf: CustomField = serde_json::from_value(json!({
+            "name": "B",
+            "type": "boolean",
+            "booleanValue": false
+        }))
+        .unwrap();
+        assert_eq!(bool_only_cf.display_value(), "false");
+
+        let empty_num_cf: CustomField = serde_json::from_value(json!({
+            "name": "Empty",
+            "type": "number"
+        }))
+        .unwrap();
+        assert_eq!(empty_num_cf.display_value(), "");
+
+        assert!(CustomField::new_typed("Flag", FieldValueType::Boolean, "maybe").is_err());
+        assert!(CustomField::parse_key_value("missing_eq", FieldValueType::Text).is_err());
+        assert!(CustomField::parse_key_value("  =val", FieldValueType::Text).is_err());
+
+        // normalize_json_aliases converts number/bool alias values via take_first_string_alias
+        let mut alias_payload = json!({
+            "name": "Extra",
+            "manufacturer": 12,
+            "notes": true,
+            "serialNumber": null
+        });
+        let alias_fields = normalize_json_aliases(&mut alias_payload);
+        assert_eq!(alias_fields.len(), 2);
+        assert_eq!(alias_fields[0].display_value(), "12");
+        assert_eq!(alias_fields[1].display_value(), "true");
+    }
 }

@@ -2313,4 +2313,67 @@ mod tests {
             .expect("delete maintenance");
         m_del.assert();
     }
+
+    #[test]
+    fn test_parse_retry_after_all_months_and_edge_cases() {
+        let now = UNIX_EPOCH + Duration::from_secs(1_445_412_470);
+        for (mon, date_str) in [
+            ("Jan", "Thu, 01 Jan 2026 00:00:00 GMT"),
+            ("Feb", "Sun, 01 Feb 2026 00:00:00 GMT"),
+            ("Mar", "Sun, 01 Mar 2026 00:00:00 GMT"),
+            ("Apr", "Wed, 01 Apr 2026 00:00:00 GMT"),
+            ("May", "Fri, 01 May 2026 00:00:00 GMT"),
+            ("Jun", "Mon, 01 Jun 2026 00:00:00 GMT"),
+            ("Jul", "Wed, 01 Jul 2026 00:00:00 GMT"),
+            ("Aug", "Sat, 01 Aug 2026 00:00:00 GMT"),
+            ("Sep", "Tue, 01 Sep 2026 00:00:00 GMT"),
+            ("Oct", "Thu, 01 Oct 2026 00:00:00 GMT"),
+            ("Nov", "Sun, 01 Nov 2026 00:00:00 GMT"),
+            ("Dec", "Tue, 01 Dec 2026 00:00:00 GMT"),
+        ] {
+            let parsed = parse_retry_after_at(date_str, now);
+            assert!(parsed.is_some(), "expected Some for month {mon}");
+        }
+        assert_eq!(
+            parse_retry_after_at("Wed 21 Oct 2015 07:28:00 GMT", now),
+            None
+        );
+        assert_eq!(
+            parse_retry_after_at("Wed, 32 Oct 2015 07:28:00 GMT", now),
+            None
+        );
+        assert_eq!(
+            parse_retry_after_at("Wed, 21 Oct 1969 07:28:00 GMT", now),
+            None
+        );
+    }
+
+    #[test]
+    fn test_with_defaults_upload_empty_name_and_http_methods() {
+        let client = HomeboxClient::with_defaults("http://127.0.0.1:7745", "hb_tok").unwrap();
+        assert_eq!(client.base_url(), "http://127.0.0.1:7745/api/v1");
+        assert!(HomeboxClient::with_defaults("://bad-url", "hb_tok").is_err());
+
+        let dir = tempdir().unwrap();
+        let p = dir.path().join("f.txt");
+        fs::write(&p, b"hi").unwrap();
+        let err = client
+            .upload_attachment_as("ent-1", &p, Some("   "))
+            .unwrap_err();
+        assert!(matches!(err, HbctlError::InvalidInput(_)));
+
+        assert_eq!(
+            HomeboxClient::parse_http_method("patch").unwrap(),
+            Method::PATCH
+        );
+        assert_eq!(
+            HomeboxClient::parse_http_method("head").unwrap(),
+            Method::HEAD
+        );
+        assert_eq!(
+            HomeboxClient::parse_http_method("options").unwrap(),
+            Method::OPTIONS
+        );
+        assert!(HomeboxClient::parse_http_method("TRACE").is_err());
+    }
 }

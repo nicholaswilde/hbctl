@@ -2246,4 +2246,25 @@ mod tests {
             other => panic!("unexpected command: {other:?}"),
         }
     }
+
+    #[test]
+    fn test_cli_enum_display_and_maintenance_status_as_str() {
+        assert_eq!(MatchKey::Name.to_string(), "name");
+        assert_eq!(MatchKey::Model.to_string(), "model");
+        assert_eq!(MatchKey::Serial.to_string(), "serial");
+        assert_eq!(MatchKey::Field("Volt".into()).to_string(), "field:Volt");
+        assert!("field:".parse::<MatchKey>().is_err());
+
+        assert_eq!(MatchMode::Exact.to_string(), "exact");
+        assert_eq!(MatchMode::Contains.to_string(), "contains");
+        assert_eq!(MatchMode::Fuzzy.to_string(), "fuzzy");
+
+        assert_eq!(OnMatchAction::Update.to_string(), "update");
+        assert_eq!(OnMatchAction::Skip.to_string(), "skip");
+        assert_eq!(OnMatchAction::AttachOnly.to_string(), "attach-only");
+
+        assert_eq!(MaintenanceStatus::Both.as_str(), "both");
+        assert_eq!(MaintenanceStatus::Completed.as_str(), "completed");
+        assert_eq!(MaintenanceStatus::Scheduled.as_str(), "scheduled");
+    }
 }

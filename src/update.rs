@@ -155,65 +155,89 @@ pub fn run_self_update(
         };
 
         let latest_ver = release.version();
-        let update_available = is_newer_version(CURRENT_VERSION, latest_ver)?;
         let asset_name =
             select_release_asset(release.assets(), &target).map(|a| a.name().to_string());
+        return render_check_output(
+            CURRENT_VERSION,
+            latest_ver,
+            &target,
+            asset_name,
+            ctx,
+            out_writer,
+        );
+    }
 
-        if ctx.quiet {
-            writeln!(out_writer, "{}", normalize_version_tag(latest_ver))?;
-            return Ok(());
-        }
-        if ctx.format == OutputFormat::Json {
-            let payload = UpdateCheckOutput {
-                current_version: normalize_version_tag(CURRENT_VERSION),
-                latest_version: normalize_version_tag(latest_ver),
-                update_available,
-                target,
-                asset: asset_name,
-            };
-            write_compact_json(&payload, ctx.select.as_deref(), out_writer)?;
-            return Ok(());
-        }
+    render_update_result(updater.update_extended(), CURRENT_VERSION, ctx, out_writer)
+}
 
-        if update_available {
-            writeln!(
-                out_writer,
-                "Update available: v{CURRENT_VERSION} -> v{latest_ver}"
-            )?;
-        } else if strip_v_prefix(latest_ver) == strip_v_prefix(CURRENT_VERSION) {
-            writeln!(out_writer, "hbctl is up to date (v{CURRENT_VERSION}).")?;
-        } else {
-            writeln!(
-                out_writer,
-                "Release v{latest_ver} found (current: v{CURRENT_VERSION})."
-            )?;
-        }
+fn render_check_output(
+    current_ver: &str,
+    latest_ver: &str,
+    target: &str,
+    asset_name: Option<String>,
+    ctx: &OutputContext,
+    out_writer: &mut dyn Write,
+) -> anyhow::Result<()> {
+    let update_available = is_newer_version(current_ver, latest_ver)?;
 
-        match asset_name {
-            Some(name) => writeln!(out_writer, "Asset: {name}")?,
-            None => writeln!(
-                out_writer,
-                "Warning: no release asset found for target '{target}'."
-            )?,
-        }
+    if ctx.quiet {
+        writeln!(out_writer, "{}", normalize_version_tag(latest_ver))?;
+        return Ok(());
+    }
+    if ctx.format == OutputFormat::Json {
+        let payload = UpdateCheckOutput {
+            current_version: normalize_version_tag(current_ver),
+            latest_version: normalize_version_tag(latest_ver),
+            update_available,
+            target: target.to_string(),
+            asset: asset_name,
+        };
+        write_compact_json(&payload, ctx.select.as_deref(), out_writer)?;
         return Ok(());
     }
 
-    match updater.update_extended() {
+    if update_available {
+        writeln!(
+            out_writer,
+            "Update available: v{current_ver} -> v{latest_ver}"
+        )?;
+    } else if strip_v_prefix(latest_ver) == strip_v_prefix(current_ver) {
+        writeln!(out_writer, "hbctl is up to date (v{current_ver}).")?;
+    } else {
+        writeln!(
+            out_writer,
+            "Release v{latest_ver} found (current: v{current_ver})."
+        )?;
+    }
+
+    match asset_name {
+        Some(name) => writeln!(out_writer, "Asset: {name}")?,
+        None => writeln!(
+            out_writer,
+            "Warning: no release asset found for target '{target}'."
+        )?,
+    }
+    Ok(())
+}
+
+fn render_update_result(
+    result: std::result::Result<ReleaseStatus, self_update::errors::Error>,
+    current_ver: &str,
+    ctx: &OutputContext,
+    out_writer: &mut dyn Write,
+) -> anyhow::Result<()> {
+    match result {
         Ok(ReleaseStatus::UpToDate) => {
             if ctx.quiet {
-                writeln!(out_writer, "v{CURRENT_VERSION}")?;
+                writeln!(out_writer, "v{current_ver}")?;
             } else if ctx.format == OutputFormat::Json {
                 let payload = serde_json::json!({
                     "status": "up_to_date",
-                    "current_version": format!("v{CURRENT_VERSION}"),
+                    "current_version": format!("v{current_ver}"),
                 });
                 write_compact_json(&payload, ctx.select.as_deref(), out_writer)?;
             } else {
-                writeln!(
-                    out_writer,
-                    "hbctl is already up to date (v{CURRENT_VERSION})."
-                )?;
+                writeln!(out_writer, "hbctl is already up to date (v{current_ver}).")?;
             }
         }
         Ok(ReleaseStatus::Updated(release)) => {
@@ -223,20 +247,20 @@ pub fn run_self_update(
             } else if ctx.format == OutputFormat::Json {
                 let payload = serde_json::json!({
                     "status": "updated",
-                    "from": format!("v{CURRENT_VERSION}"),
+                    "from": format!("v{current_ver}"),
                     "to": normalize_version_tag(ver),
                 });
                 write_compact_json(&payload, ctx.select.as_deref(), out_writer)?;
             } else {
                 writeln!(
                     out_writer,
-                    "Successfully updated hbctl from v{CURRENT_VERSION} to v{ver}."
+                    "Successfully updated hbctl from v{current_ver} to v{ver}."
                 )?;
             }
         }
         Ok(other) => {
             let ver = other
-                .into_version_status(CURRENT_VERSION.to_string())
+                .into_version_status(current_ver.to_string())
                 .version()
                 .to_string();
             if ctx.quiet {
@@ -430,5 +454,194 @@ mod tests {
                 version: None
             }
         ));
+    }
+
+    #[test]
+    fn test_render_check_output_modes() {
+        let mut buf = Vec::new();
+        let quiet_ctx = OutputContext::new(OutputFormat::Table, None, true);
+        render_check_output(
+            "0.1.0",
+            "0.2.0",
+            "x86_64-unknown-linux-musl",
+            Some("hbctl.tar.gz".into()),
+            &quiet_ctx,
+            &mut buf,
+        )
+        .unwrap();
+        assert_eq!(String::from_utf8(buf).unwrap(), "v0.2.0\n");
+
+        let mut buf = Vec::new();
+        let json_ctx = OutputContext::new(OutputFormat::Json, None, false);
+        render_check_output(
+            "0.1.0",
+            "0.2.0",
+            "x86_64-unknown-linux-musl",
+            Some("hbctl.tar.gz".into()),
+            &json_ctx,
+            &mut buf,
+        )
+        .unwrap();
+        let val: serde_json::Value = serde_json::from_slice(&buf).unwrap();
+        assert_eq!(val["current_version"], "v0.1.0");
+        assert_eq!(val["latest_version"], "v0.2.0");
+        assert_eq!(val["update_available"], true);
+        assert_eq!(val["asset"], "hbctl.tar.gz");
+
+        let mut buf = Vec::new();
+        let select_ctx = OutputContext::new(
+            OutputFormat::Json,
+            Some(vec!["latest_version".into(), "update_available".into()]),
+            false,
+        );
+        render_check_output(
+            "0.2.0",
+            "0.2.0",
+            "x86_64-unknown-linux-musl",
+            None,
+            &select_ctx,
+            &mut buf,
+        )
+        .unwrap();
+        let val_sel: serde_json::Value = serde_json::from_slice(&buf).unwrap();
+        assert_eq!(
+            val_sel,
+            serde_json::json!({"latest_version": "v0.2.0", "update_available": false})
+        );
+
+        // Table mode: update available + asset present
+        let table_ctx = OutputContext::new(OutputFormat::Table, None, false);
+        let mut buf = Vec::new();
+        render_check_output(
+            "0.1.0",
+            "0.2.0",
+            "x86_64-unknown-linux-musl",
+            Some("hbctl.tar.gz".into()),
+            &table_ctx,
+            &mut buf,
+        )
+        .unwrap();
+        let s = String::from_utf8(buf).unwrap();
+        assert!(s.contains("Update available: v0.1.0 -> v0.2.0"));
+        assert!(s.contains("Asset: hbctl.tar.gz"));
+
+        // Table mode: up to date + missing asset warning
+        let mut buf = Vec::new();
+        render_check_output(
+            "0.2.0",
+            "0.2.0",
+            "x86_64-unknown-linux-musl",
+            None,
+            &table_ctx,
+            &mut buf,
+        )
+        .unwrap();
+        let s = String::from_utf8(buf).unwrap();
+        assert!(s.contains("hbctl is up to date (v0.2.0)."));
+        assert!(
+            s.contains("Warning: no release asset found for target 'x86_64-unknown-linux-musl'.")
+        );
+
+        // Table mode: older release found
+        let mut buf = Vec::new();
+        render_check_output(
+            "0.3.0",
+            "0.2.0",
+            "x86_64-unknown-linux-musl",
+            Some("hbctl.tar.gz".into()),
+            &table_ctx,
+            &mut buf,
+        )
+        .unwrap();
+        let s = String::from_utf8(buf).unwrap();
+        assert!(s.contains("Release v0.2.0 found (current: v0.3.0)."));
+        assert!(s.contains("Asset: hbctl.tar.gz"));
+    }
+
+    #[test]
+    fn test_render_update_result_modes() {
+        let quiet_ctx = OutputContext::new(OutputFormat::Table, None, true);
+        let json_ctx = OutputContext::new(OutputFormat::Json, None, false);
+        let table_ctx = OutputContext::new(OutputFormat::Table, None, false);
+
+        // UpToDate in quiet, JSON, table
+        let mut buf = Vec::new();
+        render_update_result(Ok(ReleaseStatus::UpToDate), "0.1.5", &quiet_ctx, &mut buf).unwrap();
+        assert_eq!(String::from_utf8(buf).unwrap(), "v0.1.5\n");
+
+        let mut buf = Vec::new();
+        render_update_result(Ok(ReleaseStatus::UpToDate), "0.1.5", &json_ctx, &mut buf).unwrap();
+        let val: serde_json::Value = serde_json::from_slice(&buf).unwrap();
+        assert_eq!(val["status"], "up_to_date");
+        assert_eq!(val["current_version"], "v0.1.5");
+
+        let mut buf = Vec::new();
+        render_update_result(Ok(ReleaseStatus::UpToDate), "0.1.5", &table_ctx, &mut buf).unwrap();
+        assert_eq!(
+            String::from_utf8(buf).unwrap(),
+            "hbctl is already up to date (v0.1.5).\n"
+        );
+
+        // Updated in quiet, JSON, table
+        let mut release = self_update::update::Release::builder();
+        release.version("0.2.0");
+        let built = release.build().unwrap();
+
+        let mut buf = Vec::new();
+        render_update_result(
+            Ok(ReleaseStatus::Updated(built.clone())),
+            "0.1.5",
+            &quiet_ctx,
+            &mut buf,
+        )
+        .unwrap();
+        assert_eq!(String::from_utf8(buf).unwrap(), "v0.2.0\n");
+
+        let mut buf = Vec::new();
+        render_update_result(
+            Ok(ReleaseStatus::Updated(built.clone())),
+            "0.1.5",
+            &json_ctx,
+            &mut buf,
+        )
+        .unwrap();
+        let val: serde_json::Value = serde_json::from_slice(&buf).unwrap();
+        assert_eq!(val["status"], "updated");
+        assert_eq!(val["from"], "v0.1.5");
+        assert_eq!(val["to"], "v0.2.0");
+
+        let mut buf = Vec::new();
+        render_update_result(
+            Ok(ReleaseStatus::Updated(built)),
+            "0.1.5",
+            &table_ctx,
+            &mut buf,
+        )
+        .unwrap();
+        assert_eq!(
+            String::from_utf8(buf).unwrap(),
+            "Successfully updated hbctl from v0.1.5 to v0.2.0.\n"
+        );
+
+        // Aborted & other errors
+        let mut buf = Vec::new();
+        render_update_result(
+            Err(self_update::errors::Error::Aborted),
+            "0.1.5",
+            &table_ctx,
+            &mut buf,
+        )
+        .unwrap();
+        assert_eq!(String::from_utf8(buf).unwrap(), "Update cancelled.\n");
+
+        let mut buf = Vec::new();
+        let err = render_update_result(
+            Err(self_update::errors::Error::no_release_found()),
+            "0.1.5",
+            &table_ctx,
+            &mut buf,
+        )
+        .unwrap_err();
+        assert!(format!("{err:#}").contains("Failed to self-update hbctl"));
     }
 }

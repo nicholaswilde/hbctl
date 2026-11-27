@@ -1114,4 +1114,48 @@ max_image_dimension = 1280
         )
         .is_err());
     }
+
+    #[test]
+    fn test_output_format_credential_source_and_url_errors() {
+        assert_eq!(
+            "TABLE".parse::<OutputFormat>().unwrap(),
+            OutputFormat::Table
+        );
+        assert_eq!(
+            " json ".parse::<OutputFormat>().unwrap(),
+            OutputFormat::Json
+        );
+        assert_eq!(
+            "Plain".parse::<OutputFormat>().unwrap(),
+            OutputFormat::Plain
+        );
+        assert!("xml".parse::<OutputFormat>().is_err());
+
+        for (src, label) in [
+            (CredentialSource::CliFlag, "cli_flag"),
+            (CredentialSource::Env, "env"),
+            (CredentialSource::LocalConfig, "local_config"),
+            (CredentialSource::UserConfig, "user_config"),
+            (CredentialSource::Keyring, "keyring"),
+            (CredentialSource::CredentialsFile, "credentials_file"),
+        ] {
+            assert_eq!(src.as_str(), label);
+            assert_eq!(src.to_string(), label);
+        }
+
+        let dir = tempdir().unwrap();
+        assert!(ConfigFile::load_from_path(&dir.path().join("missing.toml")).is_err());
+        let bad_toml = dir.path().join("bad.toml");
+        fs::write(&bad_toml, "not = [valid").unwrap();
+        assert!(ConfigFile::load_from_path(&bad_toml).is_err());
+
+        assert!(matches!(
+            normalize_base_url("   "),
+            Err(HbctlError::MissingUrl)
+        ));
+        assert!(matches!(
+            normalize_base_url("http://"),
+            Err(HbctlError::InvalidUrl { .. })
+        ));
+    }
 }
