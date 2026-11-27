@@ -6859,3 +6859,854 @@ fn test_search_filters_and_export_sort_modes() {
     assert_eq!(String::from_utf8(out_asset).unwrap(), "x2\nx1\nx3\n");
     m_export_list.assert();
 }
+
+#[test]
+fn test_bulk_item_update_positional_stdin_filters_dry_run_and_partial_failure() {
+    if !can_execute_binary() {
+        return;
+    }
+
+    // 1. Offline --dry-run with multiple positional IDs
+    let dry_out = hbctl("http://127.0.0.1:1")
+        .args([
+            "--json",
+            "--dry-run",
+            "item",
+            "update",
+            "e1",
+            "e2",
+            "--archived",
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let dry_val: Value = serde_json::from_slice(&dry_out).unwrap();
+    let dry_arr = dry_val.as_array().unwrap();
+    assert_eq!(dry_arr.len(), 2);
+    assert_eq!(dry_arr[0]["method"], "PUT");
+    assert_eq!(dry_arr[0]["url"], "http://127.0.0.1:1/api/v1/entities/e1");
+    assert_eq!(dry_arr[1]["url"], "http://127.0.0.1:1/api/v1/entities/e2");
+    assert_eq!(dry_arr[0]["body"]["archived"], true);
+
+    // Dual stdin rejection
+    hbctl("http://127.0.0.1:1")
+        .args(["item", "update", "--from-json", "-", "--items-from", "-"])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("cannot read both"));
+
+    let mut server = Server::new();
+
+    // 2. Multiple positional IDs live update
+    let m_get_e1 = server
+        .mock("GET", "/api/v1/entities/e1")
+        .with_status(200)
+        .with_body(r#"{"id":"e1","name":"One","quantity":1,"fields":[]}"#)
+        .expect(1)
+        .create();
+    let m_put_e1 = server
+        .mock("PUT", "/api/v1/entities/e1")
+        .with_status(200)
+        .with_body(r#"{"id":"e1","name":"One","quantity":1,"archived":true,"fields":[]}"#)
+        .expect(1)
+        .create();
+    let m_get_e2 = server
+        .mock("GET", "/api/v1/entities/e2")
+        .with_status(200)
+        .with_body(r#"{"id":"e2","name":"Two","quantity":1,"fields":[]}"#)
+        .expect(1)
+        .create();
+    let m_put_e2 = server
+        .mock("PUT", "/api/v1/entities/e2")
+        .with_status(200)
+        .with_body(r#"{"id":"e2","name":"Two","quantity":1,"archived":true,"fields":[]}"#)
+        .expect(1)
+        .create();
+
+    let out_pos = hbctl(&server.url())
+        .args(["--json", "item", "update", "e1", "e2", "--archived"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let pos_val: Value = serde_json::from_slice(&out_pos).unwrap();
+    assert_eq!(pos_val["updated"], 2);
+    assert_eq!(pos_val["failed"], 0);
+    assert_eq!(pos_val["ids"], json!(["e1", "e2"]));
+    m_get_e1.assert();
+    m_put_e1.assert();
+    m_get_e2.assert();
+    m_put_e2.assert();
+
+    // 3. --items-from - (stdin) with comments & duplicate IDs
+    let m_get_s1 = server
+        .mock("GET", "/api/v1/entities/s1")
+        .with_status(200)
+        .with_body(r#"{"id":"s1","name":"Stdin One","quantity":1,"fields":[]}"#)
+        .expect(1)
+        .create();
+    let m_put_s1 = server
+        .mock("PUT", "/api/v1/entities/s1")
+        .with_status(200)
+        .with_body(r#"{"id":"s1","name":"Stdin One","quantity":5,"fields":[]}"#)
+        .expect(1)
+        .create();
+    let m_get_s2 = server
+        .mock("GET", "/api/v1/entities/s2")
+        .with_status(200)
+        .with_body(r#"{"id":"s2","name":"Stdin Two","quantity":1,"fields":[]}"#)
+        .expect(1)
+        .create();
+    let m_put_s2 = server
+        .mock("PUT", "/api/v1/entities/s2")
+        .with_status(200)
+        .with_body(r#"{"id":"s2","name":"Stdin Two","quantity":5,"fields":[]}"#)
+        .expect(1)
+        .create();
+
+    hbctl(&server.url())
+        .args([
+            "-q",
+            "item",
+            "update",
+            "--items-from",
+            "-",
+            "--quantity",
+            "5",
+        ])
+        .write_stdin("# batch\ns1\n\ns2\ns1\n")
+        .assert()
+        .success()
+        .stdout(predicate::eq("s1\ns2\n"));
+    m_get_s1.assert();
+    m_put_s1.assert();
+    m_get_s2.assert();
+    m_put_s2.assert();
+
+    // 4. Filter selectors (--filter-tag, --filter-type, --filter-parent) with --dry-run and live
+    let m_tags = server
+        .mock("GET", "/api/v1/tags")
+        .with_status(200)
+        .with_body(r#"[{"id":"tag-tools","name":"tools"}]"#)
+        .expect(2)
+        .create();
+    let m_types = server
+        .mock("GET", "/api/v1/entity-types")
+        .with_status(200)
+        .with_body(r#"[{"id":"et-item","name":"Item","isLocation":false}]"#)
+        .expect(2)
+        .create();
+    let m_parents = server
+        .mock("GET", "/api/v1/entities")
+        .match_query(Matcher::Exact("page=1&pageSize=50".into()))
+        .with_status(200)
+        .with_body(r#"{"items":[{"id":"loc-garage","name":"Garage","quantity":1}],"page":1,"pageSize":50,"total":1}"#)
+        .expect(2)
+        .create();
+    let m_filtered = server
+        .mock("GET", "/api/v1/entities")
+        .match_query(Matcher::AllOf(vec![
+            Matcher::UrlEncoded("tags".into(), "tag-tools".into()),
+            Matcher::UrlEncoded("entityTypeId".into(), "et-item".into()),
+            Matcher::UrlEncoded("page".into(), "1".into()),
+        ]))
+        .with_status(200)
+        .with_body(
+            json!({
+                "items": [
+                    { "id": "f1", "name": "Drill", "quantity": 1, "parentId": "loc-garage" },
+                    { "id": "f2", "name": "Lamp", "quantity": 1, "parentId": "loc-attic" }
+                ],
+                "page": 1,
+                "pageSize": 50,
+                "total": 2
+            })
+            .to_string(),
+        )
+        .expect(2)
+        .create();
+
+    let filter_dry = hbctl(&server.url())
+        .args([
+            "--json",
+            "--dry-run",
+            "item",
+            "update",
+            "--filter-tag",
+            "tools",
+            "--filter-type",
+            "Item",
+            "--filter-parent",
+            "Garage",
+            "--insured",
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let fd_val: Value = serde_json::from_slice(&filter_dry).unwrap();
+    let fd_arr = fd_val.as_array().unwrap();
+    assert_eq!(fd_arr.len(), 1);
+    assert_eq!(
+        fd_arr[0]["url"],
+        format!("{}/api/v1/entities/f1", server.url())
+    );
+
+    let m_get_f1 = server
+        .mock("GET", "/api/v1/entities/f1")
+        .with_status(200)
+        .with_body(r#"{"id":"f1","name":"Drill","quantity":1,"parentId":"loc-garage","fields":[]}"#)
+        .expect(1)
+        .create();
+    let m_put_f1 = server
+        .mock("PUT", "/api/v1/entities/f1")
+        .with_status(200)
+        .with_body(r#"{"id":"f1","name":"Drill","quantity":1,"parentId":"loc-garage","insured":true,"fields":[]}"#)
+        .expect(1)
+        .create();
+
+    let filter_live = hbctl(&server.url())
+        .args([
+            "--json",
+            "item",
+            "update",
+            "--filter-tag",
+            "tools",
+            "--filter-type",
+            "Item",
+            "--filter-parent",
+            "Garage",
+            "--insured",
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let fl_val: Value = serde_json::from_slice(&filter_live).unwrap();
+    assert_eq!(fl_val["updated"], 1);
+    assert_eq!(fl_val["ids"], json!(["f1"]));
+    m_tags.assert();
+    m_types.assert();
+    m_parents.assert();
+    m_filtered.assert();
+    m_get_f1.assert();
+    m_put_f1.assert();
+
+    // 5. Partial failure reporting (p1 succeeds, p2 returns 404)
+    let m_get_p1 = server
+        .mock("GET", "/api/v1/entities/p1")
+        .with_status(200)
+        .with_body(r#"{"id":"p1","name":"P1","quantity":1,"fields":[]}"#)
+        .expect(1)
+        .create();
+    let m_put_p1 = server
+        .mock("PUT", "/api/v1/entities/p1")
+        .with_status(200)
+        .with_body(r#"{"id":"p1","name":"P1","quantity":1,"archived":true,"fields":[]}"#)
+        .expect(1)
+        .create();
+    let m_get_p2 = server
+        .mock("GET", "/api/v1/entities/p2")
+        .with_status(404)
+        .with_body(r#"{"error":"not found"}"#)
+        .expect(1)
+        .create();
+
+    let partial = hbctl(&server.url())
+        .args(["--json", "item", "update", "p1", "p2", "--archived"])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("error updating item 'p2'"))
+        .get_output()
+        .stdout
+        .clone();
+    let partial_val: Value = serde_json::from_slice(&partial).unwrap();
+    assert_eq!(partial_val["updated"], 1);
+    assert_eq!(partial_val["failed"], 1);
+    assert_eq!(partial_val["ids"], json!(["p1"]));
+    assert_eq!(partial_val["errors"][0]["id"], "p2");
+    m_get_p1.assert();
+    m_put_p1.assert();
+    m_get_p2.assert();
+}
+
+#[test]
+fn test_bulk_item_move_positional_file_filters_dry_run_and_partial_failure() {
+    if !can_execute_binary() {
+        return;
+    }
+
+    // 1. Offline --dry-run with multiple positional IDs + --to
+    let dry_out = hbctl("http://127.0.0.1:1")
+        .args([
+            "--json",
+            "--dry-run",
+            "item",
+            "move",
+            "m1",
+            "m2",
+            "--to",
+            "loc-1",
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let dry_val: Value = serde_json::from_slice(&dry_out).unwrap();
+    let dry_arr = dry_val.as_array().unwrap();
+    assert_eq!(dry_arr.len(), 2);
+    assert_eq!(dry_arr[0]["url"], "http://127.0.0.1:1/api/v1/entities/m1");
+    assert_eq!(dry_arr[1]["url"], "http://127.0.0.1:1/api/v1/entities/m2");
+    assert_eq!(dry_arr[0]["body"]["parentId"], "loc-1");
+
+    let mut server = Server::new();
+    let dir = tempdir().unwrap();
+    let ids_file = dir.path().join("move_ids.txt");
+    fs::write(&ids_file, "m1\nm2\n").unwrap();
+
+    // 2. --items-from file with --to none
+    let m_parents = server
+        .mock("GET", "/api/v1/entities")
+        .match_query(Matcher::Exact("page=1&pageSize=50".into()))
+        .with_status(200)
+        .with_body(
+            r#"{"items":[{"id":"loc-garage","name":"Garage","quantity":1}],"page":1,"pageSize":50,"total":1}"#,
+        )
+        .expect(2)
+        .create();
+    let m_get_m1 = server
+        .mock("GET", "/api/v1/entities/m1")
+        .with_status(200)
+        .with_body(r#"{"id":"m1","name":"M1","quantity":1,"parentId":"loc-garage","fields":[]}"#)
+        .expect(1)
+        .create();
+    let m_put_m1 = server
+        .mock("PUT", "/api/v1/entities/m1")
+        .with_status(200)
+        .with_body(r#"{"id":"m1","name":"M1","quantity":1,"fields":[]}"#)
+        .expect(1)
+        .create();
+    let m_get_m2 = server
+        .mock("GET", "/api/v1/entities/m2")
+        .with_status(200)
+        .with_body(r#"{"id":"m2","name":"M2","quantity":1,"parentId":"loc-garage","fields":[]}"#)
+        .expect(1)
+        .create();
+    let m_put_m2 = server
+        .mock("PUT", "/api/v1/entities/m2")
+        .with_status(200)
+        .with_body(r#"{"id":"m2","name":"M2","quantity":1,"fields":[]}"#)
+        .expect(1)
+        .create();
+
+    let out_file = hbctl(&server.url())
+        .args([
+            "--json",
+            "item",
+            "move",
+            "--items-from",
+            ids_file.to_str().unwrap(),
+            "--to",
+            "none",
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let mv_val: Value = serde_json::from_slice(&out_file).unwrap();
+    assert_eq!(mv_val["moved"], 2);
+    assert_eq!(mv_val["failed"], 0);
+    assert_eq!(mv_val["ids"], json!(["m1", "m2"]));
+    m_get_m1.assert();
+    m_put_m1.assert();
+    m_get_m2.assert();
+    m_put_m2.assert();
+
+    // 3. Filter selector (--tag) + partial failure including self-parent error
+    let m_tags = server
+        .mock("GET", "/api/v1/tags")
+        .with_status(200)
+        .with_body(r#"[{"id":"tag-mv","name":"relocate"}]"#)
+        .expect(1)
+        .create();
+    let m_tagged = server
+        .mock("GET", "/api/v1/entities")
+        .match_query(Matcher::AllOf(vec![
+            Matcher::UrlEncoded("tags".into(), "tag-mv".into()),
+            Matcher::UrlEncoded("page".into(), "1".into()),
+        ]))
+        .with_status(200)
+        .with_body(
+            json!({
+                "items": [
+                    { "id": "m3", "name": "M3", "quantity": 1 },
+                    { "id": "loc-garage", "name": "Garage", "quantity": 1 }
+                ],
+                "page": 1,
+                "pageSize": 50,
+                "total": 2
+            })
+            .to_string(),
+        )
+        .expect(1)
+        .create();
+    let m_get_m3 = server
+        .mock("GET", "/api/v1/entities/m3")
+        .with_status(200)
+        .with_body(r#"{"id":"m3","name":"M3","quantity":1,"fields":[]}"#)
+        .expect(1)
+        .create();
+    let m_put_m3 = server
+        .mock("PUT", "/api/v1/entities/m3")
+        .with_status(200)
+        .with_body(r#"{"id":"m3","name":"M3","quantity":1,"parentId":"loc-garage","fields":[]}"#)
+        .expect(1)
+        .create();
+
+    let partial = hbctl(&server.url())
+        .args([
+            "--json", "item", "move", "--tag", "relocate", "--to", "Garage",
+        ])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains(
+            "cannot move item 'loc-garage' under itself",
+        ))
+        .get_output()
+        .stdout
+        .clone();
+    let partial_val: Value = serde_json::from_slice(&partial).unwrap();
+    assert_eq!(partial_val["moved"], 1);
+    assert_eq!(partial_val["failed"], 1);
+    assert_eq!(partial_val["ids"], json!(["m3"]));
+    assert_eq!(partial_val["errors"][0]["id"], "loc-garage");
+
+    // 4. Bulk positional move (`item move m4 m5 Garage`)
+    let m_get_m4 = server
+        .mock("GET", "/api/v1/entities/m4")
+        .with_status(200)
+        .with_body(r#"{"id":"m4","name":"M4","quantity":1,"fields":[]}"#)
+        .expect(1)
+        .create();
+    let m_put_m4 = server
+        .mock("PUT", "/api/v1/entities/m4")
+        .with_status(200)
+        .with_body(r#"{"id":"m4","name":"M4","quantity":1,"parentId":"loc-garage","fields":[]}"#)
+        .expect(1)
+        .create();
+    let m_get_m5 = server
+        .mock("GET", "/api/v1/entities/m5")
+        .with_status(200)
+        .with_body(r#"{"id":"m5","name":"M5","quantity":1,"fields":[]}"#)
+        .expect(1)
+        .create();
+    let m_put_m5 = server
+        .mock("PUT", "/api/v1/entities/m5")
+        .with_status(200)
+        .with_body(r#"{"id":"m5","name":"M5","quantity":1,"parentId":"loc-garage","fields":[]}"#)
+        .expect(1)
+        .create();
+
+    hbctl(&server.url())
+        .args(["-q", "item", "move", "m4", "m5", "Garage"])
+        .assert()
+        .success()
+        .stdout(predicate::eq("m4\nm5\n"));
+
+    m_parents.assert();
+    m_tags.assert();
+    m_tagged.assert();
+    m_get_m3.assert();
+    m_put_m3.assert();
+    m_get_m4.assert();
+    m_put_m4.assert();
+    m_get_m5.assert();
+    m_put_m5.assert();
+}
+
+#[test]
+fn test_bulk_item_delete_safeguards_dry_run_and_partial_failure() {
+    if !can_execute_binary() {
+        return;
+    }
+
+    // 1. Non-interactive bulk delete without --yes/--force is refused offline
+    hbctl("http://127.0.0.1:1")
+        .args(["item", "delete", "d1", "d2"])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("without --yes"));
+
+    let mut server = Server::new();
+
+    // 2. Non-interactive filter delete without --yes/--force resolves targets then refuses with 0 DELETEs
+    let m_tags = server
+        .mock("GET", "/api/v1/tags")
+        .with_status(200)
+        .with_body(r#"[{"id":"tag-old","name":"old"}]"#)
+        .expect(2)
+        .create();
+    let m_tagged = server
+        .mock("GET", "/api/v1/entities")
+        .match_query(Matcher::AllOf(vec![
+            Matcher::UrlEncoded("tags".into(), "tag-old".into()),
+            Matcher::UrlEncoded("page".into(), "1".into()),
+        ]))
+        .with_status(200)
+        .with_body(
+            r#"{"items":[{"id":"d1","name":"Old 1","quantity":1},{"id":"d2","name":"Old 2","quantity":1}],"page":1,"pageSize":50,"total":2}"#,
+        )
+        .expect(2)
+        .create();
+
+    hbctl(&server.url())
+        .args(["item", "delete", "--tag", "old"])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("without --yes"));
+
+    // 3. --dry-run with filter selector sends 0 DELETEs
+    let dry_out = hbctl(&server.url())
+        .args(["--json", "--dry-run", "item", "delete", "--tag", "old"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let dry_val: Value = serde_json::from_slice(&dry_out).unwrap();
+    let dry_arr = dry_val.as_array().unwrap();
+    assert_eq!(dry_arr.len(), 2);
+    assert_eq!(dry_arr[0]["method"], "DELETE");
+    assert_eq!(
+        dry_arr[0]["url"],
+        format!("{}/api/v1/entities/d1", server.url())
+    );
+    m_tags.assert();
+    m_tagged.assert();
+
+    // 4. --items-from - with --yes and partial failure (d1 succeeds 204, d2 fails 500)
+    let m_del_d1 = server
+        .mock("DELETE", "/api/v1/entities/d1")
+        .with_status(204)
+        .expect(1)
+        .create();
+    let m_del_d2 = server
+        .mock("DELETE", "/api/v1/entities/d2")
+        .with_status(500)
+        .with_body(r#"{"error":"boom"}"#)
+        .expect(1)
+        .create();
+
+    let partial = hbctl(&server.url())
+        .args(["--json", "item", "delete", "--items-from", "-", "-y"])
+        .write_stdin("d1\nd2\n")
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("error deleting item 'd2'"))
+        .get_output()
+        .stdout
+        .clone();
+    let partial_val: Value = serde_json::from_slice(&partial).unwrap();
+    assert_eq!(partial_val["deleted"], 1);
+    assert_eq!(partial_val["failed"], 1);
+    assert_eq!(partial_val["ids"], json!(["d1"]));
+    assert_eq!(partial_val["errors"][0]["id"], "d2");
+    m_del_d1.assert();
+    m_del_d2.assert();
+
+    // 5. Multiple positional IDs with --yes succeeds cleanly
+    let m_del_a = server
+        .mock("DELETE", "/api/v1/entities/a1")
+        .with_status(204)
+        .expect(1)
+        .create();
+    let m_del_b = server
+        .mock("DELETE", "/api/v1/entities/a2")
+        .with_status(204)
+        .expect(1)
+        .create();
+    hbctl(&server.url())
+        .args(["-q", "item", "delete", "a1", "a2", "--yes"])
+        .assert()
+        .success()
+        .stdout(predicate::eq("a1\na2\n"));
+    m_del_a.assert();
+    m_del_b.assert();
+}
+
+#[test]
+fn test_item_duplicate_and_dry_run() {
+    if !can_execute_binary() {
+        return;
+    }
+
+    // 1. --count 0 rejected
+    hbctl("http://127.0.0.1:1")
+        .args(["item", "duplicate", "ent-1", "--count", "0"])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("--count must be at least 1"));
+
+    // 2. --dry-run with --count 2
+    let dry_out = hbctl("http://127.0.0.1:1")
+        .args([
+            "--json",
+            "--dry-run",
+            "item",
+            "duplicate",
+            "ent-1",
+            "--count",
+            "2",
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let dry_val: Value = serde_json::from_slice(&dry_out).unwrap();
+    let dry_arr = dry_val.as_array().unwrap();
+    assert_eq!(dry_arr.len(), 2);
+    assert_eq!(dry_arr[0]["method"], "POST");
+    assert_eq!(
+        dry_arr[0]["url"],
+        "http://127.0.0.1:1/api/v1/entities/ent-1/duplicate"
+    );
+
+    let mut server = Server::new();
+
+    // 3. Default single duplicate (--count 1)
+    let m_dup_single = server
+        .mock("POST", "/api/v1/entities/ent-1/duplicate")
+        .with_status(201)
+        .with_body(r#"{"id":"ent-copy-1","name":"Copy of Drill","quantity":1,"fields":[]}"#)
+        .expect(1)
+        .create();
+
+    let single_out = hbctl(&server.url())
+        .args(["--json", "item", "duplicate", "ent-1"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let single_val: Value = serde_json::from_slice(&single_out).unwrap();
+    assert_eq!(single_val["id"], "ent-copy-1");
+    m_dup_single.assert();
+
+    // 4. Multi-duplicate (--count 3) + -q
+    let m_dup_c1 = server
+        .mock("POST", "/api/v1/entities/ent-1/duplicate")
+        .with_status(201)
+        .with_body(r#"{"id":"copy-a","name":"Copy A","quantity":1,"fields":[]}"#)
+        .expect(1)
+        .create();
+    let m_dup_c2 = server
+        .mock("POST", "/api/v1/entities/ent-1/duplicate")
+        .with_status(201)
+        .with_body(r#"{"id":"copy-b","name":"Copy B","quantity":1,"fields":[]}"#)
+        .expect(1)
+        .create();
+    let m_dup_c3 = server
+        .mock("POST", "/api/v1/entities/ent-1/duplicate")
+        .with_status(201)
+        .with_body(r#"{"id":"copy-c","name":"Copy C","quantity":1,"fields":[]}"#)
+        .expect(1)
+        .create();
+
+    hbctl(&server.url())
+        .args(["-q", "item", "duplicate", "ent-1", "--count", "3"])
+        .assert()
+        .success()
+        .stdout(predicate::eq("copy-a\ncopy-b\ncopy-c\n"));
+    m_dup_c1.assert();
+    m_dup_c2.assert();
+    m_dup_c3.assert();
+}
+
+#[test]
+fn test_item_path_and_with_path_for_get_and_search() {
+    if !can_execute_binary() {
+        return;
+    }
+    let mut server = Server::new();
+
+    // 1. `item path` with bare array response in table, json, plain, quiet
+    let m_path_arr = server
+        .mock("GET", "/api/v1/entities/ent-1/path")
+        .with_status(200)
+        .with_body(
+            r#"[
+                {"id":"loc-1","name":"House","type":"location"},
+                {"id":"loc-2","name":"Garage","type":"location"},
+                {"id":"ent-1","name":"Drill","type":"item"}
+            ]"#,
+        )
+        .expect(4)
+        .create();
+
+    hbctl(&server.url())
+        .args(["item", "path", "ent-1"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("DEPTH"))
+        .stdout(predicate::str::contains("House"))
+        .stdout(predicate::str::contains("Garage"));
+
+    let path_json = hbctl(&server.url())
+        .args(["--json", "item", "path", "ent-1"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let pj: Value = serde_json::from_slice(&path_json).unwrap();
+    assert_eq!(pj["id"], "ent-1");
+    assert_eq!(pj["breadcrumb"], "House > Garage > Drill");
+    assert_eq!(pj["path"].as_array().unwrap().len(), 3);
+
+    hbctl(&server.url())
+        .args(["--output", "plain", "item", "path", "ent-1"])
+        .assert()
+        .success()
+        .stdout(predicate::eq("House > Garage > Drill\n"));
+
+    hbctl(&server.url())
+        .args(["-q", "item", "path", "ent-1"])
+        .assert()
+        .success()
+        .stdout(predicate::eq("loc-1\nloc-2\nent-1\n"));
+    m_path_arr.assert();
+
+    // 2. `item path` with wrapped `{"path": [...]}` response
+    let m_path_wrapped = server
+        .mock("GET", "/api/v1/entities/ent-2/path")
+        .with_status(200)
+        .with_body(r#"{"path":[{"id":"loc-9","name":"Attic"}]}"#)
+        .expect(1)
+        .create();
+    hbctl(&server.url())
+        .args(["--output", "plain", "item", "path", "ent-2"])
+        .assert()
+        .success()
+        .stdout(predicate::eq("Attic\n"));
+    m_path_wrapped.assert();
+
+    // 3. `item get` without --with-path makes zero /path requests; with --with-path enriches output
+    let m_get_e1 = server
+        .mock("GET", "/api/v1/entities/ent-1")
+        .with_status(200)
+        .with_body(r#"{"id":"ent-1","name":"Drill","quantity":1,"parentId":"loc-2","fields":[]}"#)
+        .expect(3)
+        .create();
+    let m_get_path_e1 = server
+        .mock("GET", "/api/v1/entities/ent-1/path")
+        .with_status(200)
+        .with_body(r#"[{"id":"loc-1","name":"House"},{"id":"loc-2","name":"Garage"},{"id":"ent-1","name":"Drill"}]"#)
+        .expect(2)
+        .create();
+
+    // Default `item get` (no --with-path)
+    let default_get = hbctl(&server.url())
+        .args(["--json", "item", "get", "ent-1"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let dg_val: Value = serde_json::from_slice(&default_get).unwrap();
+    assert!(dg_val.get("breadcrumb").is_none());
+
+    // `item get --with-path` JSON + --select
+    let wp_get_json = hbctl(&server.url())
+        .args([
+            "--json",
+            "--select",
+            "id,name,breadcrumb",
+            "item",
+            "get",
+            "ent-1",
+            "--with-path",
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let wp_val: Value = serde_json::from_slice(&wp_get_json).unwrap();
+    assert_eq!(wp_val["id"], "ent-1");
+    assert_eq!(wp_val["breadcrumb"], "House > Garage > Drill");
+
+    // `item get --with-path` table
+    hbctl(&server.url())
+        .args(["item", "get", "ent-1", "--with-path"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("path"))
+        .stdout(predicate::str::contains("House > Garage > Drill"));
+    m_get_e1.assert();
+    m_get_path_e1.assert();
+
+    // 4. `search` without --with-path makes zero /path requests; `search --with-path` fetches paths
+    let m_search_list = server
+        .mock("GET", "/api/v1/entities")
+        .match_query(Matcher::AllOf(vec![
+            Matcher::UrlEncoded("q".into(), "drill".into()),
+            Matcher::UrlEncoded("page".into(), "1".into()),
+        ]))
+        .with_status(200)
+        .with_body(
+            r#"{"items":[{"id":"s-1","name":"Cordless Drill","quantity":1}],"page":1,"pageSize":50,"total":1}"#,
+        )
+        .expect(3)
+        .create();
+    let m_search_path = server
+        .mock("GET", "/api/v1/entities/s-1/path")
+        .with_status(200)
+        .with_body(r#"[{"id":"loc-2","name":"Garage"},{"id":"s-1","name":"Cordless Drill"}]"#)
+        .expect(2)
+        .create();
+
+    let default_search = hbctl(&server.url())
+        .args(["--json", "search", "drill"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let ds_val: Value = serde_json::from_slice(&default_search).unwrap();
+    assert!(ds_val[0].get("breadcrumb").is_none());
+
+    let wp_search_json = hbctl(&server.url())
+        .args([
+            "--json",
+            "--select",
+            "id,name,breadcrumb",
+            "search",
+            "drill",
+            "--with-path",
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let wps_val: Value = serde_json::from_slice(&wp_search_json).unwrap();
+    assert_eq!(wps_val[0]["id"], "s-1");
+    assert_eq!(wps_val[0]["breadcrumb"], "Garage > Cordless Drill");
+
+    hbctl(&server.url())
+        .args(["search", "drill", "--with-path"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("PATH"))
+        .stdout(predicate::str::contains("Garage > Cordless Drill"));
+    m_search_list.assert();
+    m_search_path.assert();
+}

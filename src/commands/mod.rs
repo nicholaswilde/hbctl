@@ -10,11 +10,15 @@ pub mod search;
 pub mod status;
 pub mod tag;
 
+use std::collections::HashSet;
 use std::fs;
 use std::io::{self, Read, Write};
+use std::path::Path;
+
+use serde_json::Value;
 
 use crate::cli::{Cli, Commands};
-use crate::client::models::{is_blank_date, Entity};
+use crate::client::models::{format_breadcrumb, is_blank_date, Entity, EntityPathEntry};
 use crate::config::{AppConfig, OutputFormat};
 use crate::error::{HbctlError, Result};
 use crate::output::{
@@ -69,6 +73,58 @@ pub fn read_file_or_stdin(path: &str) -> Result<String> {
     }
 }
 
+/// Parse newline-delimited entity IDs, ignoring blank lines and `#` comments, deduplicating while preserving order.
+pub fn parse_item_ids(input: &str) -> Vec<String> {
+    let mut seen = HashSet::new();
+    let mut ids = Vec::new();
+    for raw in input.lines() {
+        let trimmed = raw.trim();
+        if trimmed.is_empty() || trimmed.starts_with('#') {
+            continue;
+        }
+        if seen.insert(trimmed.to_string()) {
+            ids.push(trimmed.to_string());
+        }
+    }
+    ids
+}
+
+/// Read newline-delimited entity IDs from a file path or `-` (stdin).
+pub fn read_item_ids(path: &Path) -> Result<Vec<String>> {
+    let raw = if path.as_os_str() == "-" {
+        let mut buf = String::new();
+        io::stdin().read_to_string(&mut buf)?;
+        buf
+    } else {
+        fs::read_to_string(path).map_err(|e| {
+            HbctlError::InvalidInput(format!(
+                "cannot read item IDs file '{}': {e}",
+                path.display()
+            ))
+        })?
+    };
+    Ok(parse_item_ids(&raw))
+}
+
+fn entity_tags_csv(entity: &Entity) -> String {
+    entity
+        .tags
+        .iter()
+        .map(|t| t.name.as_str())
+        .collect::<Vec<_>>()
+        .join(", ")
+}
+
+fn enrich_entity_with_path(entity: &Entity, path: &[EntityPathEntry]) -> Result<Value> {
+    let mut val = serde_json::to_value(entity)?;
+    let breadcrumb = format_breadcrumb(path);
+    if let Some(obj) = val.as_object_mut() {
+        obj.insert("path".to_string(), serde_json::to_value(path)?);
+        obj.insert("breadcrumb".to_string(), Value::String(breadcrumb));
+    }
+    Ok(val)
+}
+
 /// Render a list of entities to `stdout` honoring `--quiet`, `--json`, `--select`, and `--output`.
 pub fn render_entities(
     entities: &[Entity],
@@ -98,17 +154,11 @@ pub fn render_entities(
     let rows: Vec<Vec<String>> = entities
         .iter()
         .map(|e| {
-            let tags = e
-                .tags
-                .iter()
-                .map(|t| t.name.as_str())
-                .collect::<Vec<_>>()
-                .join(", ");
             vec![
                 e.id.clone(),
                 e.name.clone(),
                 e.quantity.to_string(),
-                tags,
+                entity_tags_csv(e),
                 e.description.clone(),
             ]
         })
@@ -117,20 +167,64 @@ pub fn render_entities(
     write_table_or_plain(&headers, &rows, ctx.format, out)
 }
 
-/// Render a single entity to `stdout` honoring `--quiet`, `--json`, `--select`, and `--output`.
-pub fn render_entity(entity: &Entity, ctx: &OutputContext, out: &mut dyn Write) -> Result<()> {
+/// Render a list of entities alongside their breadcrumb paths to `stdout`.
+pub fn render_entities_with_paths(
+    entities: &[Entity],
+    paths: &[Vec<EntityPathEntry>],
+    ctx: &OutputContext,
+    out: &mut dyn Write,
+) -> Result<()> {
     if ctx.quiet {
-        return write_quiet_ids(std::slice::from_ref(&entity.id), out);
+        let ids: Vec<String> = entities.iter().map(|e| e.id.clone()).collect();
+        return write_quiet_ids(&ids, out);
     }
 
-    if ctx.format == OutputFormat::Json {
-        return write_compact_json(entity, ctx.select.as_deref(), out);
+    if ctx.format == OutputFormat::Json || ctx.select.is_some() {
+        let enriched: Vec<Value> = entities
+            .iter()
+            .enumerate()
+            .map(|(idx, e)| {
+                let p = paths.get(idx).map(Vec::as_slice).unwrap_or(&[]);
+                enrich_entity_with_path(e, p)
+            })
+            .collect::<Result<Vec<_>>>()?;
+
+        if ctx.format == OutputFormat::Json {
+            return write_compact_json(&enriched, ctx.select.as_deref(), out);
+        }
+        if let Some(ref select) = ctx.select {
+            return write_selected_table(&enriched, select, ctx.format, out);
+        }
     }
 
-    if let Some(ref select) = ctx.select {
-        return write_selected_table(std::slice::from_ref(entity), select, ctx.format, out);
-    }
+    let headers = vec![
+        "ID".to_string(),
+        "NAME".to_string(),
+        "QTY".to_string(),
+        "PATH".to_string(),
+        "TAGS".to_string(),
+        "DESCRIPTION".to_string(),
+    ];
+    let rows: Vec<Vec<String>> = entities
+        .iter()
+        .enumerate()
+        .map(|(idx, e)| {
+            let p = paths.get(idx).map(Vec::as_slice).unwrap_or(&[]);
+            vec![
+                e.id.clone(),
+                e.name.clone(),
+                e.quantity.to_string(),
+                format_breadcrumb(p),
+                entity_tags_csv(e),
+                e.description.clone(),
+            ]
+        })
+        .collect();
 
+    write_table_or_plain(&headers, &rows, ctx.format, out)
+}
+
+fn entity_property_rows(entity: &Entity, breadcrumb: Option<&str>) -> Vec<Vec<String>> {
     let mut rows = vec![
         vec!["id".to_string(), entity.id.clone()],
         vec!["name".to_string(), entity.name.clone()],
@@ -145,14 +239,13 @@ pub fn render_entity(entity: &Entity, ctx: &OutputContext, out: &mut dyn Write) 
             rows.push(vec!["parentId".to_string(), pid.clone()]);
         }
     }
+    if let Some(bc) = breadcrumb {
+        if !bc.trim().is_empty() {
+            rows.push(vec!["path".to_string(), bc.to_string()]);
+        }
+    }
     if !entity.tags.is_empty() {
-        let names = entity
-            .tags
-            .iter()
-            .map(|t| t.name.as_str())
-            .collect::<Vec<_>>()
-            .join(", ");
-        rows.push(vec!["tags".to_string(), names]);
+        rows.push(vec!["tags".to_string(), entity_tags_csv(entity)]);
     }
     if let Some(price) = entity.purchase_price {
         rows.push(vec!["purchasePrice".to_string(), format!("{price:.2}")]);
@@ -217,7 +310,55 @@ pub fn render_entity(entity: &Entity, ctx: &OutputContext, out: &mut dyn Write) 
             entity.attachments.len().to_string(),
         ]);
     }
+    rows
+}
 
+/// Render a single entity to `stdout` honoring `--quiet`, `--json`, `--select`, and `--output`.
+pub fn render_entity(entity: &Entity, ctx: &OutputContext, out: &mut dyn Write) -> Result<()> {
+    if ctx.quiet {
+        return write_quiet_ids(std::slice::from_ref(&entity.id), out);
+    }
+
+    if ctx.format == OutputFormat::Json {
+        return write_compact_json(entity, ctx.select.as_deref(), out);
+    }
+
+    if let Some(ref select) = ctx.select {
+        return write_selected_table(std::slice::from_ref(entity), select, ctx.format, out);
+    }
+
+    let rows = entity_property_rows(entity, None);
+    write_table_or_plain(
+        &["PROPERTY".to_string(), "VALUE".to_string()],
+        &rows,
+        ctx.format,
+        out,
+    )
+}
+
+/// Render a single entity alongside its breadcrumb path to `stdout`.
+pub fn render_entity_with_path(
+    entity: &Entity,
+    path: &[EntityPathEntry],
+    ctx: &OutputContext,
+    out: &mut dyn Write,
+) -> Result<()> {
+    if ctx.quiet {
+        return write_quiet_ids(std::slice::from_ref(&entity.id), out);
+    }
+
+    if ctx.format == OutputFormat::Json || ctx.select.is_some() {
+        let val = enrich_entity_with_path(entity, path)?;
+        if ctx.format == OutputFormat::Json {
+            return write_compact_json(&val, ctx.select.as_deref(), out);
+        }
+        if let Some(ref select) = ctx.select {
+            return write_selected_table(&[val], select, ctx.format, out);
+        }
+    }
+
+    let breadcrumb = format_breadcrumb(path);
+    let rows = entity_property_rows(entity, Some(&breadcrumb));
     write_table_or_plain(
         &["PROPERTY".to_string(), "VALUE".to_string()],
         &rows,

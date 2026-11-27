@@ -4,7 +4,7 @@ use crate::cli::SearchArgs;
 use crate::client::models::{entity_warranty_expiring_within, today_utc_days, Entity};
 use crate::client::resolve::Resolver;
 use crate::client::{HomeboxClient, ListEntitiesQuery};
-use crate::commands::render_entities;
+use crate::commands::{render_entities, render_entities_with_paths};
 use crate::config::AppConfig;
 use crate::error::{HbctlError, Result};
 use crate::output::OutputContext;
@@ -131,6 +131,12 @@ pub fn handle(
 
     if let Some(limit) = args.limit {
         entities.truncate(limit);
+    }
+
+    if args.with_path {
+        let ids: Vec<String> = entities.iter().map(|e| e.id.clone()).collect();
+        let paths = client.get_entity_paths_by_ids(&ids)?;
+        return render_entities_with_paths(&entities, &paths, ctx, out);
     }
 
     render_entities(&entities, ctx, out)

@@ -219,6 +219,10 @@ pub enum ItemCommands {
     Dedup(ItemDedupArgs),
     /// Move an item under a parent item/location (or 'none' to unparent)
     Move(ItemMoveArgs),
+    /// Duplicate an existing item one or more times
+    Duplicate(ItemDuplicateArgs),
+    /// Display the location/parent breadcrumb path for an item
+    Path(ItemPathArgs),
     /// Render item parent/location hierarchy as a tree
     Tree(ItemTreeArgs),
 }
@@ -266,6 +270,10 @@ pub struct ItemListArgs {
 pub struct ItemGetArgs {
     /// Entity ID
     pub id: String,
+
+    /// Include full location/parent breadcrumb path in output
+    #[arg(long)]
+    pub with_path: bool,
 }
 
 #[derive(Args, Debug, Clone)]
@@ -393,8 +401,25 @@ pub struct ItemCreateArgs {
 
 #[derive(Args, Debug, Clone)]
 pub struct ItemUpdateArgs {
-    /// Entity ID to update
-    pub id: String,
+    /// Entity ID(s) to update (omit when using --items-from or filter selectors)
+    #[arg(value_name = "ID")]
+    pub ids: Vec<String>,
+
+    /// Read newline-delimited entity IDs to update from a file or '-' (stdin)
+    #[arg(long = "items-from", value_name = "FILE|-")]
+    pub items_from: Option<PathBuf>,
+
+    /// Select items to update matching this tag name or UUID
+    #[arg(long = "filter-tag", value_name = "TAG")]
+    pub filter_tag: Option<String>,
+
+    /// Select items to update under this parent item/location name, ID, or 'none'
+    #[arg(long = "filter-parent", value_name = "PARENT")]
+    pub filter_parent: Option<String>,
+
+    /// Select items to update matching this entity type name or UUID
+    #[arg(long = "filter-type", value_name = "TYPE")]
+    pub filter_type: Option<String>,
 
     /// Updated item name
     #[arg(long)]
@@ -736,12 +761,43 @@ pub struct ItemUpsertArgs {
 
 #[derive(Args, Debug, Clone)]
 pub struct ItemDeleteArgs {
-    /// Entity ID to delete
-    pub id: String,
+    /// Entity ID(s) to delete (omit when using --items-from or filter selectors)
+    #[arg(value_name = "ID")]
+    pub ids: Vec<String>,
 
-    /// Skip interactive confirmation prompt
+    /// Read newline-delimited entity IDs to delete from a file or '-' (stdin)
+    #[arg(long = "items-from", value_name = "FILE|-")]
+    pub items_from: Option<PathBuf>,
+
+    /// Select items to delete matching this tag name or UUID
+    #[arg(long = "tag", visible_alias = "filter-tag", value_name = "TAG")]
+    pub tag: Option<String>,
+
+    /// Select items to delete under this parent item/location name, ID, or 'none'
+    #[arg(
+        long = "parent",
+        visible_alias = "filter-parent",
+        value_name = "PARENT"
+    )]
+    pub parent: Option<String>,
+
+    /// Select items to delete matching this entity type name or UUID
+    #[arg(long = "type", visible_alias = "filter-type", value_name = "TYPE")]
+    pub entity_type: Option<String>,
+
+    /// Skip interactive/bulk confirmation prompt
+    #[arg(short = 'y', long = "yes")]
+    pub yes: bool,
+
+    /// Skip interactive/bulk confirmation prompt
     #[arg(long)]
     pub force: bool,
+}
+
+impl ItemDeleteArgs {
+    pub fn skip_confirm(&self) -> bool {
+        self.yes || self.force
+    }
 }
 
 #[derive(ValueEnum, Clone, Copy, Debug, PartialEq, Eq)]
@@ -798,11 +854,95 @@ pub struct ItemImportArgs {
 
 #[derive(Args, Debug, Clone)]
 pub struct ItemMoveArgs {
-    /// Entity ID to move
+    /// Entity ID(s) followed by target parent (`<ID>... <PARENT>`), or `<ID>...` when `--to` is set
+    #[arg(value_name = "ID_OR_PARENT")]
+    pub ids: Vec<String>,
+
+    /// Target parent item name, ID, or 'none' to unparent (required when using selectors without trailing positional parent)
+    #[arg(long = "to", value_name = "PARENT")]
+    pub to: Option<String>,
+
+    /// Read newline-delimited entity IDs to move from a file or '-' (stdin)
+    #[arg(long = "items-from", value_name = "FILE|-")]
+    pub items_from: Option<PathBuf>,
+
+    /// Select items to move matching this tag name or UUID
+    #[arg(long = "tag", visible_alias = "filter-tag", value_name = "TAG")]
+    pub tag: Option<String>,
+
+    /// Select items to move under this parent item/location name, ID, or 'none'
+    #[arg(
+        long = "parent",
+        visible_alias = "filter-parent",
+        value_name = "PARENT"
+    )]
+    pub parent: Option<String>,
+
+    /// Select items to move matching this entity type name or UUID
+    #[arg(long = "type", visible_alias = "filter-type", value_name = "TYPE")]
+    pub entity_type: Option<String>,
+}
+
+impl ItemMoveArgs {
+    /// Split positional arguments and `--to` into `(explicit_item_ids, destination_parent)`.
+    pub fn split_targets_and_destination(&self) -> crate::error::Result<(Vec<String>, String)> {
+        let has_selector = self.items_from.is_some()
+            || self.tag.is_some()
+            || self.parent.is_some()
+            || self.entity_type.is_some();
+
+        if let Some(ref dest) = self.to {
+            if dest.trim().is_empty() {
+                return Err(crate::error::HbctlError::InvalidInput(
+                    "target parent cannot be empty".to_string(),
+                ));
+            }
+            return Ok((self.ids.clone(), dest.clone()));
+        }
+
+        if has_selector {
+            let Some((dest, targets)) = self.ids.split_last() else {
+                return Err(crate::error::HbctlError::InvalidInput(
+                    "missing target parent: pass --to <PARENT>".to_string(),
+                ));
+            };
+            if dest.trim().is_empty() {
+                return Err(crate::error::HbctlError::InvalidInput(
+                    "target parent cannot be empty".to_string(),
+                ));
+            }
+            return Ok((targets.to_vec(), dest.clone()));
+        }
+
+        if self.ids.len() < 2 {
+            return Err(crate::error::HbctlError::InvalidInput(
+                "specify <ID>... <PARENT> or use --to <PARENT> with --items-from/--tag/--parent/--type".to_string(),
+            ));
+        }
+        let (dest, targets) = self.ids.split_last().expect("checked len >= 2 above");
+        if dest.trim().is_empty() {
+            return Err(crate::error::HbctlError::InvalidInput(
+                "target parent cannot be empty".to_string(),
+            ));
+        }
+        Ok((targets.to_vec(), dest.clone()))
+    }
+}
+
+#[derive(Args, Debug, Clone)]
+pub struct ItemDuplicateArgs {
+    /// Entity ID to duplicate
     pub id: String,
 
-    /// Target parent item name, ID, or 'none' to unparent
-    pub parent: String,
+    /// Number of duplicates to create
+    #[arg(long, default_value_t = 1, value_name = "N")]
+    pub count: usize,
+}
+
+#[derive(Args, Debug, Clone)]
+pub struct ItemPathArgs {
+    /// Entity ID
+    pub id: String,
 }
 
 #[derive(Args, Debug, Clone)]
@@ -999,6 +1139,10 @@ pub struct SearchArgs {
     /// Match items satisfying ANY provided filter (OR) instead of ALL filters (AND)
     #[arg(long)]
     pub any: bool,
+
+    /// Include full location/parent breadcrumb path for each matching item
+    #[arg(long)]
+    pub with_path: bool,
 }
 
 // -----------------------------------------------------------------------------
@@ -1813,8 +1957,10 @@ mod tests {
             Commands::Item(ItemArgs {
                 command: ItemCommands::Move(a),
             }) => {
-                assert_eq!(a.id, "ent-1");
-                assert_eq!(a.parent, "Garage");
+                assert_eq!(
+                    a.split_targets_and_destination().unwrap(),
+                    (vec!["ent-1".to_string()], "Garage".to_string())
+                );
             }
             other => panic!("unexpected command: {other:?}"),
         }
@@ -2561,6 +2707,146 @@ mod tests {
                 Commands::Export(a) => assert_eq!(a.sort, expected),
                 other => panic!("unexpected command: {other:?}"),
             }
+        }
+    }
+
+    #[test]
+    fn test_cli_parse_wave2_bulk_duplicate_and_path() {
+        let upd = Cli::try_parse_from([
+            "hbctl",
+            "item",
+            "update",
+            "ent-1",
+            "ent-2",
+            "--items-from",
+            "-",
+            "--filter-tag",
+            "tools",
+            "--filter-parent",
+            "Garage",
+            "--filter-type",
+            "Item",
+            "--tag",
+            "new-tag",
+            "--archived",
+        ])
+        .unwrap();
+        match upd.command {
+            Commands::Item(ItemArgs {
+                command: ItemCommands::Update(a),
+            }) => {
+                assert_eq!(a.ids, vec!["ent-1", "ent-2"]);
+                assert_eq!(a.items_from, Some(PathBuf::from("-")));
+                assert_eq!(a.filter_tag.as_deref(), Some("tools"));
+                assert_eq!(a.filter_parent.as_deref(), Some("Garage"));
+                assert_eq!(a.filter_type.as_deref(), Some("Item"));
+                assert_eq!(a.tags, vec!["new-tag"]);
+                assert_eq!(a.archived, Some(true));
+            }
+            other => panic!("unexpected command: {other:?}"),
+        }
+
+        let mv_multi =
+            Cli::try_parse_from(["hbctl", "item", "move", "ent-1", "ent-2", "--to", "Garage"])
+                .unwrap();
+        match mv_multi.command {
+            Commands::Item(ItemArgs {
+                command: ItemCommands::Move(a),
+            }) => {
+                assert_eq!(
+                    a.split_targets_and_destination().unwrap(),
+                    (
+                        vec!["ent-1".to_string(), "ent-2".to_string()],
+                        "Garage".to_string()
+                    )
+                );
+            }
+            other => panic!("unexpected command: {other:?}"),
+        }
+
+        let mv_sel =
+            Cli::try_parse_from(["hbctl", "item", "move", "--tag", "tools", "--to", "none"])
+                .unwrap();
+        match mv_sel.command {
+            Commands::Item(ItemArgs {
+                command: ItemCommands::Move(a),
+            }) => {
+                assert_eq!(a.tag.as_deref(), Some("tools"));
+                assert_eq!(
+                    a.split_targets_and_destination().unwrap(),
+                    (Vec::<String>::new(), "none".to_string())
+                );
+            }
+            other => panic!("unexpected command: {other:?}"),
+        }
+
+        let mv_missing_dest =
+            Cli::try_parse_from(["hbctl", "item", "move", "--tag", "tools"]).unwrap();
+        match mv_missing_dest.command {
+            Commands::Item(ItemArgs {
+                command: ItemCommands::Move(a),
+            }) => assert!(a.split_targets_and_destination().is_err()),
+            other => panic!("unexpected command: {other:?}"),
+        }
+
+        let del = Cli::try_parse_from([
+            "hbctl",
+            "item",
+            "delete",
+            "ent-1",
+            "ent-2",
+            "--items-from",
+            "ids.txt",
+            "--filter-tag",
+            "old",
+            "-y",
+        ])
+        .unwrap();
+        match del.command {
+            Commands::Item(ItemArgs {
+                command: ItemCommands::Delete(a),
+            }) => {
+                assert_eq!(a.ids, vec!["ent-1", "ent-2"]);
+                assert_eq!(a.items_from, Some(PathBuf::from("ids.txt")));
+                assert_eq!(a.tag.as_deref(), Some("old"));
+                assert!(a.yes);
+                assert!(a.skip_confirm());
+            }
+            other => panic!("unexpected command: {other:?}"),
+        }
+
+        let dup =
+            Cli::try_parse_from(["hbctl", "item", "duplicate", "ent-1", "--count", "3"]).unwrap();
+        match dup.command {
+            Commands::Item(ItemArgs {
+                command: ItemCommands::Duplicate(a),
+            }) => {
+                assert_eq!(a.id, "ent-1");
+                assert_eq!(a.count, 3);
+            }
+            other => panic!("unexpected command: {other:?}"),
+        }
+
+        let path = Cli::try_parse_from(["hbctl", "item", "path", "ent-1"]).unwrap();
+        match path.command {
+            Commands::Item(ItemArgs {
+                command: ItemCommands::Path(a),
+            }) => assert_eq!(a.id, "ent-1"),
+            other => panic!("unexpected command: {other:?}"),
+        }
+
+        let get_wp = Cli::try_parse_from(["hbctl", "item", "get", "ent-1", "--with-path"]).unwrap();
+        match get_wp.command {
+            Commands::Item(ItemArgs {
+                command: ItemCommands::Get(a),
+            }) => assert!(a.with_path),
+            other => panic!("unexpected command: {other:?}"),
+        }
+
+        let search_wp = Cli::try_parse_from(["hbctl", "search", "drill", "--with-path"]).unwrap();
+        match search_wp.command {
+            Commands::Search(a) => assert!(a.with_path),
+            other => panic!("unexpected command: {other:?}"),
         }
     }
 }

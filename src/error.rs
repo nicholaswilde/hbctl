@@ -48,6 +48,13 @@ pub enum HbctlError {
         size_bytes: u64,
         max_bytes: u64,
     },
+
+    #[error("bulk {action} completed with {failed} failure(s) ({succeeded} succeeded)")]
+    BulkPartialFailure {
+        action: String,
+        succeeded: usize,
+        failed: usize,
+    },
 }
 
 pub type Result<T> = std::result::Result<T, HbctlError>;

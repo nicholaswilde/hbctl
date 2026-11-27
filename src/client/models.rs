@@ -959,6 +959,64 @@ impl Entity {
     }
 }
 
+/// Entry in Homebox `GET /api/v1/entities/{id}/path` breadcrumb response.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+pub struct EntityPathEntry {
+    #[serde(default)]
+    pub id: String,
+
+    #[serde(default)]
+    pub name: String,
+
+    #[serde(rename = "type", default, skip_serializing_if = "Option::is_none")]
+    pub entry_type: Option<String>,
+
+    #[serde(rename = "assetId", default, skip_serializing_if = "Option::is_none")]
+    pub asset_id: Option<String>,
+
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// Homebox `/entities/{id}/path` response shape (bare array, `{ "path": [...] }`, or `null`).
+#[derive(Debug, Clone, Deserialize)]
+#[serde(untagged)]
+pub enum EntityPathResponse {
+    Array(Vec<EntityPathEntry>),
+    Wrapped {
+        #[serde(default, deserialize_with = "deserialize_null_default")]
+        path: Vec<EntityPathEntry>,
+    },
+    Null,
+}
+
+impl EntityPathResponse {
+    pub fn into_entries(self) -> Vec<EntityPathEntry> {
+        match self {
+            Self::Array(entries) => entries,
+            Self::Wrapped { path } => path,
+            Self::Null => Vec::new(),
+        }
+    }
+}
+
+/// Format an entity path into a `Parent > Child > Item` breadcrumb string.
+pub fn format_breadcrumb(entries: &[EntityPathEntry]) -> String {
+    entries
+        .iter()
+        .filter_map(|e| {
+            let name = e.name.trim();
+            if !name.is_empty() {
+                Some(name)
+            } else {
+                let id = e.id.trim();
+                (!id.is_empty()).then_some(id)
+            }
+        })
+        .collect::<Vec<_>>()
+        .join(" > ")
+}
+
 /// Paginated or array list response from Homebox endpoints.
 #[derive(Debug, Clone, Deserialize)]
 #[serde(untagged, bound(deserialize = "T: Deserialize<'de>"))]
@@ -2529,5 +2587,44 @@ mod tests {
             30,
             today
         ));
+    }
+
+    #[test]
+    fn test_entity_path_response_shapes_and_breadcrumb() {
+        let arr: EntityPathResponse = serde_json::from_value(json!([
+            { "id": "loc-1", "name": "Garage", "type": "location", "assetId": "LOC-1" },
+            { "id": "ent-1", "name": "Multimeter", "type": "item" }
+        ]))
+        .unwrap();
+        let arr_entries = arr.into_entries();
+        assert_eq!(arr_entries.len(), 2);
+        assert_eq!(arr_entries[0].entry_type.as_deref(), Some("location"));
+        assert_eq!(arr_entries[0].asset_id.as_deref(), Some("LOC-1"));
+        assert_eq!(format_breadcrumb(&arr_entries), "Garage > Multimeter");
+
+        let wrapped: EntityPathResponse = serde_json::from_value(json!({
+            "path": [
+                { "id": "loc-1", "name": "House" },
+                { "id": "loc-2", "name": "   " },
+                { "id": "loc-3", "name": "Shelf B" }
+            ]
+        }))
+        .unwrap();
+        let wrapped_entries = wrapped.into_entries();
+        assert_eq!(wrapped_entries.len(), 3);
+        assert_eq!(
+            format_breadcrumb(&wrapped_entries),
+            "House > loc-2 > Shelf B"
+        );
+
+        let wrapped_null: EntityPathResponse = serde_json::from_value(json!({
+            "path": null
+        }))
+        .unwrap();
+        assert!(wrapped_null.into_entries().is_empty());
+
+        let null_resp: EntityPathResponse = serde_json::from_value(Value::Null).unwrap();
+        assert!(null_resp.into_entries().is_empty());
+        assert_eq!(format_breadcrumb(&[]), "");
     }
 }

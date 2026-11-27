@@ -218,6 +218,7 @@ _arguments "${_arguments_options[@]}" : \
 '--parent=[Filter by parent item name, ID, or '\''none'\'' for top-level items]:PARENT:_default' \
 '--has-field=[Only include items having the named custom field (hydrates details if missing)]:HAS_FIELD:_default' \
 '--page-size=[Page size for listing]:PAGE_SIZE:_default' \
+'--warranty-expiring=[Only show items with a warranty expiring within the next DAYS days (excludes lifetime warranties)]:DAYS:_default' \
 '--url=[Homebox base URL (env\: HBCTL_URL > HOMEBOX_URL > http\://<HOMEBOX_IP>\:7745)]:URL:_default' \
 '--api-key=[Homebox API key or Bearer token (env\: HBCTL_API_KEY > HOMEBOX_API_KEY)]:API_KEY:_default' \
 '--output=[Output format (table, json, plain) \[env\: HBCTL_OUTPUT\]]:OUTPUT:(table json plain)' \
@@ -227,6 +228,8 @@ _arguments "${_arguments_options[@]}" : \
 '-P+[Named configuration profile (env\: HBCTL_PROFILE)]:NAME:_default' \
 '--profile=[Named configuration profile (env\: HBCTL_PROFILE)]:NAME:_default' \
 '--all[Fetch all pages]' \
+'--include-archived[Include archived items in results]' \
+'--archived-only[Only show archived items (implies --include-archived)]' \
 '--json[Shorthand for --output json (emits compact JSON)]' \
 '--dry-run[Preview mutating requests without hitting the server (redacts Authorization)]' \
 '-q[Output only created/affected IDs for shell piping]' \
@@ -245,6 +248,7 @@ _arguments "${_arguments_options[@]}" : \
 '--config=[Path to explicit TOML configuration file]:CONFIG:_files' \
 '-P+[Named configuration profile (env\: HBCTL_PROFILE)]:NAME:_default' \
 '--profile=[Named configuration profile (env\: HBCTL_PROFILE)]:NAME:_default' \
+'--with-path[Include full location/parent breadcrumb path in output]' \
 '--json[Shorthand for --output json (emits compact JSON)]' \
 '--dry-run[Preview mutating requests without hitting the server (redacts Authorization)]' \
 '-q[Output only created/affected IDs for shell piping]' \
@@ -269,10 +273,20 @@ _arguments "${_arguments_options[@]}" : \
 '--purchase-price=[Purchase price]:PURCHASE_PRICE:_default' \
 '--purchase-date=[Purchase date (YYYY-MM-DD)]:PURCHASE_DATE:_default' \
 '--purchase-from=[Purchase vendor/source]:PURCHASE_FROM:_default' \
+'--archived=[Mark item as archived (true/false; bare flag means true)]::ARCHIVED:(true false)' \
+'--insured=[Mark item as insured (true/false; bare flag means true)]::INSURED:(true false)' \
+'--lifetime-warranty=[Mark item as having a lifetime warranty (true/false; bare flag means true)]::LIFETIME_WARRANTY:(true false)' \
+'--warranty-expires=[Warranty expiration date (YYYY-MM-DD or RFC3339)]:DATE:_default' \
+'--warranty-details=[Warranty details or terms]:WARRANTY_DETAILS:_default' \
+'--sold-time=[Date/time the item was sold (YYYY-MM-DD or RFC3339)]:DATE:_default' \
+'--sold-to=[Buyer name or recipient the item was sold to]:SOLD_TO:_default' \
+'--sold-price=[Sale price]:SOLD_PRICE:_default' \
+'--sold-notes=[Notes about the sale]:SOLD_NOTES:_default' \
 '*--field=[Custom field KEY=VAL (repeatable)]:FIELDS:_default' \
 '--field-type=[Value type for --field entries]:FIELD_TYPE:(text number boolean)' \
 '--from-json=[Load initial item JSON from file path or '\''-'\'' for stdin]:FROM_JSON:_default' \
-'*--attach=[Local file path(s) to attach after creating the item (repeatable)]:FILE:_files' \
+'*--attach=[Local file path(s) to attach after creating the item (\`FILE\` or \`FILE=REMOTE_NAME\`, repeatable)]:FILE[=NAME]:_default' \
+'*--attach-url=[Remote HTTP(S) URL(s) to download and attach (\`URL\` or \`URL=REMOTE_NAME\`, repeatable)]:URL[=NAME]:_default' \
 '--url=[Homebox base URL (env\: HBCTL_URL > HOMEBOX_URL > http\://<HOMEBOX_IP>\:7745)]:URL:_default' \
 '--api-key=[Homebox API key or Bearer token (env\: HBCTL_API_KEY > HOMEBOX_API_KEY)]:API_KEY:_default' \
 '--output=[Output format (table, json, plain) \[env\: HBCTL_OUTPUT\]]:OUTPUT:(table json plain)' \
@@ -281,6 +295,8 @@ _arguments "${_arguments_options[@]}" : \
 '--config=[Path to explicit TOML configuration file]:CONFIG:_files' \
 '-P+[Named configuration profile (env\: HBCTL_PROFILE)]:NAME:_default' \
 '--profile=[Named configuration profile (env\: HBCTL_PROFILE)]:NAME:_default' \
+'--attach-best-effort[Treat attachment failures as non-fatal warnings and include \`attachmentErrors\` in JSON output]' \
+'--optimize[Automatically resize/compress oversized images before upload]' \
 '--force[Allow attaching images larger than 500KB]' \
 '--json[Shorthand for --output json (emits compact JSON)]' \
 '--dry-run[Preview mutating requests without hitting the server (redacts Authorization)]' \
@@ -292,6 +308,10 @@ _arguments "${_arguments_options[@]}" : \
 ;;
 (update)
 _arguments "${_arguments_options[@]}" : \
+'--items-from=[Read newline-delimited entity IDs to update from a file or '\''-'\'' (stdin)]:FILE|-:_files' \
+'--filter-tag=[Select items to update matching this tag name or UUID]:TAG:_default' \
+'--filter-parent=[Select items to update under this parent item/location name, ID, or '\''none'\'']:PARENT:_default' \
+'--filter-type=[Select items to update matching this entity type name or UUID]:TYPE:_default' \
 '--name=[Updated item name]:NAME:_default' \
 '--description=[Updated item description]:DESCRIPTION:_default' \
 '--type=[Entity type name or UUID]:ENTITY_TYPE:_default' \
@@ -306,6 +326,15 @@ _arguments "${_arguments_options[@]}" : \
 '--purchase-price=[Updated purchase price]:PURCHASE_PRICE:_default' \
 '--purchase-date=[Updated purchase date (YYYY-MM-DD)]:PURCHASE_DATE:_default' \
 '--purchase-from=[Updated purchase source]:PURCHASE_FROM:_default' \
+'--archived=[Mark item as archived (true/false; bare flag means true)]::ARCHIVED:(true false)' \
+'--insured=[Mark item as insured (true/false; bare flag means true)]::INSURED:(true false)' \
+'--lifetime-warranty=[Mark item as having a lifetime warranty (true/false; bare flag means true)]::LIFETIME_WARRANTY:(true false)' \
+'--warranty-expires=[Warranty expiration date (YYYY-MM-DD or RFC3339)]:DATE:_default' \
+'--warranty-details=[Warranty details or terms]:WARRANTY_DETAILS:_default' \
+'--sold-time=[Date/time the item was sold (YYYY-MM-DD or RFC3339)]:DATE:_default' \
+'--sold-to=[Buyer name or recipient the item was sold to]:SOLD_TO:_default' \
+'--sold-price=[Sale price]:SOLD_PRICE:_default' \
+'--sold-notes=[Notes about the sale]:SOLD_NOTES:_default' \
 '--notes=[Notes (merged into custom field '\''Notes'\'')]:NOTES:_default' \
 '*--field=[Custom field KEY=VAL to upsert (repeatable)]:FIELDS:_default' \
 '--field-type=[Value type for --field entries]:FIELD_TYPE:(text number boolean)' \
@@ -325,7 +354,7 @@ _arguments "${_arguments_options[@]}" : \
 '--quiet[Output only created/affected IDs for shell piping]' \
 '-h[Print help]' \
 '--help[Print help]' \
-':id -- Entity ID to update:_default' \
+'*::ids -- Entity ID(s) to update (omit when using --items-from or filter selectors):_default' \
 && ret=0
 ;;
 (upsert)
@@ -343,11 +372,23 @@ _arguments "${_arguments_options[@]}" : \
 '--purchase-price=[Purchase price]:PURCHASE_PRICE:_default' \
 '--purchase-date=[Purchase date (YYYY-MM-DD)]:PURCHASE_DATE:_default' \
 '--purchase-from=[Purchase source]:PURCHASE_FROM:_default' \
+'--archived=[Mark item as archived (true/false; bare flag means true)]::ARCHIVED:(true false)' \
+'--insured=[Mark item as insured (true/false; bare flag means true)]::INSURED:(true false)' \
+'--lifetime-warranty=[Mark item as having a lifetime warranty (true/false; bare flag means true)]::LIFETIME_WARRANTY:(true false)' \
+'--warranty-expires=[Warranty expiration date (YYYY-MM-DD or RFC3339)]:DATE:_default' \
+'--warranty-details=[Warranty details or terms]:WARRANTY_DETAILS:_default' \
+'--sold-time=[Date/time the item was sold (YYYY-MM-DD or RFC3339)]:DATE:_default' \
+'--sold-to=[Buyer name or recipient the item was sold to]:SOLD_TO:_default' \
+'--sold-price=[Sale price]:SOLD_PRICE:_default' \
+'--sold-notes=[Notes about the sale]:SOLD_NOTES:_default' \
 '*--field=[Custom field KEY=VAL (repeatable)]:FIELDS:_default' \
 '--field-type=[Value type for --field entries]:FIELD_TYPE:(text number boolean)' \
 '--from-json=[Load item JSON from file path or '\''-'\'' for stdin]:FROM_JSON:_default' \
 '*--match-by=[Match existing items by key in priority order\: name, model, serial, or field\:KEY (repeatable; defaults to name)]:KEY:_default' \
-'*--attach=[Local file path(s) to attach after upserting the item (repeatable)]:FILE:_files' \
+'--match-mode=[Matching strategy for --match-by keys (exact, contains, fuzzy)]:MATCH_MODE:(exact contains fuzzy)' \
+'--on-match=[Action to take when an existing item matches (update, skip, attach-only)]:ON_MATCH:(update skip attach-only)' \
+'*--attach=[Local file path(s) to attach after upserting the item (\`FILE\` or \`FILE=REMOTE_NAME\`, repeatable)]:FILE[=NAME]:_default' \
+'*--attach-url=[Remote HTTP(S) URL(s) to download and attach (\`URL\` or \`URL=REMOTE_NAME\`, repeatable)]:URL[=NAME]:_default' \
 '--url=[Homebox base URL (env\: HBCTL_URL > HOMEBOX_URL > http\://<HOMEBOX_IP>\:7745)]:URL:_default' \
 '--api-key=[Homebox API key or Bearer token (env\: HBCTL_API_KEY > HOMEBOX_API_KEY)]:API_KEY:_default' \
 '--output=[Output format (table, json, plain) \[env\: HBCTL_OUTPUT\]]:OUTPUT:(table json plain)' \
@@ -357,6 +398,8 @@ _arguments "${_arguments_options[@]}" : \
 '-P+[Named configuration profile (env\: HBCTL_PROFILE)]:NAME:_default' \
 '--profile=[Named configuration profile (env\: HBCTL_PROFILE)]:NAME:_default' \
 '--fill-missing[When updating an existing item, only populate blank/missing/zero fields]' \
+'--attach-best-effort[Treat attachment failures as non-fatal warnings and include \`attachmentErrors\` in JSON output]' \
+'--optimize[Automatically resize/compress oversized images before upload]' \
 '--force[Allow attaching images larger than 500KB]' \
 '--json[Shorthand for --output json (emits compact JSON)]' \
 '--dry-run[Preview mutating requests without hitting the server (redacts Authorization)]' \
@@ -368,6 +411,13 @@ _arguments "${_arguments_options[@]}" : \
 ;;
 (delete)
 _arguments "${_arguments_options[@]}" : \
+'--items-from=[Read newline-delimited entity IDs to delete from a file or '\''-'\'' (stdin)]:FILE|-:_files' \
+'--tag=[Select items to delete matching this tag name or UUID]:TAG:_default' \
+'--filter-tag=[Select items to delete matching this tag name or UUID]:TAG:_default' \
+'--parent=[Select items to delete under this parent item/location name, ID, or '\''none'\'']:PARENT:_default' \
+'--filter-parent=[Select items to delete under this parent item/location name, ID, or '\''none'\'']:PARENT:_default' \
+'--type=[Select items to delete matching this entity type name or UUID]:TYPE:_default' \
+'--filter-type=[Select items to delete matching this entity type name or UUID]:TYPE:_default' \
 '--url=[Homebox base URL (env\: HBCTL_URL > HOMEBOX_URL > http\://<HOMEBOX_IP>\:7745)]:URL:_default' \
 '--api-key=[Homebox API key or Bearer token (env\: HBCTL_API_KEY > HOMEBOX_API_KEY)]:API_KEY:_default' \
 '--output=[Output format (table, json, plain) \[env\: HBCTL_OUTPUT\]]:OUTPUT:(table json plain)' \
@@ -376,22 +426,25 @@ _arguments "${_arguments_options[@]}" : \
 '--config=[Path to explicit TOML configuration file]:CONFIG:_files' \
 '-P+[Named configuration profile (env\: HBCTL_PROFILE)]:NAME:_default' \
 '--profile=[Named configuration profile (env\: HBCTL_PROFILE)]:NAME:_default' \
-'--force[Skip interactive confirmation prompt]' \
+'-y[Skip interactive/bulk confirmation prompt]' \
+'--yes[Skip interactive/bulk confirmation prompt]' \
+'--force[Skip interactive/bulk confirmation prompt]' \
 '--json[Shorthand for --output json (emits compact JSON)]' \
 '--dry-run[Preview mutating requests without hitting the server (redacts Authorization)]' \
 '-q[Output only created/affected IDs for shell piping]' \
 '--quiet[Output only created/affected IDs for shell piping]' \
 '-h[Print help]' \
 '--help[Print help]' \
-':id -- Entity ID to delete:_default' \
+'*::ids -- Entity ID(s) to delete (omit when using --items-from or filter selectors):_default' \
 && ret=0
 ;;
 (import)
 _arguments "${_arguments_options[@]}" : \
 '--format=[Input format (inferred from extension if omitted; defaults to json for stdin)]:FORMAT:(json csv)' \
 '*--match-by=[Match existing items by key in priority order\: name, model, serial, or field\:KEY (repeatable; defaults to name)]:KEY:_default' \
+'--match-mode=[Matching strategy for --match-by keys (exact, contains, fuzzy)]:MATCH_MODE:(exact contains fuzzy)' \
 '--parent=[Default parent item/location name, ID, or '\''none'\'' for imported records without one]:PARENT:_default' \
-'*--attach=[Local file path(s) to attach to each imported item (repeatable)]:FILE:_files' \
+'*--attach=[Local file path(s) to attach to each imported item (\`FILE\` or \`FILE=REMOTE_NAME\`, repeatable)]:FILE[=NAME]:_default' \
 '--url=[Homebox base URL (env\: HBCTL_URL > HOMEBOX_URL > http\://<HOMEBOX_IP>\:7745)]:URL:_default' \
 '--api-key=[Homebox API key or Bearer token (env\: HBCTL_API_KEY > HOMEBOX_API_KEY)]:API_KEY:_default' \
 '--output=[Output format (table, json, plain) \[env\: HBCTL_OUTPUT\]]:OUTPUT:(table json plain)' \
@@ -403,6 +456,7 @@ _arguments "${_arguments_options[@]}" : \
 '(--update-existing)--skip-existing[Skip items whose name already exists in Homebox]' \
 '(--skip-existing)--update-existing[Update items whose name already exists in Homebox]' \
 '(--skip-existing)--fill-missing[With --update-existing, only populate blank/missing/zero fields on existing items]' \
+'--optimize[Automatically resize/compress oversized images before upload]' \
 '--force[Allow attaching images larger than 500KB]' \
 '--json[Shorthand for --output json (emits compact JSON)]' \
 '--dry-run[Preview mutating requests without hitting the server (redacts Authorization)]' \
@@ -436,6 +490,14 @@ _arguments "${_arguments_options[@]}" : \
 ;;
 (move)
 _arguments "${_arguments_options[@]}" : \
+'--to=[Target parent item name, ID, or '\''none'\'' to unparent (required when using selectors without trailing positional parent)]:PARENT:_default' \
+'--items-from=[Read newline-delimited entity IDs to move from a file or '\''-'\'' (stdin)]:FILE|-:_files' \
+'--tag=[Select items to move matching this tag name or UUID]:TAG:_default' \
+'--filter-tag=[Select items to move matching this tag name or UUID]:TAG:_default' \
+'--parent=[Select items to move under this parent item/location name, ID, or '\''none'\'']:PARENT:_default' \
+'--filter-parent=[Select items to move under this parent item/location name, ID, or '\''none'\'']:PARENT:_default' \
+'--type=[Select items to move matching this entity type name or UUID]:TYPE:_default' \
+'--filter-type=[Select items to move matching this entity type name or UUID]:TYPE:_default' \
 '--url=[Homebox base URL (env\: HBCTL_URL > HOMEBOX_URL > http\://<HOMEBOX_IP>\:7745)]:URL:_default' \
 '--api-key=[Homebox API key or Bearer token (env\: HBCTL_API_KEY > HOMEBOX_API_KEY)]:API_KEY:_default' \
 '--output=[Output format (table, json, plain) \[env\: HBCTL_OUTPUT\]]:OUTPUT:(table json plain)' \
@@ -450,8 +512,46 @@ _arguments "${_arguments_options[@]}" : \
 '--quiet[Output only created/affected IDs for shell piping]' \
 '-h[Print help]' \
 '--help[Print help]' \
-':id -- Entity ID to move:_default' \
-':parent -- Target parent item name, ID, or '\''none'\'' to unparent:_default' \
+'*::ids -- Entity ID(s) followed by target parent (`<ID>... <PARENT>`), or `<ID>...` when `--to` is set:_default' \
+&& ret=0
+;;
+(duplicate)
+_arguments "${_arguments_options[@]}" : \
+'--count=[Number of duplicates to create]:N:_default' \
+'--url=[Homebox base URL (env\: HBCTL_URL > HOMEBOX_URL > http\://<HOMEBOX_IP>\:7745)]:URL:_default' \
+'--api-key=[Homebox API key or Bearer token (env\: HBCTL_API_KEY > HOMEBOX_API_KEY)]:API_KEY:_default' \
+'--output=[Output format (table, json, plain) \[env\: HBCTL_OUTPUT\]]:OUTPUT:(table json plain)' \
+'*--select=[Comma-separated field projection for JSON/table output (e.g. id,name,fields)]:SELECT:_default' \
+'-C+[Path to explicit TOML configuration file]:CONFIG:_files' \
+'--config=[Path to explicit TOML configuration file]:CONFIG:_files' \
+'-P+[Named configuration profile (env\: HBCTL_PROFILE)]:NAME:_default' \
+'--profile=[Named configuration profile (env\: HBCTL_PROFILE)]:NAME:_default' \
+'--json[Shorthand for --output json (emits compact JSON)]' \
+'--dry-run[Preview mutating requests without hitting the server (redacts Authorization)]' \
+'-q[Output only created/affected IDs for shell piping]' \
+'--quiet[Output only created/affected IDs for shell piping]' \
+'-h[Print help]' \
+'--help[Print help]' \
+':id -- Entity ID to duplicate:_default' \
+&& ret=0
+;;
+(path)
+_arguments "${_arguments_options[@]}" : \
+'--url=[Homebox base URL (env\: HBCTL_URL > HOMEBOX_URL > http\://<HOMEBOX_IP>\:7745)]:URL:_default' \
+'--api-key=[Homebox API key or Bearer token (env\: HBCTL_API_KEY > HOMEBOX_API_KEY)]:API_KEY:_default' \
+'--output=[Output format (table, json, plain) \[env\: HBCTL_OUTPUT\]]:OUTPUT:(table json plain)' \
+'*--select=[Comma-separated field projection for JSON/table output (e.g. id,name,fields)]:SELECT:_default' \
+'-C+[Path to explicit TOML configuration file]:CONFIG:_files' \
+'--config=[Path to explicit TOML configuration file]:CONFIG:_files' \
+'-P+[Named configuration profile (env\: HBCTL_PROFILE)]:NAME:_default' \
+'--profile=[Named configuration profile (env\: HBCTL_PROFILE)]:NAME:_default' \
+'--json[Shorthand for --output json (emits compact JSON)]' \
+'--dry-run[Preview mutating requests without hitting the server (redacts Authorization)]' \
+'-q[Output only created/affected IDs for shell piping]' \
+'--quiet[Output only created/affected IDs for shell piping]' \
+'-h[Print help]' \
+'--help[Print help]' \
+':id -- Entity ID:_default' \
 && ret=0
 ;;
 (tree)
@@ -522,6 +622,14 @@ _arguments "${_arguments_options[@]}" : \
 _arguments "${_arguments_options[@]}" : \
 && ret=0
 ;;
+(duplicate)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+(path)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
 (tree)
 _arguments "${_arguments_options[@]}" : \
 && ret=0
@@ -566,6 +674,7 @@ _arguments "${_arguments_options[@]}" : \
         case $line[1] in
             (upload)
 _arguments "${_arguments_options[@]}" : \
+'*--attach-url=[Remote HTTP(S) URL(s) to download and attach (\`URL\` or \`URL=REMOTE_NAME\`, repeatable)]:URL[=NAME]:_default' \
 '--name=[Override remote filename/title (for single-file or stdin '\''-'\'' uploads)]:NAME:_default' \
 '--url=[Homebox base URL (env\: HBCTL_URL > HOMEBOX_URL > http\://<HOMEBOX_IP>\:7745)]:URL:_default' \
 '--api-key=[Homebox API key or Bearer token (env\: HBCTL_API_KEY > HOMEBOX_API_KEY)]:API_KEY:_default' \
@@ -577,6 +686,7 @@ _arguments "${_arguments_options[@]}" : \
 '--profile=[Named configuration profile (env\: HBCTL_PROFILE)]:NAME:_default' \
 '(--overwrite)--skip-existing[Skip files that already exist on the item (default behavior)]' \
 '(--skip-existing)--overwrite[Delete and re-upload files that already exist on the item]' \
+'--optimize[Automatically resize/compress oversized images before upload]' \
 '--force[Allow uploading images larger than 500KB]' \
 '--json[Shorthand for --output json (emits compact JSON)]' \
 '--dry-run[Preview mutating requests without hitting the server (redacts Authorization)]' \
@@ -698,6 +808,10 @@ esac
 (search)
 _arguments "${_arguments_options[@]}" : \
 '--tag=[Filter by tag name or UUID]:TAG:_default' \
+'--type=[Filter by entity type name or UUID]:ENTITY_TYPE:_default' \
+'--parent=[Filter by parent item name, ID, or '\''none'\'' for top-level items]:PARENT:_default' \
+'--limit=[Maximum number of matching results to return]:N:_default' \
+'--warranty-expiring=[Only include items with a warranty expiring within the next DAYS days (excludes lifetime warranties)]:DAYS:_default' \
 '--model=[Filter by model number (exact or substring, case-insensitive)]:MODEL:_default' \
 '--serial=[Filter by serial number (exact or substring, case-insensitive)]:SERIAL:_default' \
 '--manufacturer=[Filter by manufacturer (exact or substring, case-insensitive)]:MANUFACTURER:_default' \
@@ -710,6 +824,10 @@ _arguments "${_arguments_options[@]}" : \
 '--config=[Path to explicit TOML configuration file]:CONFIG:_files' \
 '-P+[Named configuration profile (env\: HBCTL_PROFILE)]:NAME:_default' \
 '--profile=[Named configuration profile (env\: HBCTL_PROFILE)]:NAME:_default' \
+'--include-archived[Include archived items in search results]' \
+'--archived-only[Only search archived items (implies --include-archived)]' \
+'--any[Match items satisfying ANY provided filter (OR) instead of ALL filters (AND)]' \
+'--with-path[Include full location/parent breadcrumb path for each matching item]' \
 '--json[Shorthand for --output json (emits compact JSON)]' \
 '--dry-run[Preview mutating requests without hitting the server (redacts Authorization)]' \
 '-q[Output only created/affected IDs for shell piping]' \
@@ -1271,12 +1389,190 @@ _arguments "${_arguments_options[@]}" : \
 '--help[Print help]' \
 && ret=0
 ;;
+(api)
+_arguments "${_arguments_options[@]}" : \
+'(--from-json)-d+[Inline JSON request body]:JSON:_default' \
+'(--from-json)--data=[Inline JSON request body]:JSON:_default' \
+'(-d --data)--from-json=[Read JSON request body from a file path or '\''-'\'' for stdin]:FILE|-:_default' \
+'*--query=[Query parameter KEY=VALUE (repeatable; appended to any inline path query)]:KEY=VALUE:_default' \
+'--url=[Homebox base URL (env\: HBCTL_URL > HOMEBOX_URL > http\://<HOMEBOX_IP>\:7745)]:URL:_default' \
+'--api-key=[Homebox API key or Bearer token (env\: HBCTL_API_KEY > HOMEBOX_API_KEY)]:API_KEY:_default' \
+'--output=[Output format (table, json, plain) \[env\: HBCTL_OUTPUT\]]:OUTPUT:(table json plain)' \
+'*--select=[Comma-separated field projection for JSON/table output (e.g. id,name,fields)]:SELECT:_default' \
+'-C+[Path to explicit TOML configuration file]:CONFIG:_files' \
+'--config=[Path to explicit TOML configuration file]:CONFIG:_files' \
+'-P+[Named configuration profile (env\: HBCTL_PROFILE)]:NAME:_default' \
+'--profile=[Named configuration profile (env\: HBCTL_PROFILE)]:NAME:_default' \
+'--json[Shorthand for --output json (emits compact JSON)]' \
+'--dry-run[Preview mutating requests without hitting the server (redacts Authorization)]' \
+'-q[Output only created/affected IDs for shell piping]' \
+'--quiet[Output only created/affected IDs for shell piping]' \
+'-h[Print help]' \
+'--help[Print help]' \
+':method -- HTTP method (GET, POST, PUT, PATCH, DELETE, HEAD, OPTIONS):_default' \
+':path -- Homebox API endpoint path (e.g. groups, /maintenance, /api/v1/templates):_default' \
+&& ret=0
+;;
+(maintenance)
+_arguments "${_arguments_options[@]}" : \
+'--url=[Homebox base URL (env\: HBCTL_URL > HOMEBOX_URL > http\://<HOMEBOX_IP>\:7745)]:URL:_default' \
+'--api-key=[Homebox API key or Bearer token (env\: HBCTL_API_KEY > HOMEBOX_API_KEY)]:API_KEY:_default' \
+'--output=[Output format (table, json, plain) \[env\: HBCTL_OUTPUT\]]:OUTPUT:(table json plain)' \
+'*--select=[Comma-separated field projection for JSON/table output (e.g. id,name,fields)]:SELECT:_default' \
+'-C+[Path to explicit TOML configuration file]:CONFIG:_files' \
+'--config=[Path to explicit TOML configuration file]:CONFIG:_files' \
+'-P+[Named configuration profile (env\: HBCTL_PROFILE)]:NAME:_default' \
+'--profile=[Named configuration profile (env\: HBCTL_PROFILE)]:NAME:_default' \
+'--json[Shorthand for --output json (emits compact JSON)]' \
+'--dry-run[Preview mutating requests without hitting the server (redacts Authorization)]' \
+'-q[Output only created/affected IDs for shell piping]' \
+'--quiet[Output only created/affected IDs for shell piping]' \
+'-h[Print help]' \
+'--help[Print help]' \
+":: :_hbctl__subcmd__maintenance_commands" \
+"*::: :->maintenance" \
+&& ret=0
+
+    case $state in
+    (maintenance)
+        words=($line[1] "${words[@]}")
+        (( CURRENT += 1 ))
+        curcontext="${curcontext%:*:*}:hbctl-maintenance-command-$line[1]:"
+        case $line[1] in
+            (list)
+_arguments "${_arguments_options[@]}" : \
+'--status=[Filter by maintenance status (both, completed, scheduled)]:STATUS:(both completed scheduled)' \
+'--url=[Homebox base URL (env\: HBCTL_URL > HOMEBOX_URL > http\://<HOMEBOX_IP>\:7745)]:URL:_default' \
+'--api-key=[Homebox API key or Bearer token (env\: HBCTL_API_KEY > HOMEBOX_API_KEY)]:API_KEY:_default' \
+'--output=[Output format (table, json, plain) \[env\: HBCTL_OUTPUT\]]:OUTPUT:(table json plain)' \
+'*--select=[Comma-separated field projection for JSON/table output (e.g. id,name,fields)]:SELECT:_default' \
+'-C+[Path to explicit TOML configuration file]:CONFIG:_files' \
+'--config=[Path to explicit TOML configuration file]:CONFIG:_files' \
+'-P+[Named configuration profile (env\: HBCTL_PROFILE)]:NAME:_default' \
+'--profile=[Named configuration profile (env\: HBCTL_PROFILE)]:NAME:_default' \
+'--json[Shorthand for --output json (emits compact JSON)]' \
+'--dry-run[Preview mutating requests without hitting the server (redacts Authorization)]' \
+'-q[Output only created/affected IDs for shell piping]' \
+'--quiet[Output only created/affected IDs for shell piping]' \
+'-h[Print help]' \
+'--help[Print help]' \
+'::entity -- Optional entity UUID:_default' \
+&& ret=0
+;;
+(create)
+_arguments "${_arguments_options[@]}" : \
+'--name=[Maintenance task/entry name]:NAME:_default' \
+'--completed-date=[Completion date (YYYY-MM-DD or YYYY-MM)]:YYYY-MM-DD:_default' \
+'--scheduled-date=[Scheduled date (YYYY-MM-DD or YYYY-MM)]:YYYY-MM-DD:_default' \
+'--cost=[Maintenance cost (e.g. 29.99 or \$29.99)]:COST:_default' \
+'--description=[Maintenance description or notes]:TEXT:_default' \
+'--url=[Homebox base URL (env\: HBCTL_URL > HOMEBOX_URL > http\://<HOMEBOX_IP>\:7745)]:URL:_default' \
+'--api-key=[Homebox API key or Bearer token (env\: HBCTL_API_KEY > HOMEBOX_API_KEY)]:API_KEY:_default' \
+'--output=[Output format (table, json, plain) \[env\: HBCTL_OUTPUT\]]:OUTPUT:(table json plain)' \
+'*--select=[Comma-separated field projection for JSON/table output (e.g. id,name,fields)]:SELECT:_default' \
+'-C+[Path to explicit TOML configuration file]:CONFIG:_files' \
+'--config=[Path to explicit TOML configuration file]:CONFIG:_files' \
+'-P+[Named configuration profile (env\: HBCTL_PROFILE)]:NAME:_default' \
+'--profile=[Named configuration profile (env\: HBCTL_PROFILE)]:NAME:_default' \
+'--json[Shorthand for --output json (emits compact JSON)]' \
+'--dry-run[Preview mutating requests without hitting the server (redacts Authorization)]' \
+'-q[Output only created/affected IDs for shell piping]' \
+'--quiet[Output only created/affected IDs for shell piping]' \
+'-h[Print help]' \
+'--help[Print help]' \
+':entity -- Target entity UUID:_default' \
+&& ret=0
+;;
+(update)
+_arguments "${_arguments_options[@]}" : \
+'--name=[Updated maintenance task/entry name]:NAME:_default' \
+'--completed-date=[Updated completion date (YYYY-MM-DD or YYYY-MM)]:YYYY-MM-DD:_default' \
+'--scheduled-date=[Updated scheduled date (YYYY-MM-DD or YYYY-MM)]:YYYY-MM-DD:_default' \
+'--cost=[Updated maintenance cost (e.g. 29.99 or \$29.99)]:COST:_default' \
+'--description=[Updated maintenance description or notes]:TEXT:_default' \
+'--url=[Homebox base URL (env\: HBCTL_URL > HOMEBOX_URL > http\://<HOMEBOX_IP>\:7745)]:URL:_default' \
+'--api-key=[Homebox API key or Bearer token (env\: HBCTL_API_KEY > HOMEBOX_API_KEY)]:API_KEY:_default' \
+'--output=[Output format (table, json, plain) \[env\: HBCTL_OUTPUT\]]:OUTPUT:(table json plain)' \
+'*--select=[Comma-separated field projection for JSON/table output (e.g. id,name,fields)]:SELECT:_default' \
+'-C+[Path to explicit TOML configuration file]:CONFIG:_files' \
+'--config=[Path to explicit TOML configuration file]:CONFIG:_files' \
+'-P+[Named configuration profile (env\: HBCTL_PROFILE)]:NAME:_default' \
+'--profile=[Named configuration profile (env\: HBCTL_PROFILE)]:NAME:_default' \
+'--json[Shorthand for --output json (emits compact JSON)]' \
+'--dry-run[Preview mutating requests without hitting the server (redacts Authorization)]' \
+'-q[Output only created/affected IDs for shell piping]' \
+'--quiet[Output only created/affected IDs for shell piping]' \
+'-h[Print help]' \
+'--help[Print help]' \
+':entry_id -- Maintenance entry UUID:_default' \
+&& ret=0
+;;
+(delete)
+_arguments "${_arguments_options[@]}" : \
+'--url=[Homebox base URL (env\: HBCTL_URL > HOMEBOX_URL > http\://<HOMEBOX_IP>\:7745)]:URL:_default' \
+'--api-key=[Homebox API key or Bearer token (env\: HBCTL_API_KEY > HOMEBOX_API_KEY)]:API_KEY:_default' \
+'--output=[Output format (table, json, plain) \[env\: HBCTL_OUTPUT\]]:OUTPUT:(table json plain)' \
+'*--select=[Comma-separated field projection for JSON/table output (e.g. id,name,fields)]:SELECT:_default' \
+'-C+[Path to explicit TOML configuration file]:CONFIG:_files' \
+'--config=[Path to explicit TOML configuration file]:CONFIG:_files' \
+'-P+[Named configuration profile (env\: HBCTL_PROFILE)]:NAME:_default' \
+'--profile=[Named configuration profile (env\: HBCTL_PROFILE)]:NAME:_default' \
+'--force[Skip interactive confirmation prompt]' \
+'--json[Shorthand for --output json (emits compact JSON)]' \
+'--dry-run[Preview mutating requests without hitting the server (redacts Authorization)]' \
+'-q[Output only created/affected IDs for shell piping]' \
+'--quiet[Output only created/affected IDs for shell piping]' \
+'-h[Print help]' \
+'--help[Print help]' \
+':entry_id -- Maintenance entry UUID:_default' \
+&& ret=0
+;;
+(help)
+_arguments "${_arguments_options[@]}" : \
+":: :_hbctl__subcmd__maintenance__subcmd__help_commands" \
+"*::: :->help" \
+&& ret=0
+
+    case $state in
+    (help)
+        words=($line[1] "${words[@]}")
+        (( CURRENT += 1 ))
+        curcontext="${curcontext%:*:*}:hbctl-maintenance-help-command-$line[1]:"
+        case $line[1] in
+            (list)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+(create)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+(update)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+(delete)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+(help)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+        esac
+    ;;
+esac
+;;
+        esac
+    ;;
+esac
+;;
 (export)
 _arguments "${_arguments_options[@]}" : \
 '--tag=[Filter by tag name or UUID]:TAG:_default' \
 '--has-field=[Require items to have the named custom field]:HAS_FIELD:_default' \
 '*--field=[Custom field column(s) to include in export (repeatable)]:FIELDS:_default' \
-'--sort=[Sort exported items by name or id]:SORT:(name id)' \
+'--sort=[Sort exported items (name, id, purchase-price, purchase-date, updated-at, asset-id)]:SORT:(name id purchase-price purchase-date updated-at asset-id)' \
 '--format=[Export format (json, csv, markdown)]:FORMAT:(json csv markdown)' \
 '*--columns=[Custom column list and order (comma-separated or repeatable; supports '\''key=Header Alias'\'')]:COL[=ALIAS]:_default' \
 '--align=[Markdown table column alignment (default, left, right, center)]:ALIGN:(default left right center)' \
@@ -1470,6 +1766,14 @@ _arguments "${_arguments_options[@]}" : \
 _arguments "${_arguments_options[@]}" : \
 && ret=0
 ;;
+(duplicate)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+(path)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
 (tree)
 _arguments "${_arguments_options[@]}" : \
 && ret=0
@@ -1610,6 +1914,42 @@ esac
 _arguments "${_arguments_options[@]}" : \
 && ret=0
 ;;
+(api)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+(maintenance)
+_arguments "${_arguments_options[@]}" : \
+":: :_hbctl__subcmd__help__subcmd__maintenance_commands" \
+"*::: :->maintenance" \
+&& ret=0
+
+    case $state in
+    (maintenance)
+        words=($line[1] "${words[@]}")
+        (( CURRENT += 1 ))
+        curcontext="${curcontext%:*:*}:hbctl-help-maintenance-command-$line[1]:"
+        case $line[1] in
+            (list)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+(create)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+(update)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+(delete)
+_arguments "${_arguments_options[@]}" : \
+&& ret=0
+;;
+        esac
+    ;;
+esac
+;;
 (export)
 _arguments "${_arguments_options[@]}" : \
 && ret=0
@@ -1651,6 +1991,8 @@ _hbctl_commands() {
 'entity-types:Manage Homebox entity types (/api/v1/entity-types)' \
 'entity-type:Manage Homebox entity types (/api/v1/entity-types)' \
 'status:Check remote Homebox server connectivity and version (/api/v1/status)' \
+'api:Issue a raw authenticated HTTP request against any Homebox API endpoint' \
+'maintenance:Manage maintenance log entries (/api/v1/maintenance)' \
 'export:Export filtered items to JSON, CSV, or Markdown' \
 'completions:Generate shell completion scripts' \
 'man:Generate UNIX roff man page' \
@@ -1659,6 +2001,11 @@ _hbctl_commands() {
 'help:Print this message or the help of the given subcommand(s)' \
     )
     _describe -t commands 'hbctl commands' commands "$@"
+}
+(( $+functions[_hbctl__subcmd__api_commands] )) ||
+_hbctl__subcmd__api_commands() {
+    local commands; commands=()
+    _describe -t commands 'hbctl api commands' commands "$@"
 }
 (( $+functions[_hbctl__subcmd__attachment_commands] )) ||
 _hbctl__subcmd__attachment_commands() {
@@ -1937,6 +2284,8 @@ _hbctl__subcmd__help_commands() {
 'tag:Manage tags (/api/v1/tags)' \
 'entity-types:Manage Homebox entity types (/api/v1/entity-types)' \
 'status:Check remote Homebox server connectivity and version (/api/v1/status)' \
+'api:Issue a raw authenticated HTTP request against any Homebox API endpoint' \
+'maintenance:Manage maintenance log entries (/api/v1/maintenance)' \
 'export:Export filtered items to JSON, CSV, or Markdown' \
 'completions:Generate shell completion scripts' \
 'man:Generate UNIX roff man page' \
@@ -1944,6 +2293,11 @@ _hbctl__subcmd__help_commands() {
 'help:Print this message or the help of the given subcommand(s)' \
     )
     _describe -t commands 'hbctl help commands' commands "$@"
+}
+(( $+functions[_hbctl__subcmd__help__subcmd__api_commands] )) ||
+_hbctl__subcmd__help__subcmd__api_commands() {
+    local commands; commands=()
+    _describe -t commands 'hbctl help api commands' commands "$@"
 }
 (( $+functions[_hbctl__subcmd__help__subcmd__attachment_commands] )) ||
 _hbctl__subcmd__help__subcmd__attachment_commands() {
@@ -2086,6 +2440,8 @@ _hbctl__subcmd__help__subcmd__item_commands() {
 'import:Bulk import items from JSON or CSV (file or '\''-'\'' for stdin)' \
 'dedup:Detect (and optionally delete or merge) duplicate items' \
 'move:Move an item under a parent item/location (or '\''none'\'' to unparent)' \
+'duplicate:Duplicate an existing item one or more times' \
+'path:Display the location/parent breadcrumb path for an item' \
 'tree:Render item parent/location hierarchy as a tree' \
     )
     _describe -t commands 'hbctl help item commands' commands "$@"
@@ -2104,6 +2460,11 @@ _hbctl__subcmd__help__subcmd__item__subcmd__dedup_commands() {
 _hbctl__subcmd__help__subcmd__item__subcmd__delete_commands() {
     local commands; commands=()
     _describe -t commands 'hbctl help item delete commands' commands "$@"
+}
+(( $+functions[_hbctl__subcmd__help__subcmd__item__subcmd__duplicate_commands] )) ||
+_hbctl__subcmd__help__subcmd__item__subcmd__duplicate_commands() {
+    local commands; commands=()
+    _describe -t commands 'hbctl help item duplicate commands' commands "$@"
 }
 (( $+functions[_hbctl__subcmd__help__subcmd__item__subcmd__get_commands] )) ||
 _hbctl__subcmd__help__subcmd__item__subcmd__get_commands() {
@@ -2125,6 +2486,11 @@ _hbctl__subcmd__help__subcmd__item__subcmd__move_commands() {
     local commands; commands=()
     _describe -t commands 'hbctl help item move commands' commands "$@"
 }
+(( $+functions[_hbctl__subcmd__help__subcmd__item__subcmd__path_commands] )) ||
+_hbctl__subcmd__help__subcmd__item__subcmd__path_commands() {
+    local commands; commands=()
+    _describe -t commands 'hbctl help item path commands' commands "$@"
+}
 (( $+functions[_hbctl__subcmd__help__subcmd__item__subcmd__tree_commands] )) ||
 _hbctl__subcmd__help__subcmd__item__subcmd__tree_commands() {
     local commands; commands=()
@@ -2139,6 +2505,36 @@ _hbctl__subcmd__help__subcmd__item__subcmd__update_commands() {
 _hbctl__subcmd__help__subcmd__item__subcmd__upsert_commands() {
     local commands; commands=()
     _describe -t commands 'hbctl help item upsert commands' commands "$@"
+}
+(( $+functions[_hbctl__subcmd__help__subcmd__maintenance_commands] )) ||
+_hbctl__subcmd__help__subcmd__maintenance_commands() {
+    local commands; commands=(
+'list:List maintenance log entries (globally or for a specific entity)' \
+'create:Create a maintenance log entry on an entity' \
+'update:Update an existing maintenance log entry by entry ID' \
+'delete:Delete a maintenance log entry by entry ID' \
+    )
+    _describe -t commands 'hbctl help maintenance commands' commands "$@"
+}
+(( $+functions[_hbctl__subcmd__help__subcmd__maintenance__subcmd__create_commands] )) ||
+_hbctl__subcmd__help__subcmd__maintenance__subcmd__create_commands() {
+    local commands; commands=()
+    _describe -t commands 'hbctl help maintenance create commands' commands "$@"
+}
+(( $+functions[_hbctl__subcmd__help__subcmd__maintenance__subcmd__delete_commands] )) ||
+_hbctl__subcmd__help__subcmd__maintenance__subcmd__delete_commands() {
+    local commands; commands=()
+    _describe -t commands 'hbctl help maintenance delete commands' commands "$@"
+}
+(( $+functions[_hbctl__subcmd__help__subcmd__maintenance__subcmd__list_commands] )) ||
+_hbctl__subcmd__help__subcmd__maintenance__subcmd__list_commands() {
+    local commands; commands=()
+    _describe -t commands 'hbctl help maintenance list commands' commands "$@"
+}
+(( $+functions[_hbctl__subcmd__help__subcmd__maintenance__subcmd__update_commands] )) ||
+_hbctl__subcmd__help__subcmd__maintenance__subcmd__update_commands() {
+    local commands; commands=()
+    _describe -t commands 'hbctl help maintenance update commands' commands "$@"
 }
 (( $+functions[_hbctl__subcmd__help__subcmd__man_commands] )) ||
 _hbctl__subcmd__help__subcmd__man_commands() {
@@ -2202,6 +2598,8 @@ _hbctl__subcmd__item_commands() {
 'import:Bulk import items from JSON or CSV (file or '\''-'\'' for stdin)' \
 'dedup:Detect (and optionally delete or merge) duplicate items' \
 'move:Move an item under a parent item/location (or '\''none'\'' to unparent)' \
+'duplicate:Duplicate an existing item one or more times' \
+'path:Display the location/parent breadcrumb path for an item' \
 'tree:Render item parent/location hierarchy as a tree' \
 'help:Print this message or the help of the given subcommand(s)' \
     )
@@ -2222,6 +2620,11 @@ _hbctl__subcmd__item__subcmd__delete_commands() {
     local commands; commands=()
     _describe -t commands 'hbctl item delete commands' commands "$@"
 }
+(( $+functions[_hbctl__subcmd__item__subcmd__duplicate_commands] )) ||
+_hbctl__subcmd__item__subcmd__duplicate_commands() {
+    local commands; commands=()
+    _describe -t commands 'hbctl item duplicate commands' commands "$@"
+}
 (( $+functions[_hbctl__subcmd__item__subcmd__get_commands] )) ||
 _hbctl__subcmd__item__subcmd__get_commands() {
     local commands; commands=()
@@ -2239,6 +2642,8 @@ _hbctl__subcmd__item__subcmd__help_commands() {
 'import:Bulk import items from JSON or CSV (file or '\''-'\'' for stdin)' \
 'dedup:Detect (and optionally delete or merge) duplicate items' \
 'move:Move an item under a parent item/location (or '\''none'\'' to unparent)' \
+'duplicate:Duplicate an existing item one or more times' \
+'path:Display the location/parent breadcrumb path for an item' \
 'tree:Render item parent/location hierarchy as a tree' \
 'help:Print this message or the help of the given subcommand(s)' \
     )
@@ -2258,6 +2663,11 @@ _hbctl__subcmd__item__subcmd__help__subcmd__dedup_commands() {
 _hbctl__subcmd__item__subcmd__help__subcmd__delete_commands() {
     local commands; commands=()
     _describe -t commands 'hbctl item help delete commands' commands "$@"
+}
+(( $+functions[_hbctl__subcmd__item__subcmd__help__subcmd__duplicate_commands] )) ||
+_hbctl__subcmd__item__subcmd__help__subcmd__duplicate_commands() {
+    local commands; commands=()
+    _describe -t commands 'hbctl item help duplicate commands' commands "$@"
 }
 (( $+functions[_hbctl__subcmd__item__subcmd__help__subcmd__get_commands] )) ||
 _hbctl__subcmd__item__subcmd__help__subcmd__get_commands() {
@@ -2283,6 +2693,11 @@ _hbctl__subcmd__item__subcmd__help__subcmd__list_commands() {
 _hbctl__subcmd__item__subcmd__help__subcmd__move_commands() {
     local commands; commands=()
     _describe -t commands 'hbctl item help move commands' commands "$@"
+}
+(( $+functions[_hbctl__subcmd__item__subcmd__help__subcmd__path_commands] )) ||
+_hbctl__subcmd__item__subcmd__help__subcmd__path_commands() {
+    local commands; commands=()
+    _describe -t commands 'hbctl item help path commands' commands "$@"
 }
 (( $+functions[_hbctl__subcmd__item__subcmd__help__subcmd__tree_commands] )) ||
 _hbctl__subcmd__item__subcmd__help__subcmd__tree_commands() {
@@ -2314,6 +2729,11 @@ _hbctl__subcmd__item__subcmd__move_commands() {
     local commands; commands=()
     _describe -t commands 'hbctl item move commands' commands "$@"
 }
+(( $+functions[_hbctl__subcmd__item__subcmd__path_commands] )) ||
+_hbctl__subcmd__item__subcmd__path_commands() {
+    local commands; commands=()
+    _describe -t commands 'hbctl item path commands' commands "$@"
+}
 (( $+functions[_hbctl__subcmd__item__subcmd__tree_commands] )) ||
 _hbctl__subcmd__item__subcmd__tree_commands() {
     local commands; commands=()
@@ -2328,6 +2748,73 @@ _hbctl__subcmd__item__subcmd__update_commands() {
 _hbctl__subcmd__item__subcmd__upsert_commands() {
     local commands; commands=()
     _describe -t commands 'hbctl item upsert commands' commands "$@"
+}
+(( $+functions[_hbctl__subcmd__maintenance_commands] )) ||
+_hbctl__subcmd__maintenance_commands() {
+    local commands; commands=(
+'list:List maintenance log entries (globally or for a specific entity)' \
+'create:Create a maintenance log entry on an entity' \
+'update:Update an existing maintenance log entry by entry ID' \
+'delete:Delete a maintenance log entry by entry ID' \
+'help:Print this message or the help of the given subcommand(s)' \
+    )
+    _describe -t commands 'hbctl maintenance commands' commands "$@"
+}
+(( $+functions[_hbctl__subcmd__maintenance__subcmd__create_commands] )) ||
+_hbctl__subcmd__maintenance__subcmd__create_commands() {
+    local commands; commands=()
+    _describe -t commands 'hbctl maintenance create commands' commands "$@"
+}
+(( $+functions[_hbctl__subcmd__maintenance__subcmd__delete_commands] )) ||
+_hbctl__subcmd__maintenance__subcmd__delete_commands() {
+    local commands; commands=()
+    _describe -t commands 'hbctl maintenance delete commands' commands "$@"
+}
+(( $+functions[_hbctl__subcmd__maintenance__subcmd__help_commands] )) ||
+_hbctl__subcmd__maintenance__subcmd__help_commands() {
+    local commands; commands=(
+'list:List maintenance log entries (globally or for a specific entity)' \
+'create:Create a maintenance log entry on an entity' \
+'update:Update an existing maintenance log entry by entry ID' \
+'delete:Delete a maintenance log entry by entry ID' \
+'help:Print this message or the help of the given subcommand(s)' \
+    )
+    _describe -t commands 'hbctl maintenance help commands' commands "$@"
+}
+(( $+functions[_hbctl__subcmd__maintenance__subcmd__help__subcmd__create_commands] )) ||
+_hbctl__subcmd__maintenance__subcmd__help__subcmd__create_commands() {
+    local commands; commands=()
+    _describe -t commands 'hbctl maintenance help create commands' commands "$@"
+}
+(( $+functions[_hbctl__subcmd__maintenance__subcmd__help__subcmd__delete_commands] )) ||
+_hbctl__subcmd__maintenance__subcmd__help__subcmd__delete_commands() {
+    local commands; commands=()
+    _describe -t commands 'hbctl maintenance help delete commands' commands "$@"
+}
+(( $+functions[_hbctl__subcmd__maintenance__subcmd__help__subcmd__help_commands] )) ||
+_hbctl__subcmd__maintenance__subcmd__help__subcmd__help_commands() {
+    local commands; commands=()
+    _describe -t commands 'hbctl maintenance help help commands' commands "$@"
+}
+(( $+functions[_hbctl__subcmd__maintenance__subcmd__help__subcmd__list_commands] )) ||
+_hbctl__subcmd__maintenance__subcmd__help__subcmd__list_commands() {
+    local commands; commands=()
+    _describe -t commands 'hbctl maintenance help list commands' commands "$@"
+}
+(( $+functions[_hbctl__subcmd__maintenance__subcmd__help__subcmd__update_commands] )) ||
+_hbctl__subcmd__maintenance__subcmd__help__subcmd__update_commands() {
+    local commands; commands=()
+    _describe -t commands 'hbctl maintenance help update commands' commands "$@"
+}
+(( $+functions[_hbctl__subcmd__maintenance__subcmd__list_commands] )) ||
+_hbctl__subcmd__maintenance__subcmd__list_commands() {
+    local commands; commands=()
+    _describe -t commands 'hbctl maintenance list commands' commands "$@"
+}
+(( $+functions[_hbctl__subcmd__maintenance__subcmd__update_commands] )) ||
+_hbctl__subcmd__maintenance__subcmd__update_commands() {
+    local commands; commands=()
+    _describe -t commands 'hbctl maintenance update commands' commands "$@"
 }
 (( $+functions[_hbctl__subcmd__man_commands] )) ||
 _hbctl__subcmd__man_commands() {

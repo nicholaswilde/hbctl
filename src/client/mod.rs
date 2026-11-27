@@ -19,9 +19,9 @@ use url::Url;
 
 use crate::client::models::{
     merge_entity_patch, upsert_custom_fields, Attachment, CreateEntityRequest,
-    CreateEntityTypeRequest, CreateMaintenanceRequest, Entity, EntityPatch, EntityType,
-    ListResponse, LoginResponse, MaintenanceEntry, ServerStatus, Tag, UpdateMaintenanceRequest,
-    UserProfile, UserSelfResponse,
+    CreateEntityTypeRequest, CreateMaintenanceRequest, Entity, EntityPatch, EntityPathEntry,
+    EntityPathResponse, EntityType, ListResponse, LoginResponse, MaintenanceEntry, ServerStatus,
+    Tag, UpdateMaintenanceRequest, UserProfile, UserSelfResponse,
 };
 use crate::config::{
     normalize_auth_header, normalize_base_url, redact_auth_header, redact_secret, AppConfig,
@@ -468,7 +468,14 @@ impl HomeboxClient {
         self.handle_response(resp)
     }
 
-    fn fetch_entities_indexed(&self, work: &[(usize, String)]) -> Result<Vec<(usize, Entity)>> {
+    fn fetch_indexed<T: Send, F>(
+        &self,
+        work: &[(usize, String)],
+        fetch_one: F,
+    ) -> Result<Vec<(usize, T)>>
+    where
+        F: Fn(&str) -> Result<T> + Sync,
+    {
         if work.is_empty() {
             return Ok(Vec::new());
         }
@@ -476,7 +483,7 @@ impl HomeboxClient {
         if work.len() == 1 || self.hydrate_concurrency <= 1 {
             let mut out = Vec::with_capacity(work.len());
             for (idx, id) in work {
-                out.push((*idx, self.get_entity(id)?));
+                out.push((*idx, fetch_one(id)?));
             }
             return Ok(out);
         }
@@ -499,8 +506,8 @@ impl HomeboxClient {
                             break;
                         }
                         let (orig_idx, ref id) = work[pos];
-                        match self.get_entity(id) {
-                            Ok(ent) => local.push((orig_idx, ent)),
+                        match fetch_one(id) {
+                            Ok(item) => local.push((orig_idx, item)),
                             Err(err) => {
                                 failed.store(true, Ordering::Release);
                                 return Err((orig_idx, err));
@@ -544,6 +551,10 @@ impl HomeboxClient {
         }
 
         Ok(fetched)
+    }
+
+    fn fetch_entities_indexed(&self, work: &[(usize, String)]) -> Result<Vec<(usize, Entity)>> {
+        self.fetch_indexed(work, |id| self.get_entity(id))
     }
 
     /// Hydrate entities whose `fields` were omitted or `null` in list summaries.
@@ -699,6 +710,38 @@ impl HomeboxClient {
                 .header(AUTHORIZATION, &self.auth_header))
         })?;
         self.handle_empty_response(resp)
+    }
+
+    /// Duplicate an existing entity (`POST /api/v1/entities/{id}/duplicate`).
+    pub fn duplicate_entity(&self, id: &str) -> Result<Entity> {
+        let url = self.endpoint(&format!("entities/{id}/duplicate"));
+        let resp = self.send_with_retry(RetryMode::SafeMutation, || {
+            Ok(self
+                .http
+                .post(&url)
+                .header(AUTHORIZATION, &self.auth_header)
+                .header(CONTENT_TYPE, "application/json")
+                .json(&json!({})))
+        })?;
+        self.handle_response(resp)
+    }
+
+    /// Fetch the location/parent breadcrumb path for an entity (`GET /api/v1/entities/{id}/path`).
+    pub fn get_entity_path(&self, id: &str) -> Result<Vec<EntityPathEntry>> {
+        let url = self.endpoint(&format!("entities/{id}/path"));
+        let resp = self.send_with_retry(RetryMode::Idempotent, || {
+            Ok(self.http.get(&url).header(AUTHORIZATION, &self.auth_header))
+        })?;
+        let parsed: EntityPathResponse = self.handle_response(resp)?;
+        Ok(parsed.into_entries())
+    }
+
+    /// Fetch breadcrumb paths for multiple entities concurrently, preserving input order.
+    pub fn get_entity_paths_by_ids(&self, ids: &[String]) -> Result<Vec<Vec<EntityPathEntry>>> {
+        let work: Vec<(usize, String)> = ids.iter().cloned().enumerate().collect();
+        let mut fetched = self.fetch_indexed(&work, |id| self.get_entity_path(id))?;
+        fetched.sort_by_key(|(idx, _)| *idx);
+        Ok(fetched.into_iter().map(|(_, p)| p).collect())
     }
 
     // -------------------------------------------------------------------------

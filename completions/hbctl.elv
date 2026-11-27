@@ -43,6 +43,8 @@ set edit:completion:arg-completer[hbctl] = {|@words|
             cand entity-types 'Manage Homebox entity types (/api/v1/entity-types)'
             cand entity-type 'Manage Homebox entity types (/api/v1/entity-types)'
             cand status 'Check remote Homebox server connectivity and version (/api/v1/status)'
+            cand api 'Issue a raw authenticated HTTP request against any Homebox API endpoint'
+            cand maintenance 'Manage maintenance log entries (/api/v1/maintenance)'
             cand export 'Export filtered items to JSON, CSV, or Markdown'
             cand completions 'Generate shell completion scripts'
             cand man 'Generate UNIX roff man page'
@@ -183,6 +185,8 @@ set edit:completion:arg-completer[hbctl] = {|@words|
             cand import 'Bulk import items from JSON or CSV (file or ''-'' for stdin)'
             cand dedup 'Detect (and optionally delete or merge) duplicate items'
             cand move 'Move an item under a parent item/location (or ''none'' to unparent)'
+            cand duplicate 'Duplicate an existing item one or more times'
+            cand path 'Display the location/parent breadcrumb path for an item'
             cand tree 'Render item parent/location hierarchy as a tree'
             cand help 'Print this message or the help of the given subcommand(s)'
         }
@@ -192,6 +196,7 @@ set edit:completion:arg-completer[hbctl] = {|@words|
             cand --parent 'Filter by parent item name, ID, or ''none'' for top-level items'
             cand --has-field 'Only include items having the named custom field (hydrates details if missing)'
             cand --page-size 'Page size for listing'
+            cand --warranty-expiring 'Only show items with a warranty expiring within the next DAYS days (excludes lifetime warranties)'
             cand --url 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
             cand --api-key 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)'
             cand --output 'Output format (table, json, plain) [env: HBCTL_OUTPUT]'
@@ -201,6 +206,8 @@ set edit:completion:arg-completer[hbctl] = {|@words|
             cand -P 'Named configuration profile (env: HBCTL_PROFILE)'
             cand --profile 'Named configuration profile (env: HBCTL_PROFILE)'
             cand --all 'Fetch all pages'
+            cand --include-archived 'Include archived items in results'
+            cand --archived-only 'Only show archived items (implies --include-archived)'
             cand --json 'Shorthand for --output json (emits compact JSON)'
             cand --dry-run 'Preview mutating requests without hitting the server (redacts Authorization)'
             cand -q 'Output only created/affected IDs for shell piping'
@@ -217,6 +224,7 @@ set edit:completion:arg-completer[hbctl] = {|@words|
             cand --config 'Path to explicit TOML configuration file'
             cand -P 'Named configuration profile (env: HBCTL_PROFILE)'
             cand --profile 'Named configuration profile (env: HBCTL_PROFILE)'
+            cand --with-path 'Include full location/parent breadcrumb path in output'
             cand --json 'Shorthand for --output json (emits compact JSON)'
             cand --dry-run 'Preview mutating requests without hitting the server (redacts Authorization)'
             cand -q 'Output only created/affected IDs for shell piping'
@@ -238,10 +246,20 @@ set edit:completion:arg-completer[hbctl] = {|@words|
             cand --purchase-price 'Purchase price'
             cand --purchase-date 'Purchase date (YYYY-MM-DD)'
             cand --purchase-from 'Purchase vendor/source'
+            cand --archived 'Mark item as archived (true/false; bare flag means true)'
+            cand --insured 'Mark item as insured (true/false; bare flag means true)'
+            cand --lifetime-warranty 'Mark item as having a lifetime warranty (true/false; bare flag means true)'
+            cand --warranty-expires 'Warranty expiration date (YYYY-MM-DD or RFC3339)'
+            cand --warranty-details 'Warranty details or terms'
+            cand --sold-time 'Date/time the item was sold (YYYY-MM-DD or RFC3339)'
+            cand --sold-to 'Buyer name or recipient the item was sold to'
+            cand --sold-price 'Sale price'
+            cand --sold-notes 'Notes about the sale'
             cand --field 'Custom field KEY=VAL (repeatable)'
             cand --field-type 'Value type for --field entries'
             cand --from-json 'Load initial item JSON from file path or ''-'' for stdin'
-            cand --attach 'Local file path(s) to attach after creating the item (repeatable)'
+            cand --attach 'Local file path(s) to attach after creating the item (`FILE` or `FILE=REMOTE_NAME`, repeatable)'
+            cand --attach-url 'Remote HTTP(S) URL(s) to download and attach (`URL` or `URL=REMOTE_NAME`, repeatable)'
             cand --url 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
             cand --api-key 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)'
             cand --output 'Output format (table, json, plain) [env: HBCTL_OUTPUT]'
@@ -250,6 +268,8 @@ set edit:completion:arg-completer[hbctl] = {|@words|
             cand --config 'Path to explicit TOML configuration file'
             cand -P 'Named configuration profile (env: HBCTL_PROFILE)'
             cand --profile 'Named configuration profile (env: HBCTL_PROFILE)'
+            cand --attach-best-effort 'Treat attachment failures as non-fatal warnings and include `attachmentErrors` in JSON output'
+            cand --optimize 'Automatically resize/compress oversized images before upload'
             cand --force 'Allow attaching images larger than 500KB'
             cand --json 'Shorthand for --output json (emits compact JSON)'
             cand --dry-run 'Preview mutating requests without hitting the server (redacts Authorization)'
@@ -259,6 +279,10 @@ set edit:completion:arg-completer[hbctl] = {|@words|
             cand --help 'Print help'
         }
         &'hbctl;item;update'= {
+            cand --items-from 'Read newline-delimited entity IDs to update from a file or ''-'' (stdin)'
+            cand --filter-tag 'Select items to update matching this tag name or UUID'
+            cand --filter-parent 'Select items to update under this parent item/location name, ID, or ''none'''
+            cand --filter-type 'Select items to update matching this entity type name or UUID'
             cand --name 'Updated item name'
             cand --description 'Updated item description'
             cand --type 'Entity type name or UUID'
@@ -273,6 +297,15 @@ set edit:completion:arg-completer[hbctl] = {|@words|
             cand --purchase-price 'Updated purchase price'
             cand --purchase-date 'Updated purchase date (YYYY-MM-DD)'
             cand --purchase-from 'Updated purchase source'
+            cand --archived 'Mark item as archived (true/false; bare flag means true)'
+            cand --insured 'Mark item as insured (true/false; bare flag means true)'
+            cand --lifetime-warranty 'Mark item as having a lifetime warranty (true/false; bare flag means true)'
+            cand --warranty-expires 'Warranty expiration date (YYYY-MM-DD or RFC3339)'
+            cand --warranty-details 'Warranty details or terms'
+            cand --sold-time 'Date/time the item was sold (YYYY-MM-DD or RFC3339)'
+            cand --sold-to 'Buyer name or recipient the item was sold to'
+            cand --sold-price 'Sale price'
+            cand --sold-notes 'Notes about the sale'
             cand --notes 'Notes (merged into custom field ''Notes'')'
             cand --field 'Custom field KEY=VAL to upsert (repeatable)'
             cand --field-type 'Value type for --field entries'
@@ -307,11 +340,23 @@ set edit:completion:arg-completer[hbctl] = {|@words|
             cand --purchase-price 'Purchase price'
             cand --purchase-date 'Purchase date (YYYY-MM-DD)'
             cand --purchase-from 'Purchase source'
+            cand --archived 'Mark item as archived (true/false; bare flag means true)'
+            cand --insured 'Mark item as insured (true/false; bare flag means true)'
+            cand --lifetime-warranty 'Mark item as having a lifetime warranty (true/false; bare flag means true)'
+            cand --warranty-expires 'Warranty expiration date (YYYY-MM-DD or RFC3339)'
+            cand --warranty-details 'Warranty details or terms'
+            cand --sold-time 'Date/time the item was sold (YYYY-MM-DD or RFC3339)'
+            cand --sold-to 'Buyer name or recipient the item was sold to'
+            cand --sold-price 'Sale price'
+            cand --sold-notes 'Notes about the sale'
             cand --field 'Custom field KEY=VAL (repeatable)'
             cand --field-type 'Value type for --field entries'
             cand --from-json 'Load item JSON from file path or ''-'' for stdin'
             cand --match-by 'Match existing items by key in priority order: name, model, serial, or field:KEY (repeatable; defaults to name)'
-            cand --attach 'Local file path(s) to attach after upserting the item (repeatable)'
+            cand --match-mode 'Matching strategy for --match-by keys (exact, contains, fuzzy)'
+            cand --on-match 'Action to take when an existing item matches (update, skip, attach-only)'
+            cand --attach 'Local file path(s) to attach after upserting the item (`FILE` or `FILE=REMOTE_NAME`, repeatable)'
+            cand --attach-url 'Remote HTTP(S) URL(s) to download and attach (`URL` or `URL=REMOTE_NAME`, repeatable)'
             cand --url 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
             cand --api-key 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)'
             cand --output 'Output format (table, json, plain) [env: HBCTL_OUTPUT]'
@@ -321,6 +366,8 @@ set edit:completion:arg-completer[hbctl] = {|@words|
             cand -P 'Named configuration profile (env: HBCTL_PROFILE)'
             cand --profile 'Named configuration profile (env: HBCTL_PROFILE)'
             cand --fill-missing 'When updating an existing item, only populate blank/missing/zero fields'
+            cand --attach-best-effort 'Treat attachment failures as non-fatal warnings and include `attachmentErrors` in JSON output'
+            cand --optimize 'Automatically resize/compress oversized images before upload'
             cand --force 'Allow attaching images larger than 500KB'
             cand --json 'Shorthand for --output json (emits compact JSON)'
             cand --dry-run 'Preview mutating requests without hitting the server (redacts Authorization)'
@@ -330,6 +377,13 @@ set edit:completion:arg-completer[hbctl] = {|@words|
             cand --help 'Print help'
         }
         &'hbctl;item;delete'= {
+            cand --items-from 'Read newline-delimited entity IDs to delete from a file or ''-'' (stdin)'
+            cand --tag 'Select items to delete matching this tag name or UUID'
+            cand --filter-tag 'Select items to delete matching this tag name or UUID'
+            cand --parent 'Select items to delete under this parent item/location name, ID, or ''none'''
+            cand --filter-parent 'Select items to delete under this parent item/location name, ID, or ''none'''
+            cand --type 'Select items to delete matching this entity type name or UUID'
+            cand --filter-type 'Select items to delete matching this entity type name or UUID'
             cand --url 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
             cand --api-key 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)'
             cand --output 'Output format (table, json, plain) [env: HBCTL_OUTPUT]'
@@ -338,7 +392,9 @@ set edit:completion:arg-completer[hbctl] = {|@words|
             cand --config 'Path to explicit TOML configuration file'
             cand -P 'Named configuration profile (env: HBCTL_PROFILE)'
             cand --profile 'Named configuration profile (env: HBCTL_PROFILE)'
-            cand --force 'Skip interactive confirmation prompt'
+            cand -y 'Skip interactive/bulk confirmation prompt'
+            cand --yes 'Skip interactive/bulk confirmation prompt'
+            cand --force 'Skip interactive/bulk confirmation prompt'
             cand --json 'Shorthand for --output json (emits compact JSON)'
             cand --dry-run 'Preview mutating requests without hitting the server (redacts Authorization)'
             cand -q 'Output only created/affected IDs for shell piping'
@@ -349,8 +405,9 @@ set edit:completion:arg-completer[hbctl] = {|@words|
         &'hbctl;item;import'= {
             cand --format 'Input format (inferred from extension if omitted; defaults to json for stdin)'
             cand --match-by 'Match existing items by key in priority order: name, model, serial, or field:KEY (repeatable; defaults to name)'
+            cand --match-mode 'Matching strategy for --match-by keys (exact, contains, fuzzy)'
             cand --parent 'Default parent item/location name, ID, or ''none'' for imported records without one'
-            cand --attach 'Local file path(s) to attach to each imported item (repeatable)'
+            cand --attach 'Local file path(s) to attach to each imported item (`FILE` or `FILE=REMOTE_NAME`, repeatable)'
             cand --url 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
             cand --api-key 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)'
             cand --output 'Output format (table, json, plain) [env: HBCTL_OUTPUT]'
@@ -362,6 +419,7 @@ set edit:completion:arg-completer[hbctl] = {|@words|
             cand --skip-existing 'Skip items whose name already exists in Homebox'
             cand --update-existing 'Update items whose name already exists in Homebox'
             cand --fill-missing 'With --update-existing, only populate blank/missing/zero fields on existing items'
+            cand --optimize 'Automatically resize/compress oversized images before upload'
             cand --force 'Allow attaching images larger than 500KB'
             cand --json 'Shorthand for --output json (emits compact JSON)'
             cand --dry-run 'Preview mutating requests without hitting the server (redacts Authorization)'
@@ -390,6 +448,47 @@ set edit:completion:arg-completer[hbctl] = {|@words|
             cand --help 'Print help'
         }
         &'hbctl;item;move'= {
+            cand --to 'Target parent item name, ID, or ''none'' to unparent (required when using selectors without trailing positional parent)'
+            cand --items-from 'Read newline-delimited entity IDs to move from a file or ''-'' (stdin)'
+            cand --tag 'Select items to move matching this tag name or UUID'
+            cand --filter-tag 'Select items to move matching this tag name or UUID'
+            cand --parent 'Select items to move under this parent item/location name, ID, or ''none'''
+            cand --filter-parent 'Select items to move under this parent item/location name, ID, or ''none'''
+            cand --type 'Select items to move matching this entity type name or UUID'
+            cand --filter-type 'Select items to move matching this entity type name or UUID'
+            cand --url 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
+            cand --api-key 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)'
+            cand --output 'Output format (table, json, plain) [env: HBCTL_OUTPUT]'
+            cand --select 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)'
+            cand -C 'Path to explicit TOML configuration file'
+            cand --config 'Path to explicit TOML configuration file'
+            cand -P 'Named configuration profile (env: HBCTL_PROFILE)'
+            cand --profile 'Named configuration profile (env: HBCTL_PROFILE)'
+            cand --json 'Shorthand for --output json (emits compact JSON)'
+            cand --dry-run 'Preview mutating requests without hitting the server (redacts Authorization)'
+            cand -q 'Output only created/affected IDs for shell piping'
+            cand --quiet 'Output only created/affected IDs for shell piping'
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'hbctl;item;duplicate'= {
+            cand --count 'Number of duplicates to create'
+            cand --url 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
+            cand --api-key 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)'
+            cand --output 'Output format (table, json, plain) [env: HBCTL_OUTPUT]'
+            cand --select 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)'
+            cand -C 'Path to explicit TOML configuration file'
+            cand --config 'Path to explicit TOML configuration file'
+            cand -P 'Named configuration profile (env: HBCTL_PROFILE)'
+            cand --profile 'Named configuration profile (env: HBCTL_PROFILE)'
+            cand --json 'Shorthand for --output json (emits compact JSON)'
+            cand --dry-run 'Preview mutating requests without hitting the server (redacts Authorization)'
+            cand -q 'Output only created/affected IDs for shell piping'
+            cand --quiet 'Output only created/affected IDs for shell piping'
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'hbctl;item;path'= {
             cand --url 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
             cand --api-key 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)'
             cand --output 'Output format (table, json, plain) [env: HBCTL_OUTPUT]'
@@ -433,6 +532,8 @@ set edit:completion:arg-completer[hbctl] = {|@words|
             cand import 'Bulk import items from JSON or CSV (file or ''-'' for stdin)'
             cand dedup 'Detect (and optionally delete or merge) duplicate items'
             cand move 'Move an item under a parent item/location (or ''none'' to unparent)'
+            cand duplicate 'Duplicate an existing item one or more times'
+            cand path 'Display the location/parent breadcrumb path for an item'
             cand tree 'Render item parent/location hierarchy as a tree'
             cand help 'Print this message or the help of the given subcommand(s)'
         }
@@ -453,6 +554,10 @@ set edit:completion:arg-completer[hbctl] = {|@words|
         &'hbctl;item;help;dedup'= {
         }
         &'hbctl;item;help;move'= {
+        }
+        &'hbctl;item;help;duplicate'= {
+        }
+        &'hbctl;item;help;path'= {
         }
         &'hbctl;item;help;tree'= {
         }
@@ -480,6 +585,7 @@ set edit:completion:arg-completer[hbctl] = {|@words|
             cand help 'Print this message or the help of the given subcommand(s)'
         }
         &'hbctl;attachment;upload'= {
+            cand --attach-url 'Remote HTTP(S) URL(s) to download and attach (`URL` or `URL=REMOTE_NAME`, repeatable)'
             cand --name 'Override remote filename/title (for single-file or stdin ''-'' uploads)'
             cand --url 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
             cand --api-key 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)'
@@ -491,6 +597,7 @@ set edit:completion:arg-completer[hbctl] = {|@words|
             cand --profile 'Named configuration profile (env: HBCTL_PROFILE)'
             cand --skip-existing 'Skip files that already exist on the item (default behavior)'
             cand --overwrite 'Delete and re-upload files that already exist on the item'
+            cand --optimize 'Automatically resize/compress oversized images before upload'
             cand --force 'Allow uploading images larger than 500KB'
             cand --json 'Shorthand for --output json (emits compact JSON)'
             cand --dry-run 'Preview mutating requests without hitting the server (redacts Authorization)'
@@ -574,6 +681,10 @@ set edit:completion:arg-completer[hbctl] = {|@words|
         }
         &'hbctl;search'= {
             cand --tag 'Filter by tag name or UUID'
+            cand --type 'Filter by entity type name or UUID'
+            cand --parent 'Filter by parent item name, ID, or ''none'' for top-level items'
+            cand --limit 'Maximum number of matching results to return'
+            cand --warranty-expiring 'Only include items with a warranty expiring within the next DAYS days (excludes lifetime warranties)'
             cand --model 'Filter by model number (exact or substring, case-insensitive)'
             cand --serial 'Filter by serial number (exact or substring, case-insensitive)'
             cand --manufacturer 'Filter by manufacturer (exact or substring, case-insensitive)'
@@ -586,6 +697,10 @@ set edit:completion:arg-completer[hbctl] = {|@words|
             cand --config 'Path to explicit TOML configuration file'
             cand -P 'Named configuration profile (env: HBCTL_PROFILE)'
             cand --profile 'Named configuration profile (env: HBCTL_PROFILE)'
+            cand --include-archived 'Include archived items in search results'
+            cand --archived-only 'Only search archived items (implies --include-archived)'
+            cand --any 'Match items satisfying ANY provided filter (OR) instead of ALL filters (AND)'
+            cand --with-path 'Include full location/parent breadcrumb path for each matching item'
             cand --json 'Shorthand for --output json (emits compact JSON)'
             cand --dry-run 'Preview mutating requests without hitting the server (redacts Authorization)'
             cand -q 'Output only created/affected IDs for shell piping'
@@ -988,11 +1103,145 @@ set edit:completion:arg-completer[hbctl] = {|@words|
             cand -h 'Print help'
             cand --help 'Print help'
         }
+        &'hbctl;api'= {
+            cand -d 'Inline JSON request body'
+            cand --data 'Inline JSON request body'
+            cand --from-json 'Read JSON request body from a file path or ''-'' for stdin'
+            cand --query 'Query parameter KEY=VALUE (repeatable; appended to any inline path query)'
+            cand --url 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
+            cand --api-key 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)'
+            cand --output 'Output format (table, json, plain) [env: HBCTL_OUTPUT]'
+            cand --select 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)'
+            cand -C 'Path to explicit TOML configuration file'
+            cand --config 'Path to explicit TOML configuration file'
+            cand -P 'Named configuration profile (env: HBCTL_PROFILE)'
+            cand --profile 'Named configuration profile (env: HBCTL_PROFILE)'
+            cand --json 'Shorthand for --output json (emits compact JSON)'
+            cand --dry-run 'Preview mutating requests without hitting the server (redacts Authorization)'
+            cand -q 'Output only created/affected IDs for shell piping'
+            cand --quiet 'Output only created/affected IDs for shell piping'
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'hbctl;maintenance'= {
+            cand --url 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
+            cand --api-key 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)'
+            cand --output 'Output format (table, json, plain) [env: HBCTL_OUTPUT]'
+            cand --select 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)'
+            cand -C 'Path to explicit TOML configuration file'
+            cand --config 'Path to explicit TOML configuration file'
+            cand -P 'Named configuration profile (env: HBCTL_PROFILE)'
+            cand --profile 'Named configuration profile (env: HBCTL_PROFILE)'
+            cand --json 'Shorthand for --output json (emits compact JSON)'
+            cand --dry-run 'Preview mutating requests without hitting the server (redacts Authorization)'
+            cand -q 'Output only created/affected IDs for shell piping'
+            cand --quiet 'Output only created/affected IDs for shell piping'
+            cand -h 'Print help'
+            cand --help 'Print help'
+            cand list 'List maintenance log entries (globally or for a specific entity)'
+            cand create 'Create a maintenance log entry on an entity'
+            cand update 'Update an existing maintenance log entry by entry ID'
+            cand delete 'Delete a maintenance log entry by entry ID'
+            cand help 'Print this message or the help of the given subcommand(s)'
+        }
+        &'hbctl;maintenance;list'= {
+            cand --status 'Filter by maintenance status (both, completed, scheduled)'
+            cand --url 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
+            cand --api-key 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)'
+            cand --output 'Output format (table, json, plain) [env: HBCTL_OUTPUT]'
+            cand --select 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)'
+            cand -C 'Path to explicit TOML configuration file'
+            cand --config 'Path to explicit TOML configuration file'
+            cand -P 'Named configuration profile (env: HBCTL_PROFILE)'
+            cand --profile 'Named configuration profile (env: HBCTL_PROFILE)'
+            cand --json 'Shorthand for --output json (emits compact JSON)'
+            cand --dry-run 'Preview mutating requests without hitting the server (redacts Authorization)'
+            cand -q 'Output only created/affected IDs for shell piping'
+            cand --quiet 'Output only created/affected IDs for shell piping'
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'hbctl;maintenance;create'= {
+            cand --name 'Maintenance task/entry name'
+            cand --completed-date 'Completion date (YYYY-MM-DD or YYYY-MM)'
+            cand --scheduled-date 'Scheduled date (YYYY-MM-DD or YYYY-MM)'
+            cand --cost 'Maintenance cost (e.g. 29.99 or $29.99)'
+            cand --description 'Maintenance description or notes'
+            cand --url 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
+            cand --api-key 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)'
+            cand --output 'Output format (table, json, plain) [env: HBCTL_OUTPUT]'
+            cand --select 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)'
+            cand -C 'Path to explicit TOML configuration file'
+            cand --config 'Path to explicit TOML configuration file'
+            cand -P 'Named configuration profile (env: HBCTL_PROFILE)'
+            cand --profile 'Named configuration profile (env: HBCTL_PROFILE)'
+            cand --json 'Shorthand for --output json (emits compact JSON)'
+            cand --dry-run 'Preview mutating requests without hitting the server (redacts Authorization)'
+            cand -q 'Output only created/affected IDs for shell piping'
+            cand --quiet 'Output only created/affected IDs for shell piping'
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'hbctl;maintenance;update'= {
+            cand --name 'Updated maintenance task/entry name'
+            cand --completed-date 'Updated completion date (YYYY-MM-DD or YYYY-MM)'
+            cand --scheduled-date 'Updated scheduled date (YYYY-MM-DD or YYYY-MM)'
+            cand --cost 'Updated maintenance cost (e.g. 29.99 or $29.99)'
+            cand --description 'Updated maintenance description or notes'
+            cand --url 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
+            cand --api-key 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)'
+            cand --output 'Output format (table, json, plain) [env: HBCTL_OUTPUT]'
+            cand --select 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)'
+            cand -C 'Path to explicit TOML configuration file'
+            cand --config 'Path to explicit TOML configuration file'
+            cand -P 'Named configuration profile (env: HBCTL_PROFILE)'
+            cand --profile 'Named configuration profile (env: HBCTL_PROFILE)'
+            cand --json 'Shorthand for --output json (emits compact JSON)'
+            cand --dry-run 'Preview mutating requests without hitting the server (redacts Authorization)'
+            cand -q 'Output only created/affected IDs for shell piping'
+            cand --quiet 'Output only created/affected IDs for shell piping'
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'hbctl;maintenance;delete'= {
+            cand --url 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
+            cand --api-key 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)'
+            cand --output 'Output format (table, json, plain) [env: HBCTL_OUTPUT]'
+            cand --select 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)'
+            cand -C 'Path to explicit TOML configuration file'
+            cand --config 'Path to explicit TOML configuration file'
+            cand -P 'Named configuration profile (env: HBCTL_PROFILE)'
+            cand --profile 'Named configuration profile (env: HBCTL_PROFILE)'
+            cand --force 'Skip interactive confirmation prompt'
+            cand --json 'Shorthand for --output json (emits compact JSON)'
+            cand --dry-run 'Preview mutating requests without hitting the server (redacts Authorization)'
+            cand -q 'Output only created/affected IDs for shell piping'
+            cand --quiet 'Output only created/affected IDs for shell piping'
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'hbctl;maintenance;help'= {
+            cand list 'List maintenance log entries (globally or for a specific entity)'
+            cand create 'Create a maintenance log entry on an entity'
+            cand update 'Update an existing maintenance log entry by entry ID'
+            cand delete 'Delete a maintenance log entry by entry ID'
+            cand help 'Print this message or the help of the given subcommand(s)'
+        }
+        &'hbctl;maintenance;help;list'= {
+        }
+        &'hbctl;maintenance;help;create'= {
+        }
+        &'hbctl;maintenance;help;update'= {
+        }
+        &'hbctl;maintenance;help;delete'= {
+        }
+        &'hbctl;maintenance;help;help'= {
+        }
         &'hbctl;export'= {
             cand --tag 'Filter by tag name or UUID'
             cand --has-field 'Require items to have the named custom field'
             cand --field 'Custom field column(s) to include in export (repeatable)'
-            cand --sort 'Sort exported items by name or id'
+            cand --sort 'Sort exported items (name, id, purchase-price, purchase-date, updated-at, asset-id)'
             cand --format 'Export format (json, csv, markdown)'
             cand --columns 'Custom column list and order (comma-separated or repeatable; supports ''key=Header Alias'')'
             cand --align 'Markdown table column alignment (default, left, right, center)'
@@ -1093,6 +1342,8 @@ set edit:completion:arg-completer[hbctl] = {|@words|
             cand tag 'Manage tags (/api/v1/tags)'
             cand entity-types 'Manage Homebox entity types (/api/v1/entity-types)'
             cand status 'Check remote Homebox server connectivity and version (/api/v1/status)'
+            cand api 'Issue a raw authenticated HTTP request against any Homebox API endpoint'
+            cand maintenance 'Manage maintenance log entries (/api/v1/maintenance)'
             cand export 'Export filtered items to JSON, CSV, or Markdown'
             cand completions 'Generate shell completion scripts'
             cand man 'Generate UNIX roff man page'
@@ -1123,6 +1374,8 @@ set edit:completion:arg-completer[hbctl] = {|@words|
             cand import 'Bulk import items from JSON or CSV (file or ''-'' for stdin)'
             cand dedup 'Detect (and optionally delete or merge) duplicate items'
             cand move 'Move an item under a parent item/location (or ''none'' to unparent)'
+            cand duplicate 'Duplicate an existing item one or more times'
+            cand path 'Display the location/parent breadcrumb path for an item'
             cand tree 'Render item parent/location hierarchy as a tree'
         }
         &'hbctl;help;item;list'= {
@@ -1142,6 +1395,10 @@ set edit:completion:arg-completer[hbctl] = {|@words|
         &'hbctl;help;item;dedup'= {
         }
         &'hbctl;help;item;move'= {
+        }
+        &'hbctl;help;item;duplicate'= {
+        }
+        &'hbctl;help;item;path'= {
         }
         &'hbctl;help;item;tree'= {
         }
@@ -1201,6 +1458,22 @@ set edit:completion:arg-completer[hbctl] = {|@words|
         &'hbctl;help;entity-types;delete'= {
         }
         &'hbctl;help;status'= {
+        }
+        &'hbctl;help;api'= {
+        }
+        &'hbctl;help;maintenance'= {
+            cand list 'List maintenance log entries (globally or for a specific entity)'
+            cand create 'Create a maintenance log entry on an entity'
+            cand update 'Update an existing maintenance log entry by entry ID'
+            cand delete 'Delete a maintenance log entry by entry ID'
+        }
+        &'hbctl;help;maintenance;list'= {
+        }
+        &'hbctl;help;maintenance;create'= {
+        }
+        &'hbctl;help;maintenance;update'= {
+        }
+        &'hbctl;help;maintenance;delete'= {
         }
         &'hbctl;help;export'= {
         }

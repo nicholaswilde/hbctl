@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::fs;
 use std::io::{self, Read, Write};
 use std::path::{Path, PathBuf};
@@ -13,6 +13,9 @@ use crate::cli::{
 use crate::client::models::{Attachment, Entity};
 use crate::client::resolve::Resolver;
 use crate::client::{DryRunRequest, HomeboxClient, ListEntitiesQuery};
+#[cfg(test)]
+use crate::commands::parse_item_ids;
+use crate::commands::read_item_ids;
 use crate::config::{AppConfig, OutputFormat, DEFAULT_MAX_IMAGE_KB};
 use crate::error::{HbctlError, Result};
 use crate::image_opt::{optimize_attachment_bytes, ImageOptOptions, PreparedImageBytes};
@@ -962,37 +965,6 @@ struct DownloadResult {
     path: String,
     status: String,
     bytes: u64,
-}
-
-fn parse_item_ids(input: &str) -> Vec<String> {
-    let mut seen = HashSet::new();
-    let mut ids = Vec::new();
-    for raw in input.lines() {
-        let trimmed = raw.trim();
-        if trimmed.is_empty() || trimmed.starts_with('#') {
-            continue;
-        }
-        if seen.insert(trimmed.to_string()) {
-            ids.push(trimmed.to_string());
-        }
-    }
-    ids
-}
-
-fn read_item_ids(path: &Path) -> Result<Vec<String>> {
-    let raw = if path.as_os_str() == "-" {
-        let mut buf = String::new();
-        io::stdin().read_to_string(&mut buf)?;
-        buf
-    } else {
-        fs::read_to_string(path).map_err(|e| {
-            HbctlError::InvalidInput(format!(
-                "cannot read item IDs file '{}': {e}",
-                path.display()
-            ))
-        })?
-    };
-    Ok(parse_item_ids(&raw))
 }
 
 fn collision_key(path: &Path) -> String {

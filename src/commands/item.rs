@@ -1,18 +1,19 @@
 use std::collections::{HashMap, HashSet};
 use std::io::{self, IsTerminal, Write};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use serde::Serialize;
 use serde_json::{json, Map, Value};
 
 use crate::cli::{
     ImportFormat, ItemArgs, ItemCommands, ItemCreateArgs, ItemDedupArgs, ItemDeleteArgs,
-    ItemGetArgs, ItemImportArgs, ItemListArgs, ItemMoveArgs, ItemTreeArgs, ItemUpdateArgs,
-    ItemUpsertArgs, MatchKey, MatchMode, OnMatchAction,
+    ItemDuplicateArgs, ItemGetArgs, ItemImportArgs, ItemListArgs, ItemMoveArgs, ItemPathArgs,
+    ItemTreeArgs, ItemUpdateArgs, ItemUpsertArgs, MatchKey, MatchMode, OnMatchAction,
 };
 use crate::client::models::{
-    entity_warranty_expiring_within, normalize_json_aliases, parse_bool_loose, today_utc_days,
-    upsert_custom_fields, CreateEntityRequest, CustomField, Entity, EntityPatch, FieldValueType,
+    entity_warranty_expiring_within, format_breadcrumb, normalize_json_aliases, parse_bool_loose,
+    today_utc_days, upsert_custom_fields, CreateEntityRequest, CustomField, Entity, EntityPatch,
+    FieldValueType,
 };
 use crate::client::resolve::Resolver;
 use crate::client::{DryRunRequest, HomeboxClient, ListEntitiesQuery};
@@ -20,13 +21,16 @@ use crate::commands::attachment::{
     attach_targets_to_item, build_target_dry_run, parse_local_attachment_spec,
     parse_url_attachment_spec, validate_attachment_targets, AttachmentTarget,
 };
-use crate::commands::{read_file_or_stdin, render_entities, render_entity};
+use crate::commands::{
+    read_file_or_stdin, read_item_ids, render_entities, render_entity, render_entity_with_path,
+};
 use crate::config::{AppConfig, OutputFormat};
 use crate::dedup;
 use crate::error::{HbctlError, Result};
 use crate::image_opt::ImageOptOptions;
 use crate::output::{
-    write_compact_json, write_dry_run, write_quiet_ids, write_table_or_plain, OutputContext,
+    write_compact_json, write_dry_run, write_quiet_ids, write_selected_table, write_table_or_plain,
+    OutputContext,
 };
 
 pub fn handle(
@@ -41,12 +45,14 @@ pub fn handle(
         ItemCommands::List(a) => handle_list(a, config, ctx, out),
         ItemCommands::Get(a) => handle_get(a, config, ctx, out),
         ItemCommands::Create(a) => handle_create(a, dry_run, config, ctx, out, err),
-        ItemCommands::Update(a) => handle_update(a, dry_run, config, ctx, out),
+        ItemCommands::Update(a) => handle_update(a, dry_run, config, ctx, out, err),
         ItemCommands::Upsert(a) => handle_upsert(a, dry_run, config, ctx, out, err),
         ItemCommands::Delete(a) => handle_delete(a, dry_run, config, ctx, out, err),
         ItemCommands::Import(a) => handle_import(a, dry_run, config, ctx, out, err),
         ItemCommands::Dedup(a) => handle_dedup(a, dry_run, config, ctx, out, err),
         ItemCommands::Move(a) => handle_move(a, dry_run, config, ctx, out, err),
+        ItemCommands::Duplicate(a) => handle_duplicate(a, dry_run, config, ctx, out),
+        ItemCommands::Path(a) => handle_path(a, config, ctx, out),
         ItemCommands::Tree(a) => handle_tree(a, config, ctx, out),
     }
 }
@@ -122,7 +128,186 @@ fn handle_get(
 ) -> Result<()> {
     let client = HomeboxClient::from_config(config)?;
     let entity = client.get_entity(&args.id)?;
+    if args.with_path {
+        let path = client.get_entity_path(&args.id)?;
+        return render_entity_with_path(&entity, &path, ctx, out);
+    }
     render_entity(&entity, ctx, out)
+}
+
+struct BulkSelector<'a> {
+    ids: &'a [String],
+    items_from: Option<&'a Path>,
+    tag: Option<&'a str>,
+    parent: Option<&'a str>,
+    entity_type: Option<&'a str>,
+}
+
+impl BulkSelector<'_> {
+    fn has_remote_filters(&self) -> bool {
+        self.tag.is_some() || self.parent.is_some() || self.entity_type.is_some()
+    }
+
+    fn has_any_selector(&self) -> bool {
+        !self.ids.is_empty() || self.items_from.is_some() || self.has_remote_filters()
+    }
+}
+
+struct ResolvedTargets {
+    ids: Vec<String>,
+    is_bulk: bool,
+}
+
+fn push_unique_id(seen: &mut HashSet<String>, out: &mut Vec<String>, raw: &str) {
+    let trimmed = raw.trim();
+    if !trimmed.is_empty() && seen.insert(trimmed.to_string()) {
+        out.push(trimmed.to_string());
+    }
+}
+
+fn resolve_bulk_targets(
+    selector: &BulkSelector<'_>,
+    client_opt: Option<&HomeboxClient>,
+    config: &AppConfig,
+) -> Result<ResolvedTargets> {
+    if !selector.has_any_selector() {
+        return Err(HbctlError::InvalidInput(
+            "specify one or more item <ID>s, --items-from <FILE|->, or filter selectors"
+                .to_string(),
+        ));
+    }
+
+    let mut seen = HashSet::new();
+    let mut ids = Vec::new();
+    for raw_id in selector.ids {
+        push_unique_id(&mut seen, &mut ids, raw_id);
+    }
+
+    if let Some(path) = selector.items_from {
+        for id in read_item_ids(path)? {
+            push_unique_id(&mut seen, &mut ids, &id);
+        }
+    }
+
+    if selector.has_remote_filters() {
+        let owned_client;
+        let client = match client_opt {
+            Some(c) => c,
+            None => {
+                owned_client = HomeboxClient::from_config(config)?;
+                &owned_client
+            }
+        };
+        let mut resolver = Resolver::new(client);
+        let mut query = ListEntitiesQuery::default();
+        if let Some(tag) = selector.tag {
+            query.tag_ids.push(resolver.resolve_tag_id(tag, false)?);
+        }
+        if let Some(et) = selector.entity_type {
+            query.entity_type_id = Some(resolver.resolve_entity_type_id(et)?);
+        }
+        let parent_filter = match selector.parent {
+            Some(p) => Some(resolver.resolve_parent_id(p)?),
+            None => None,
+        };
+
+        let mut entities = client.list_entities(&query, true)?;
+        if let Some(ref target_parent) = parent_filter {
+            entities.retain(|e| match target_parent {
+                Some(pid) => e.parent_id.as_deref() == Some(pid.as_str()),
+                None => e
+                    .parent_id
+                    .as_deref()
+                    .map(|s| s.trim().is_empty())
+                    .unwrap_or(true),
+            });
+        }
+        for entity in &entities {
+            push_unique_id(&mut seen, &mut ids, &entity.id);
+        }
+    }
+
+    if ids.is_empty() && selector.items_from.is_none() && !selector.has_remote_filters() {
+        return Err(HbctlError::InvalidInput(
+            "specify at least one non-empty item <ID>".to_string(),
+        ));
+    }
+
+    let is_bulk = selector.items_from.is_some() || selector.has_remote_filters() || ids.len() != 1;
+    Ok(ResolvedTargets { ids, is_bulk })
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct BulkItemError {
+    id: String,
+    error: String,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct BulkUpdateSummary {
+    updated: usize,
+    failed: usize,
+    ids: Vec<String>,
+    items: Vec<Entity>,
+    errors: Vec<BulkItemError>,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct BulkMoveSummary {
+    moved: usize,
+    failed: usize,
+    ids: Vec<String>,
+    items: Vec<Entity>,
+    errors: Vec<BulkItemError>,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct BulkDeleteSummary {
+    deleted: usize,
+    failed: usize,
+    ids: Vec<String>,
+    errors: Vec<BulkItemError>,
+}
+
+fn render_bulk_status_table(
+    succeeded_ids: &[String],
+    ok_status: &str,
+    errors: &[BulkItemError],
+    format: OutputFormat,
+    out: &mut dyn Write,
+) -> Result<()> {
+    let mut rows: Vec<Vec<String>> = succeeded_ids
+        .iter()
+        .map(|id| vec![id.clone(), ok_status.to_string(), String::new()])
+        .collect();
+    for e in errors {
+        rows.push(vec![e.id.clone(), "failed".to_string(), e.error.clone()]);
+    }
+    write_table_or_plain(
+        &["ID".to_string(), "STATUS".to_string(), "DETAIL".to_string()],
+        &rows,
+        format,
+        out,
+    )
+}
+
+fn check_bulk_partial_failure(
+    action: &str,
+    succeeded: usize,
+    errors: &[BulkItemError],
+) -> Result<()> {
+    if !errors.is_empty() {
+        return Err(HbctlError::BulkPartialFailure {
+            action: action.to_string(),
+            succeeded,
+            failed: errors.len(),
+        });
+    }
+    Ok(())
 }
 
 #[derive(Default)]
@@ -652,7 +837,23 @@ fn handle_update(
     config: &AppConfig,
     ctx: &OutputContext,
     out: &mut dyn Write,
+    err: &mut dyn Write,
 ) -> Result<()> {
+    if args.from_json.as_deref() == Some("-") && args.items_from.as_deref() == Some(Path::new("-"))
+    {
+        return Err(HbctlError::InvalidInput(
+            "cannot read both --from-json and --items-from from stdin ('-')".to_string(),
+        ));
+    }
+
+    let selector = BulkSelector {
+        ids: &args.ids,
+        items_from: args.items_from.as_deref(),
+        tag: args.filter_tag.as_deref(),
+        parent: args.filter_parent.as_deref(),
+        entity_type: args.filter_type.as_deref(),
+    };
+
     let mut parsed = if let Some(ref src) = args.from_json {
         let raw_text = read_file_or_stdin(src)?;
         let val: Value = serde_json::from_str(&raw_text)?;
@@ -713,6 +914,7 @@ fn handle_update(
     )?;
 
     if dry_run {
+        let resolved = resolve_bulk_targets(&selector, None, config)?;
         let base_url = config.require_base_url()?;
         let patch = EntityPatch {
             name: parsed.name,
@@ -743,16 +945,46 @@ fn handle_update(
             fill_missing: args.fill_missing,
             ..Default::default()
         };
-        let preview = HomeboxClient::build_dry_run(
-            base_url,
-            "PUT",
-            &format!("entities/{}", args.id),
-            Some(serde_json::to_value(&patch)?),
-        );
-        return write_dry_run(&[preview], ctx, out);
+        let patch_val = serde_json::to_value(&patch)?;
+        let previews: Vec<DryRunRequest> = resolved
+            .ids
+            .iter()
+            .map(|id| {
+                HomeboxClient::build_dry_run(
+                    base_url,
+                    "PUT",
+                    &format!("entities/{id}"),
+                    Some(patch_val.clone()),
+                )
+            })
+            .collect();
+        return write_dry_run(&previews, ctx, out);
     }
 
     let client = HomeboxClient::from_config(config)?;
+    let resolved = resolve_bulk_targets(&selector, Some(&client), config)?;
+
+    if resolved.ids.is_empty() {
+        if ctx.quiet {
+            return write_quiet_ids(&[], out);
+        }
+        if ctx.format == OutputFormat::Json {
+            return write_compact_json(
+                &BulkUpdateSummary {
+                    updated: 0,
+                    failed: 0,
+                    ids: Vec::new(),
+                    items: Vec::new(),
+                    errors: Vec::new(),
+                },
+                ctx.select.as_deref(),
+                out,
+            );
+        }
+        writeln!(out, "No matching items to update.")?;
+        return Ok(());
+    }
+
     let mut resolver = Resolver::new(&client);
 
     let tag_ids = if parsed.tags.is_empty() {
@@ -805,8 +1037,48 @@ fn handle_update(
         ..Default::default()
     };
 
-    let updated = client.update_entity(&args.id, &patch)?;
-    render_entity(&updated, ctx, out)
+    if !resolved.is_bulk {
+        let updated = client.update_entity(&resolved.ids[0], &patch)?;
+        return render_entity(&updated, ctx, out);
+    }
+
+    let mut updated_items = Vec::new();
+    let mut succeeded_ids = Vec::new();
+    let mut errors = Vec::new();
+    for id in &resolved.ids {
+        match client.update_entity(id, &patch) {
+            Ok(ent) => {
+                succeeded_ids.push(ent.id.clone());
+                updated_items.push(ent);
+            }
+            Err(e) => {
+                writeln!(err, "error updating item '{id}': {e}")?;
+                errors.push(BulkItemError {
+                    id: id.clone(),
+                    error: e.to_string(),
+                });
+            }
+        }
+    }
+
+    if ctx.quiet {
+        write_quiet_ids(&succeeded_ids, out)?;
+    } else if ctx.format == OutputFormat::Json {
+        let summary = BulkUpdateSummary {
+            updated: updated_items.len(),
+            failed: errors.len(),
+            ids: succeeded_ids.clone(),
+            items: updated_items,
+            errors: errors.clone(),
+        };
+        write_compact_json(&summary, ctx.select.as_deref(), out)?;
+    } else if errors.is_empty() {
+        render_entities(&updated_items, ctx, out)?;
+    } else {
+        render_bulk_status_table(&succeeded_ids, "updated", &errors, ctx.format, out)?;
+    }
+
+    check_bulk_partial_failure("update", succeeded_ids.len(), &errors)
 }
 
 fn effective_match_keys(keys: &[MatchKey]) -> Vec<MatchKey> {
@@ -1266,43 +1538,153 @@ fn handle_delete(
     out: &mut dyn Write,
     err: &mut dyn Write,
 ) -> Result<()> {
+    let selector = BulkSelector {
+        ids: &args.ids,
+        items_from: args.items_from.as_deref(),
+        tag: args.tag.as_deref(),
+        parent: args.parent.as_deref(),
+        entity_type: args.entity_type.as_deref(),
+    };
+
     if dry_run {
+        let resolved = resolve_bulk_targets(&selector, None, config)?;
         let base_url = config.require_base_url()?;
-        let preview = HomeboxClient::build_dry_run(
-            base_url,
-            "DELETE",
-            &format!("entities/{}", args.id),
-            None,
-        );
-        return write_dry_run(&[preview], ctx, out);
+        let previews: Vec<DryRunRequest> = resolved
+            .ids
+            .iter()
+            .map(|id| {
+                HomeboxClient::build_dry_run(base_url, "DELETE", &format!("entities/{id}"), None)
+            })
+            .collect();
+        return write_dry_run(&previews, ctx, out);
     }
 
-    if !args.force && io::stdin().is_terminal() {
-        write!(err, "Delete item '{}'? [y/N]: ", args.id)?;
-        err.flush()?;
-        let mut answer = String::new();
-        io::stdin().read_line(&mut answer)?;
-        if !matches!(answer.trim().to_ascii_lowercase().as_str(), "y" | "yes") {
-            writeln!(err, "Aborted.")?;
-            return Ok(());
+    let (resolved, client_opt) = if selector.has_remote_filters() {
+        let client = HomeboxClient::from_config(config)?;
+        let resolved = resolve_bulk_targets(&selector, Some(&client), config)?;
+        (resolved, Some(client))
+    } else {
+        let resolved = resolve_bulk_targets(&selector, None, config)?;
+        (resolved, None)
+    };
+
+    if resolved.ids.is_empty() {
+        if ctx.quiet {
+            return write_quiet_ids(&[], out);
+        }
+        if ctx.format == OutputFormat::Json {
+            return write_compact_json(
+                &BulkDeleteSummary {
+                    deleted: 0,
+                    failed: 0,
+                    ids: Vec::new(),
+                    errors: Vec::new(),
+                },
+                ctx.select.as_deref(),
+                out,
+            );
+        }
+        writeln!(out, "No matching items to delete.")?;
+        return Ok(());
+    }
+
+    if !resolved.is_bulk {
+        let target_id = &resolved.ids[0];
+        if !args.skip_confirm() && io::stdin().is_terminal() {
+            write!(err, "Delete item '{target_id}'? [y/N]: ")?;
+            err.flush()?;
+            let mut answer = String::new();
+            io::stdin().read_line(&mut answer)?;
+            if !matches!(answer.trim().to_ascii_lowercase().as_str(), "y" | "yes") {
+                writeln!(err, "Aborted.")?;
+                return Ok(());
+            }
+        }
+    } else if !args.skip_confirm() {
+        let stdin_consumed = args.items_from.as_deref() == Some(Path::new("-"));
+        if io::stdin().is_terminal() && !stdin_consumed {
+            let preview: Vec<&str> = resolved.ids.iter().take(5).map(String::as_str).collect();
+            let suffix = if resolved.ids.len() > 5 {
+                format!(", ... (+{} more)", resolved.ids.len() - 5)
+            } else {
+                String::new()
+            };
+            write!(
+                err,
+                "Delete {} item(s) ({}{suffix})? [y/N]: ",
+                resolved.ids.len(),
+                preview.join(", ")
+            )?;
+            err.flush()?;
+            let mut answer = String::new();
+            io::stdin().read_line(&mut answer)?;
+            if !matches!(answer.trim().to_ascii_lowercase().as_str(), "y" | "yes") {
+                writeln!(err, "Aborted.")?;
+                return Ok(());
+            }
+        } else {
+            return Err(HbctlError::InvalidInput(format!(
+                "refusing to delete {} item(s) non-interactively without --yes (or --force); pass --dry-run to preview",
+                resolved.ids.len()
+            )));
         }
     }
 
-    let client = HomeboxClient::from_config(config)?;
-    client.delete_entity(&args.id)?;
+    let client = match client_opt {
+        Some(c) => c,
+        None => HomeboxClient::from_config(config)?,
+    };
+
+    if !resolved.is_bulk {
+        let target_id = &resolved.ids[0];
+        client.delete_entity(target_id)?;
+
+        if ctx.quiet {
+            return write_quiet_ids(std::slice::from_ref(target_id), out);
+        }
+        if ctx.format == OutputFormat::Json {
+            return write_compact_json(
+                &json!({ "id": target_id, "deleted": true }),
+                ctx.select.as_deref(),
+                out,
+            );
+        }
+        writeln!(out, "Deleted item {target_id}")?;
+        return Ok(());
+    }
+
+    let mut deleted_ids = Vec::new();
+    let mut errors = Vec::new();
+    for id in &resolved.ids {
+        match client.delete_entity(id) {
+            Ok(()) => {
+                deleted_ids.push(id.clone());
+            }
+            Err(e) => {
+                writeln!(err, "error deleting item '{id}': {e}")?;
+                errors.push(BulkItemError {
+                    id: id.clone(),
+                    error: e.to_string(),
+                });
+            }
+        }
+    }
 
     if ctx.quiet {
-        return write_quiet_ids(std::slice::from_ref(&args.id), out);
+        write_quiet_ids(&deleted_ids, out)?;
+    } else if ctx.format == OutputFormat::Json {
+        let summary = BulkDeleteSummary {
+            deleted: deleted_ids.len(),
+            failed: errors.len(),
+            ids: deleted_ids.clone(),
+            errors: errors.clone(),
+        };
+        write_compact_json(&summary, ctx.select.as_deref(), out)?;
+    } else {
+        render_bulk_status_table(&deleted_ids, "deleted", &errors, ctx.format, out)?;
     }
-    if ctx.format == OutputFormat::Json {
-        return write_compact_json(
-            &json!({ "id": args.id, "deleted": true }),
-            ctx.select.as_deref(),
-            out,
-        );
-    }
-    writeln!(out, "Deleted item {}", args.id)?;
-    Ok(())
+
+    check_bulk_partial_failure("delete", deleted_ids.len(), &errors)
 }
 
 #[derive(Debug, Serialize)]
@@ -1839,6 +2221,22 @@ fn handle_dedup(
     write_table_or_plain(&headers, &rows, ctx.format, out)
 }
 
+fn log_move_result(
+    err: &mut dyn Write,
+    updated: &Entity,
+    target_parent: Option<&str>,
+) -> Result<()> {
+    match target_parent {
+        Some(pid) => writeln!(
+            err,
+            "moved item '{}' ({}) under {pid}",
+            updated.name, updated.id
+        )?,
+        None => writeln!(err, "unparented item '{}' ({})", updated.name, updated.id)?,
+    }
+    Ok(())
+}
+
 fn handle_move(
     args: &ItemMoveArgs,
     dry_run: bool,
@@ -1847,48 +2245,238 @@ fn handle_move(
     out: &mut dyn Write,
     err: &mut dyn Write,
 ) -> Result<()> {
+    let (explicit_ids, dest_parent) = args.split_targets_and_destination()?;
+    let selector = BulkSelector {
+        ids: &explicit_ids,
+        items_from: args.items_from.as_deref(),
+        tag: args.tag.as_deref(),
+        parent: args.parent.as_deref(),
+        entity_type: args.entity_type.as_deref(),
+    };
+
     if dry_run {
+        let resolved = resolve_bulk_targets(&selector, None, config)?;
         let base_url = config.require_base_url()?;
         let patch = EntityPatch {
-            parent_id: Some(parse_dry_run_parent(&args.parent)),
+            parent_id: Some(parse_dry_run_parent(&dest_parent)),
             ..Default::default()
         };
-        let preview = HomeboxClient::build_dry_run(
-            base_url,
-            "PUT",
-            &format!("entities/{}", args.id),
-            Some(serde_json::to_value(&patch)?),
-        );
-        return write_dry_run(&[preview], ctx, out);
+        let patch_val = serde_json::to_value(&patch)?;
+        let previews: Vec<DryRunRequest> = resolved
+            .ids
+            .iter()
+            .map(|id| {
+                HomeboxClient::build_dry_run(
+                    base_url,
+                    "PUT",
+                    &format!("entities/{id}"),
+                    Some(patch_val.clone()),
+                )
+            })
+            .collect();
+        return write_dry_run(&previews, ctx, out);
     }
 
     let client = HomeboxClient::from_config(config)?;
-    let mut resolver = Resolver::new(&client);
-    let target_parent = resolver.resolve_parent_id(&args.parent)?;
+    let resolved = resolve_bulk_targets(&selector, Some(&client), config)?;
 
-    if target_parent.as_deref() == Some(args.id.as_str()) {
-        return Err(HbctlError::InvalidInput(format!(
-            "cannot move item '{}' under itself",
-            args.id
-        )));
+    if resolved.ids.is_empty() {
+        if ctx.quiet {
+            return write_quiet_ids(&[], out);
+        }
+        if ctx.format == OutputFormat::Json {
+            return write_compact_json(
+                &BulkMoveSummary {
+                    moved: 0,
+                    failed: 0,
+                    ids: Vec::new(),
+                    items: Vec::new(),
+                    errors: Vec::new(),
+                },
+                ctx.select.as_deref(),
+                out,
+            );
+        }
+        writeln!(out, "No matching items to move.")?;
+        return Ok(());
+    }
+
+    let mut resolver = Resolver::new(&client);
+    let target_parent = resolver.resolve_parent_id(&dest_parent)?;
+
+    if !resolved.is_bulk {
+        let target_id = &resolved.ids[0];
+        if target_parent.as_deref() == Some(target_id.as_str()) {
+            return Err(HbctlError::InvalidInput(format!(
+                "cannot move item '{target_id}' under itself"
+            )));
+        }
+
+        let patch = EntityPatch {
+            parent_id: Some(target_parent.clone()),
+            ..Default::default()
+        };
+        let updated = client.update_entity(target_id, &patch)?;
+        log_move_result(err, &updated, target_parent.as_deref())?;
+        return render_entity(&updated, ctx, out);
     }
 
     let patch = EntityPatch {
         parent_id: Some(target_parent.clone()),
         ..Default::default()
     };
-    let updated = client.update_entity(&args.id, &patch)?;
+    let mut moved_items = Vec::new();
+    let mut succeeded_ids = Vec::new();
+    let mut errors = Vec::new();
 
-    match target_parent {
-        Some(ref pid) => writeln!(
-            err,
-            "moved item '{}' ({}) under {pid}",
-            updated.name, updated.id
-        )?,
-        None => writeln!(err, "unparented item '{}' ({})", updated.name, updated.id)?,
+    for id in &resolved.ids {
+        if target_parent.as_deref() == Some(id.as_str()) {
+            let msg = format!("cannot move item '{id}' under itself");
+            writeln!(err, "error moving item '{id}': {msg}")?;
+            errors.push(BulkItemError {
+                id: id.clone(),
+                error: msg,
+            });
+            continue;
+        }
+        match client.update_entity(id, &patch) {
+            Ok(updated) => {
+                log_move_result(err, &updated, target_parent.as_deref())?;
+                succeeded_ids.push(updated.id.clone());
+                moved_items.push(updated);
+            }
+            Err(e) => {
+                writeln!(err, "error moving item '{id}': {e}")?;
+                errors.push(BulkItemError {
+                    id: id.clone(),
+                    error: e.to_string(),
+                });
+            }
+        }
     }
 
-    render_entity(&updated, ctx, out)
+    if ctx.quiet {
+        write_quiet_ids(&succeeded_ids, out)?;
+    } else if ctx.format == OutputFormat::Json {
+        let summary = BulkMoveSummary {
+            moved: moved_items.len(),
+            failed: errors.len(),
+            ids: succeeded_ids.clone(),
+            items: moved_items,
+            errors: errors.clone(),
+        };
+        write_compact_json(&summary, ctx.select.as_deref(), out)?;
+    } else if errors.is_empty() {
+        render_entities(&moved_items, ctx, out)?;
+    } else {
+        render_bulk_status_table(&succeeded_ids, "moved", &errors, ctx.format, out)?;
+    }
+
+    check_bulk_partial_failure("move", succeeded_ids.len(), &errors)
+}
+
+fn handle_duplicate(
+    args: &ItemDuplicateArgs,
+    dry_run: bool,
+    config: &AppConfig,
+    ctx: &OutputContext,
+    out: &mut dyn Write,
+) -> Result<()> {
+    if args.count == 0 {
+        return Err(HbctlError::InvalidInput(
+            "--count must be at least 1".to_string(),
+        ));
+    }
+
+    if dry_run {
+        let base_url = config.require_base_url()?;
+        let previews: Vec<DryRunRequest> = (0..args.count)
+            .map(|_| {
+                HomeboxClient::build_dry_run(
+                    base_url,
+                    "POST",
+                    &format!("entities/{}/duplicate", args.id),
+                    Some(json!({})),
+                )
+            })
+            .collect();
+        return write_dry_run(&previews, ctx, out);
+    }
+
+    let client = HomeboxClient::from_config(config)?;
+    let mut created = Vec::with_capacity(args.count);
+    for _ in 0..args.count {
+        created.push(client.duplicate_entity(&args.id)?);
+    }
+
+    if created.len() == 1 {
+        render_entity(&created[0], ctx, out)
+    } else {
+        render_entities(&created, ctx, out)
+    }
+}
+
+fn handle_path(
+    args: &ItemPathArgs,
+    config: &AppConfig,
+    ctx: &OutputContext,
+    out: &mut dyn Write,
+) -> Result<()> {
+    let client = HomeboxClient::from_config(config)?;
+    let entries = client.get_entity_path(&args.id)?;
+    let breadcrumb = format_breadcrumb(&entries);
+
+    if ctx.quiet {
+        let ids: Vec<String> = entries.iter().map(|e| e.id.clone()).collect();
+        return write_quiet_ids(&ids, out);
+    }
+
+    if ctx.format == OutputFormat::Json {
+        return write_compact_json(
+            &json!({
+                "id": args.id,
+                "breadcrumb": breadcrumb,
+                "path": entries,
+            }),
+            ctx.select.as_deref(),
+            out,
+        );
+    }
+
+    if let Some(ref select) = ctx.select {
+        return write_selected_table(&entries, select, ctx.format, out);
+    }
+
+    if ctx.format == OutputFormat::Plain {
+        writeln!(out, "{breadcrumb}")?;
+        return Ok(());
+    }
+
+    if entries.is_empty() {
+        writeln!(out, "No path entries found.")?;
+        return Ok(());
+    }
+
+    let headers = vec![
+        "DEPTH".to_string(),
+        "ID".to_string(),
+        "NAME".to_string(),
+        "TYPE".to_string(),
+    ];
+    let rows: Vec<Vec<String>> = entries
+        .iter()
+        .enumerate()
+        .map(|(idx, e)| {
+            vec![
+                idx.to_string(),
+                e.id.clone(),
+                e.name.clone(),
+                e.entry_type.clone().unwrap_or_default(),
+            ]
+        })
+        .collect();
+
+    write_table_or_plain(&headers, &rows, ctx.format, out)
 }
 
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]

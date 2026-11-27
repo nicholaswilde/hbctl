@@ -46,6 +46,8 @@ complete -c hbctl -n "__fish_hbctl_needs_command" -f -a "tag" -d 'Manage tags (/
 complete -c hbctl -n "__fish_hbctl_needs_command" -f -a "entity-types" -d 'Manage Homebox entity types (/api/v1/entity-types)'
 complete -c hbctl -n "__fish_hbctl_needs_command" -f -a "entity-type" -d 'Manage Homebox entity types (/api/v1/entity-types)'
 complete -c hbctl -n "__fish_hbctl_needs_command" -f -a "status" -d 'Check remote Homebox server connectivity and version (/api/v1/status)'
+complete -c hbctl -n "__fish_hbctl_needs_command" -f -a "api" -d 'Issue a raw authenticated HTTP request against any Homebox API endpoint'
+complete -c hbctl -n "__fish_hbctl_needs_command" -f -a "maintenance" -d 'Manage maintenance log entries (/api/v1/maintenance)'
 complete -c hbctl -n "__fish_hbctl_needs_command" -f -a "export" -d 'Export filtered items to JSON, CSV, or Markdown'
 complete -c hbctl -n "__fish_hbctl_needs_command" -f -a "completions" -d 'Generate shell completion scripts'
 complete -c hbctl -n "__fish_hbctl_needs_command" -f -a "man" -d 'Generate UNIX roff man page'
@@ -128,34 +130,37 @@ complete -c hbctl -n "__fish_hbctl_using_subcommand auth; and __fish_seen_subcom
 complete -c hbctl -n "__fish_hbctl_using_subcommand auth; and __fish_seen_subcommand_from help" -f -a "logout" -d 'Remove stored credentials from OS keyring and local fallback store'
 complete -c hbctl -n "__fish_hbctl_using_subcommand auth; and __fish_seen_subcommand_from help" -f -a "refresh" -d 'Refresh an active JWT session token'
 complete -c hbctl -n "__fish_hbctl_using_subcommand auth; and __fish_seen_subcommand_from help" -f -a "help" -d 'Print this message or the help of the given subcommand(s)'
-complete -c hbctl -n "__fish_hbctl_using_subcommand item; and not __fish_seen_subcommand_from list get create update upsert delete import dedup move tree help" -l url -d 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)' -r
-complete -c hbctl -n "__fish_hbctl_using_subcommand item; and not __fish_seen_subcommand_from list get create update upsert delete import dedup move tree help" -l api-key -d 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)' -r
-complete -c hbctl -n "__fish_hbctl_using_subcommand item; and not __fish_seen_subcommand_from list get create update upsert delete import dedup move tree help" -l output -d 'Output format (table, json, plain) [env: HBCTL_OUTPUT]' -r -f -a "table\t''
+complete -c hbctl -n "__fish_hbctl_using_subcommand item; and not __fish_seen_subcommand_from list get create update upsert delete import dedup move duplicate path tree help" -l url -d 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)' -r
+complete -c hbctl -n "__fish_hbctl_using_subcommand item; and not __fish_seen_subcommand_from list get create update upsert delete import dedup move duplicate path tree help" -l api-key -d 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)' -r
+complete -c hbctl -n "__fish_hbctl_using_subcommand item; and not __fish_seen_subcommand_from list get create update upsert delete import dedup move duplicate path tree help" -l output -d 'Output format (table, json, plain) [env: HBCTL_OUTPUT]' -r -f -a "table\t''
 json\t''
 plain\t''"
-complete -c hbctl -n "__fish_hbctl_using_subcommand item; and not __fish_seen_subcommand_from list get create update upsert delete import dedup move tree help" -l select -d 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)' -r
-complete -c hbctl -n "__fish_hbctl_using_subcommand item; and not __fish_seen_subcommand_from list get create update upsert delete import dedup move tree help" -s C -l config -d 'Path to explicit TOML configuration file' -r -F
-complete -c hbctl -n "__fish_hbctl_using_subcommand item; and not __fish_seen_subcommand_from list get create update upsert delete import dedup move tree help" -s P -l profile -d 'Named configuration profile (env: HBCTL_PROFILE)' -r
-complete -c hbctl -n "__fish_hbctl_using_subcommand item; and not __fish_seen_subcommand_from list get create update upsert delete import dedup move tree help" -l json -d 'Shorthand for --output json (emits compact JSON)'
-complete -c hbctl -n "__fish_hbctl_using_subcommand item; and not __fish_seen_subcommand_from list get create update upsert delete import dedup move tree help" -l dry-run -d 'Preview mutating requests without hitting the server (redacts Authorization)'
-complete -c hbctl -n "__fish_hbctl_using_subcommand item; and not __fish_seen_subcommand_from list get create update upsert delete import dedup move tree help" -s q -l quiet -d 'Output only created/affected IDs for shell piping'
-complete -c hbctl -n "__fish_hbctl_using_subcommand item; and not __fish_seen_subcommand_from list get create update upsert delete import dedup move tree help" -s h -l help -d 'Print help'
-complete -c hbctl -n "__fish_hbctl_using_subcommand item; and not __fish_seen_subcommand_from list get create update upsert delete import dedup move tree help" -f -a "list" -d 'List inventory items'
-complete -c hbctl -n "__fish_hbctl_using_subcommand item; and not __fish_seen_subcommand_from list get create update upsert delete import dedup move tree help" -f -a "get" -d 'Fetch a single item by ID'
-complete -c hbctl -n "__fish_hbctl_using_subcommand item; and not __fish_seen_subcommand_from list get create update upsert delete import dedup move tree help" -f -a "create" -d 'Create a new item (auto-persists custom fields via follow-up PUT)'
-complete -c hbctl -n "__fish_hbctl_using_subcommand item; and not __fish_seen_subcommand_from list get create update upsert delete import dedup move tree help" -f -a "update" -d 'Update an existing item via GET -> Merge -> PUT'
-complete -c hbctl -n "__fish_hbctl_using_subcommand item; and not __fish_seen_subcommand_from list get create update upsert delete import dedup move tree help" -f -a "upsert" -d 'Create or update an item matched by name'
-complete -c hbctl -n "__fish_hbctl_using_subcommand item; and not __fish_seen_subcommand_from list get create update upsert delete import dedup move tree help" -f -a "delete" -d 'Delete an item by ID'
-complete -c hbctl -n "__fish_hbctl_using_subcommand item; and not __fish_seen_subcommand_from list get create update upsert delete import dedup move tree help" -f -a "import" -d 'Bulk import items from JSON or CSV (file or \'-\' for stdin)'
-complete -c hbctl -n "__fish_hbctl_using_subcommand item; and not __fish_seen_subcommand_from list get create update upsert delete import dedup move tree help" -f -a "dedup" -d 'Detect (and optionally delete or merge) duplicate items'
-complete -c hbctl -n "__fish_hbctl_using_subcommand item; and not __fish_seen_subcommand_from list get create update upsert delete import dedup move tree help" -f -a "move" -d 'Move an item under a parent item/location (or \'none\' to unparent)'
-complete -c hbctl -n "__fish_hbctl_using_subcommand item; and not __fish_seen_subcommand_from list get create update upsert delete import dedup move tree help" -f -a "tree" -d 'Render item parent/location hierarchy as a tree'
-complete -c hbctl -n "__fish_hbctl_using_subcommand item; and not __fish_seen_subcommand_from list get create update upsert delete import dedup move tree help" -f -a "help" -d 'Print this message or the help of the given subcommand(s)'
+complete -c hbctl -n "__fish_hbctl_using_subcommand item; and not __fish_seen_subcommand_from list get create update upsert delete import dedup move duplicate path tree help" -l select -d 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)' -r
+complete -c hbctl -n "__fish_hbctl_using_subcommand item; and not __fish_seen_subcommand_from list get create update upsert delete import dedup move duplicate path tree help" -s C -l config -d 'Path to explicit TOML configuration file' -r -F
+complete -c hbctl -n "__fish_hbctl_using_subcommand item; and not __fish_seen_subcommand_from list get create update upsert delete import dedup move duplicate path tree help" -s P -l profile -d 'Named configuration profile (env: HBCTL_PROFILE)' -r
+complete -c hbctl -n "__fish_hbctl_using_subcommand item; and not __fish_seen_subcommand_from list get create update upsert delete import dedup move duplicate path tree help" -l json -d 'Shorthand for --output json (emits compact JSON)'
+complete -c hbctl -n "__fish_hbctl_using_subcommand item; and not __fish_seen_subcommand_from list get create update upsert delete import dedup move duplicate path tree help" -l dry-run -d 'Preview mutating requests without hitting the server (redacts Authorization)'
+complete -c hbctl -n "__fish_hbctl_using_subcommand item; and not __fish_seen_subcommand_from list get create update upsert delete import dedup move duplicate path tree help" -s q -l quiet -d 'Output only created/affected IDs for shell piping'
+complete -c hbctl -n "__fish_hbctl_using_subcommand item; and not __fish_seen_subcommand_from list get create update upsert delete import dedup move duplicate path tree help" -s h -l help -d 'Print help'
+complete -c hbctl -n "__fish_hbctl_using_subcommand item; and not __fish_seen_subcommand_from list get create update upsert delete import dedup move duplicate path tree help" -f -a "list" -d 'List inventory items'
+complete -c hbctl -n "__fish_hbctl_using_subcommand item; and not __fish_seen_subcommand_from list get create update upsert delete import dedup move duplicate path tree help" -f -a "get" -d 'Fetch a single item by ID'
+complete -c hbctl -n "__fish_hbctl_using_subcommand item; and not __fish_seen_subcommand_from list get create update upsert delete import dedup move duplicate path tree help" -f -a "create" -d 'Create a new item (auto-persists custom fields via follow-up PUT)'
+complete -c hbctl -n "__fish_hbctl_using_subcommand item; and not __fish_seen_subcommand_from list get create update upsert delete import dedup move duplicate path tree help" -f -a "update" -d 'Update an existing item via GET -> Merge -> PUT'
+complete -c hbctl -n "__fish_hbctl_using_subcommand item; and not __fish_seen_subcommand_from list get create update upsert delete import dedup move duplicate path tree help" -f -a "upsert" -d 'Create or update an item matched by name'
+complete -c hbctl -n "__fish_hbctl_using_subcommand item; and not __fish_seen_subcommand_from list get create update upsert delete import dedup move duplicate path tree help" -f -a "delete" -d 'Delete an item by ID'
+complete -c hbctl -n "__fish_hbctl_using_subcommand item; and not __fish_seen_subcommand_from list get create update upsert delete import dedup move duplicate path tree help" -f -a "import" -d 'Bulk import items from JSON or CSV (file or \'-\' for stdin)'
+complete -c hbctl -n "__fish_hbctl_using_subcommand item; and not __fish_seen_subcommand_from list get create update upsert delete import dedup move duplicate path tree help" -f -a "dedup" -d 'Detect (and optionally delete or merge) duplicate items'
+complete -c hbctl -n "__fish_hbctl_using_subcommand item; and not __fish_seen_subcommand_from list get create update upsert delete import dedup move duplicate path tree help" -f -a "move" -d 'Move an item under a parent item/location (or \'none\' to unparent)'
+complete -c hbctl -n "__fish_hbctl_using_subcommand item; and not __fish_seen_subcommand_from list get create update upsert delete import dedup move duplicate path tree help" -f -a "duplicate" -d 'Duplicate an existing item one or more times'
+complete -c hbctl -n "__fish_hbctl_using_subcommand item; and not __fish_seen_subcommand_from list get create update upsert delete import dedup move duplicate path tree help" -f -a "path" -d 'Display the location/parent breadcrumb path for an item'
+complete -c hbctl -n "__fish_hbctl_using_subcommand item; and not __fish_seen_subcommand_from list get create update upsert delete import dedup move duplicate path tree help" -f -a "tree" -d 'Render item parent/location hierarchy as a tree'
+complete -c hbctl -n "__fish_hbctl_using_subcommand item; and not __fish_seen_subcommand_from list get create update upsert delete import dedup move duplicate path tree help" -f -a "help" -d 'Print this message or the help of the given subcommand(s)'
 complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from list" -l tag -d 'Filter by tag name or UUID' -r
 complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from list" -l type -d 'Filter by entity type name or UUID' -r
 complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from list" -l parent -d 'Filter by parent item name, ID, or \'none\' for top-level items' -r
 complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from list" -l has-field -d 'Only include items having the named custom field (hydrates details if missing)' -r
 complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from list" -l page-size -d 'Page size for listing' -r
+complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from list" -l warranty-expiring -d 'Only show items with a warranty expiring within the next DAYS days (excludes lifetime warranties)' -r
 complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from list" -l url -d 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)' -r
 complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from list" -l api-key -d 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)' -r
 complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from list" -l output -d 'Output format (table, json, plain) [env: HBCTL_OUTPUT]' -r -f -a "table\t''
@@ -165,6 +170,8 @@ complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcom
 complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from list" -s C -l config -d 'Path to explicit TOML configuration file' -r -F
 complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from list" -s P -l profile -d 'Named configuration profile (env: HBCTL_PROFILE)' -r
 complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from list" -l all -d 'Fetch all pages'
+complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from list" -l include-archived -d 'Include archived items in results'
+complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from list" -l archived-only -d 'Only show archived items (implies --include-archived)'
 complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from list" -l json -d 'Shorthand for --output json (emits compact JSON)'
 complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from list" -l dry-run -d 'Preview mutating requests without hitting the server (redacts Authorization)'
 complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from list" -s q -l quiet -d 'Output only created/affected IDs for shell piping'
@@ -177,6 +184,7 @@ plain\t''"
 complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from get" -l select -d 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)' -r
 complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from get" -s C -l config -d 'Path to explicit TOML configuration file' -r -F
 complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from get" -s P -l profile -d 'Named configuration profile (env: HBCTL_PROFILE)' -r
+complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from get" -l with-path -d 'Include full location/parent breadcrumb path in output'
 complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from get" -l json -d 'Shorthand for --output json (emits compact JSON)'
 complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from get" -l dry-run -d 'Preview mutating requests without hitting the server (redacts Authorization)'
 complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from get" -s q -l quiet -d 'Output only created/affected IDs for shell piping'
@@ -194,12 +202,25 @@ complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcom
 complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from create" -l purchase-price -d 'Purchase price' -r
 complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from create" -l purchase-date -d 'Purchase date (YYYY-MM-DD)' -r
 complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from create" -l purchase-from -d 'Purchase vendor/source' -r
+complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from create" -l archived -d 'Mark item as archived (true/false; bare flag means true)' -r -f -a "true\t''
+false\t''"
+complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from create" -l insured -d 'Mark item as insured (true/false; bare flag means true)' -r -f -a "true\t''
+false\t''"
+complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from create" -l lifetime-warranty -d 'Mark item as having a lifetime warranty (true/false; bare flag means true)' -r -f -a "true\t''
+false\t''"
+complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from create" -l warranty-expires -d 'Warranty expiration date (YYYY-MM-DD or RFC3339)' -r
+complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from create" -l warranty-details -d 'Warranty details or terms' -r
+complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from create" -l sold-time -d 'Date/time the item was sold (YYYY-MM-DD or RFC3339)' -r
+complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from create" -l sold-to -d 'Buyer name or recipient the item was sold to' -r
+complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from create" -l sold-price -d 'Sale price' -r
+complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from create" -l sold-notes -d 'Notes about the sale' -r
 complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from create" -l field -d 'Custom field KEY=VAL (repeatable)' -r
 complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from create" -l field-type -d 'Value type for --field entries' -r -f -a "text\t''
 number\t''
 boolean\t''"
 complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from create" -l from-json -d 'Load initial item JSON from file path or \'-\' for stdin' -r
-complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from create" -l attach -d 'Local file path(s) to attach after creating the item (repeatable)' -r -F
+complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from create" -l attach -d 'Local file path(s) to attach after creating the item (`FILE` or `FILE=REMOTE_NAME`, repeatable)' -r
+complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from create" -l attach-url -d 'Remote HTTP(S) URL(s) to download and attach (`URL` or `URL=REMOTE_NAME`, repeatable)' -r
 complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from create" -l url -d 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)' -r
 complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from create" -l api-key -d 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)' -r
 complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from create" -l output -d 'Output format (table, json, plain) [env: HBCTL_OUTPUT]' -r -f -a "table\t''
@@ -208,11 +229,17 @@ plain\t''"
 complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from create" -l select -d 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)' -r
 complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from create" -s C -l config -d 'Path to explicit TOML configuration file' -r -F
 complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from create" -s P -l profile -d 'Named configuration profile (env: HBCTL_PROFILE)' -r
+complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from create" -l attach-best-effort -d 'Treat attachment failures as non-fatal warnings and include `attachmentErrors` in JSON output'
+complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from create" -l optimize -d 'Automatically resize/compress oversized images before upload'
 complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from create" -l force -d 'Allow attaching images larger than 500KB'
 complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from create" -l json -d 'Shorthand for --output json (emits compact JSON)'
 complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from create" -l dry-run -d 'Preview mutating requests without hitting the server (redacts Authorization)'
 complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from create" -s q -l quiet -d 'Output only created/affected IDs for shell piping'
 complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from create" -s h -l help -d 'Print help'
+complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from update" -l items-from -d 'Read newline-delimited entity IDs to update from a file or \'-\' (stdin)' -r -F
+complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from update" -l filter-tag -d 'Select items to update matching this tag name or UUID' -r
+complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from update" -l filter-parent -d 'Select items to update under this parent item/location name, ID, or \'none\'' -r
+complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from update" -l filter-type -d 'Select items to update matching this entity type name or UUID' -r
 complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from update" -l name -d 'Updated item name' -r
 complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from update" -l description -d 'Updated item description' -r
 complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from update" -l type -d 'Entity type name or UUID' -r
@@ -227,6 +254,18 @@ complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcom
 complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from update" -l purchase-price -d 'Updated purchase price' -r
 complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from update" -l purchase-date -d 'Updated purchase date (YYYY-MM-DD)' -r
 complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from update" -l purchase-from -d 'Updated purchase source' -r
+complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from update" -l archived -d 'Mark item as archived (true/false; bare flag means true)' -r -f -a "true\t''
+false\t''"
+complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from update" -l insured -d 'Mark item as insured (true/false; bare flag means true)' -r -f -a "true\t''
+false\t''"
+complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from update" -l lifetime-warranty -d 'Mark item as having a lifetime warranty (true/false; bare flag means true)' -r -f -a "true\t''
+false\t''"
+complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from update" -l warranty-expires -d 'Warranty expiration date (YYYY-MM-DD or RFC3339)' -r
+complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from update" -l warranty-details -d 'Warranty details or terms' -r
+complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from update" -l sold-time -d 'Date/time the item was sold (YYYY-MM-DD or RFC3339)' -r
+complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from update" -l sold-to -d 'Buyer name or recipient the item was sold to' -r
+complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from update" -l sold-price -d 'Sale price' -r
+complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from update" -l sold-notes -d 'Notes about the sale' -r
 complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from update" -l notes -d 'Notes (merged into custom field \'Notes\')' -r
 complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from update" -l field -d 'Custom field KEY=VAL to upsert (repeatable)' -r
 complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from update" -l field-type -d 'Value type for --field entries' -r -f -a "text\t''
@@ -259,13 +298,32 @@ complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcom
 complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from upsert" -l purchase-price -d 'Purchase price' -r
 complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from upsert" -l purchase-date -d 'Purchase date (YYYY-MM-DD)' -r
 complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from upsert" -l purchase-from -d 'Purchase source' -r
+complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from upsert" -l archived -d 'Mark item as archived (true/false; bare flag means true)' -r -f -a "true\t''
+false\t''"
+complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from upsert" -l insured -d 'Mark item as insured (true/false; bare flag means true)' -r -f -a "true\t''
+false\t''"
+complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from upsert" -l lifetime-warranty -d 'Mark item as having a lifetime warranty (true/false; bare flag means true)' -r -f -a "true\t''
+false\t''"
+complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from upsert" -l warranty-expires -d 'Warranty expiration date (YYYY-MM-DD or RFC3339)' -r
+complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from upsert" -l warranty-details -d 'Warranty details or terms' -r
+complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from upsert" -l sold-time -d 'Date/time the item was sold (YYYY-MM-DD or RFC3339)' -r
+complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from upsert" -l sold-to -d 'Buyer name or recipient the item was sold to' -r
+complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from upsert" -l sold-price -d 'Sale price' -r
+complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from upsert" -l sold-notes -d 'Notes about the sale' -r
 complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from upsert" -l field -d 'Custom field KEY=VAL (repeatable)' -r
 complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from upsert" -l field-type -d 'Value type for --field entries' -r -f -a "text\t''
 number\t''
 boolean\t''"
 complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from upsert" -l from-json -d 'Load item JSON from file path or \'-\' for stdin' -r
 complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from upsert" -l match-by -d 'Match existing items by key in priority order: name, model, serial, or field:KEY (repeatable; defaults to name)' -r
-complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from upsert" -l attach -d 'Local file path(s) to attach after upserting the item (repeatable)' -r -F
+complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from upsert" -l match-mode -d 'Matching strategy for --match-by keys (exact, contains, fuzzy)' -r -f -a "exact\t''
+contains\t''
+fuzzy\t''"
+complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from upsert" -l on-match -d 'Action to take when an existing item matches (update, skip, attach-only)' -r -f -a "update\t''
+skip\t''
+attach-only\t''"
+complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from upsert" -l attach -d 'Local file path(s) to attach after upserting the item (`FILE` or `FILE=REMOTE_NAME`, repeatable)' -r
+complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from upsert" -l attach-url -d 'Remote HTTP(S) URL(s) to download and attach (`URL` or `URL=REMOTE_NAME`, repeatable)' -r
 complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from upsert" -l url -d 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)' -r
 complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from upsert" -l api-key -d 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)' -r
 complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from upsert" -l output -d 'Output format (table, json, plain) [env: HBCTL_OUTPUT]' -r -f -a "table\t''
@@ -275,11 +333,17 @@ complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcom
 complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from upsert" -s C -l config -d 'Path to explicit TOML configuration file' -r -F
 complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from upsert" -s P -l profile -d 'Named configuration profile (env: HBCTL_PROFILE)' -r
 complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from upsert" -l fill-missing -d 'When updating an existing item, only populate blank/missing/zero fields'
+complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from upsert" -l attach-best-effort -d 'Treat attachment failures as non-fatal warnings and include `attachmentErrors` in JSON output'
+complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from upsert" -l optimize -d 'Automatically resize/compress oversized images before upload'
 complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from upsert" -l force -d 'Allow attaching images larger than 500KB'
 complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from upsert" -l json -d 'Shorthand for --output json (emits compact JSON)'
 complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from upsert" -l dry-run -d 'Preview mutating requests without hitting the server (redacts Authorization)'
 complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from upsert" -s q -l quiet -d 'Output only created/affected IDs for shell piping'
 complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from upsert" -s h -l help -d 'Print help'
+complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from delete" -l items-from -d 'Read newline-delimited entity IDs to delete from a file or \'-\' (stdin)' -r -F
+complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from delete" -l tag -l filter-tag -d 'Select items to delete matching this tag name or UUID' -r
+complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from delete" -l parent -l filter-parent -d 'Select items to delete under this parent item/location name, ID, or \'none\'' -r
+complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from delete" -l type -l filter-type -d 'Select items to delete matching this entity type name or UUID' -r
 complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from delete" -l url -d 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)' -r
 complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from delete" -l api-key -d 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)' -r
 complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from delete" -l output -d 'Output format (table, json, plain) [env: HBCTL_OUTPUT]' -r -f -a "table\t''
@@ -288,7 +352,8 @@ plain\t''"
 complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from delete" -l select -d 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)' -r
 complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from delete" -s C -l config -d 'Path to explicit TOML configuration file' -r -F
 complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from delete" -s P -l profile -d 'Named configuration profile (env: HBCTL_PROFILE)' -r
-complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from delete" -l force -d 'Skip interactive confirmation prompt'
+complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from delete" -s y -l yes -d 'Skip interactive/bulk confirmation prompt'
+complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from delete" -l force -d 'Skip interactive/bulk confirmation prompt'
 complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from delete" -l json -d 'Shorthand for --output json (emits compact JSON)'
 complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from delete" -l dry-run -d 'Preview mutating requests without hitting the server (redacts Authorization)'
 complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from delete" -s q -l quiet -d 'Output only created/affected IDs for shell piping'
@@ -296,8 +361,11 @@ complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcom
 complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from import" -l format -d 'Input format (inferred from extension if omitted; defaults to json for stdin)' -r -f -a "json\t''
 csv\t''"
 complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from import" -l match-by -d 'Match existing items by key in priority order: name, model, serial, or field:KEY (repeatable; defaults to name)' -r
+complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from import" -l match-mode -d 'Matching strategy for --match-by keys (exact, contains, fuzzy)' -r -f -a "exact\t''
+contains\t''
+fuzzy\t''"
 complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from import" -l parent -d 'Default parent item/location name, ID, or \'none\' for imported records without one' -r
-complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from import" -l attach -d 'Local file path(s) to attach to each imported item (repeatable)' -r -F
+complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from import" -l attach -d 'Local file path(s) to attach to each imported item (`FILE` or `FILE=REMOTE_NAME`, repeatable)' -r
 complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from import" -l url -d 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)' -r
 complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from import" -l api-key -d 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)' -r
 complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from import" -l output -d 'Output format (table, json, plain) [env: HBCTL_OUTPUT]' -r -f -a "table\t''
@@ -309,6 +377,7 @@ complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcom
 complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from import" -l skip-existing -d 'Skip items whose name already exists in Homebox'
 complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from import" -l update-existing -d 'Update items whose name already exists in Homebox'
 complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from import" -l fill-missing -d 'With --update-existing, only populate blank/missing/zero fields on existing items'
+complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from import" -l optimize -d 'Automatically resize/compress oversized images before upload'
 complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from import" -l force -d 'Allow attaching images larger than 500KB'
 complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from import" -l json -d 'Shorthand for --output json (emits compact JSON)'
 complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from import" -l dry-run -d 'Preview mutating requests without hitting the server (redacts Authorization)'
@@ -329,6 +398,11 @@ complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcom
 complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from dedup" -l dry-run -d 'Preview mutating requests without hitting the server (redacts Authorization)'
 complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from dedup" -s q -l quiet -d 'Output only created/affected IDs for shell piping'
 complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from dedup" -s h -l help -d 'Print help'
+complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from move" -l to -d 'Target parent item name, ID, or \'none\' to unparent (required when using selectors without trailing positional parent)' -r
+complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from move" -l items-from -d 'Read newline-delimited entity IDs to move from a file or \'-\' (stdin)' -r -F
+complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from move" -l tag -l filter-tag -d 'Select items to move matching this tag name or UUID' -r
+complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from move" -l parent -l filter-parent -d 'Select items to move under this parent item/location name, ID, or \'none\'' -r
+complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from move" -l type -l filter-type -d 'Select items to move matching this entity type name or UUID' -r
 complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from move" -l url -d 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)' -r
 complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from move" -l api-key -d 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)' -r
 complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from move" -l output -d 'Output format (table, json, plain) [env: HBCTL_OUTPUT]' -r -f -a "table\t''
@@ -341,6 +415,31 @@ complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcom
 complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from move" -l dry-run -d 'Preview mutating requests without hitting the server (redacts Authorization)'
 complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from move" -s q -l quiet -d 'Output only created/affected IDs for shell piping'
 complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from move" -s h -l help -d 'Print help'
+complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from duplicate" -l count -d 'Number of duplicates to create' -r
+complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from duplicate" -l url -d 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)' -r
+complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from duplicate" -l api-key -d 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)' -r
+complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from duplicate" -l output -d 'Output format (table, json, plain) [env: HBCTL_OUTPUT]' -r -f -a "table\t''
+json\t''
+plain\t''"
+complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from duplicate" -l select -d 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)' -r
+complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from duplicate" -s C -l config -d 'Path to explicit TOML configuration file' -r -F
+complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from duplicate" -s P -l profile -d 'Named configuration profile (env: HBCTL_PROFILE)' -r
+complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from duplicate" -l json -d 'Shorthand for --output json (emits compact JSON)'
+complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from duplicate" -l dry-run -d 'Preview mutating requests without hitting the server (redacts Authorization)'
+complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from duplicate" -s q -l quiet -d 'Output only created/affected IDs for shell piping'
+complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from duplicate" -s h -l help -d 'Print help'
+complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from path" -l url -d 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)' -r
+complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from path" -l api-key -d 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)' -r
+complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from path" -l output -d 'Output format (table, json, plain) [env: HBCTL_OUTPUT]' -r -f -a "table\t''
+json\t''
+plain\t''"
+complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from path" -l select -d 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)' -r
+complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from path" -s C -l config -d 'Path to explicit TOML configuration file' -r -F
+complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from path" -s P -l profile -d 'Named configuration profile (env: HBCTL_PROFILE)' -r
+complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from path" -l json -d 'Shorthand for --output json (emits compact JSON)'
+complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from path" -l dry-run -d 'Preview mutating requests without hitting the server (redacts Authorization)'
+complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from path" -s q -l quiet -d 'Output only created/affected IDs for shell piping'
+complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from path" -s h -l help -d 'Print help'
 complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from tree" -l root -d 'Optional root item name or ID to start the tree from' -r
 complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from tree" -l max-depth -d 'Optional maximum depth to display (0 = roots only)' -r
 complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from tree" -l url -d 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)' -r
@@ -364,6 +463,8 @@ complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcom
 complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from help" -f -a "import" -d 'Bulk import items from JSON or CSV (file or \'-\' for stdin)'
 complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from help" -f -a "dedup" -d 'Detect (and optionally delete or merge) duplicate items'
 complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from help" -f -a "move" -d 'Move an item under a parent item/location (or \'none\' to unparent)'
+complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from help" -f -a "duplicate" -d 'Duplicate an existing item one or more times'
+complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from help" -f -a "path" -d 'Display the location/parent breadcrumb path for an item'
 complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from help" -f -a "tree" -d 'Render item parent/location hierarchy as a tree'
 complete -c hbctl -n "__fish_hbctl_using_subcommand item; and __fish_seen_subcommand_from help" -f -a "help" -d 'Print this message or the help of the given subcommand(s)'
 complete -c hbctl -n "__fish_hbctl_using_subcommand attachment; and not __fish_seen_subcommand_from upload list download delete help" -l url -d 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)' -r
@@ -383,6 +484,7 @@ complete -c hbctl -n "__fish_hbctl_using_subcommand attachment; and not __fish_s
 complete -c hbctl -n "__fish_hbctl_using_subcommand attachment; and not __fish_seen_subcommand_from upload list download delete help" -f -a "download" -d 'Stream-download attachments from one or multiple items'
 complete -c hbctl -n "__fish_hbctl_using_subcommand attachment; and not __fish_seen_subcommand_from upload list download delete help" -f -a "delete" -d 'Delete an attachment from an item'
 complete -c hbctl -n "__fish_hbctl_using_subcommand attachment; and not __fish_seen_subcommand_from upload list download delete help" -f -a "help" -d 'Print this message or the help of the given subcommand(s)'
+complete -c hbctl -n "__fish_hbctl_using_subcommand attachment; and __fish_seen_subcommand_from upload" -l attach-url -d 'Remote HTTP(S) URL(s) to download and attach (`URL` or `URL=REMOTE_NAME`, repeatable)' -r
 complete -c hbctl -n "__fish_hbctl_using_subcommand attachment; and __fish_seen_subcommand_from upload" -l name -d 'Override remote filename/title (for single-file or stdin \'-\' uploads)' -r
 complete -c hbctl -n "__fish_hbctl_using_subcommand attachment; and __fish_seen_subcommand_from upload" -l url -d 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)' -r
 complete -c hbctl -n "__fish_hbctl_using_subcommand attachment; and __fish_seen_subcommand_from upload" -l api-key -d 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)' -r
@@ -394,6 +496,7 @@ complete -c hbctl -n "__fish_hbctl_using_subcommand attachment; and __fish_seen_
 complete -c hbctl -n "__fish_hbctl_using_subcommand attachment; and __fish_seen_subcommand_from upload" -s P -l profile -d 'Named configuration profile (env: HBCTL_PROFILE)' -r
 complete -c hbctl -n "__fish_hbctl_using_subcommand attachment; and __fish_seen_subcommand_from upload" -l skip-existing -d 'Skip files that already exist on the item (default behavior)'
 complete -c hbctl -n "__fish_hbctl_using_subcommand attachment; and __fish_seen_subcommand_from upload" -l overwrite -d 'Delete and re-upload files that already exist on the item'
+complete -c hbctl -n "__fish_hbctl_using_subcommand attachment; and __fish_seen_subcommand_from upload" -l optimize -d 'Automatically resize/compress oversized images before upload'
 complete -c hbctl -n "__fish_hbctl_using_subcommand attachment; and __fish_seen_subcommand_from upload" -l force -d 'Allow uploading images larger than 500KB'
 complete -c hbctl -n "__fish_hbctl_using_subcommand attachment; and __fish_seen_subcommand_from upload" -l json -d 'Shorthand for --output json (emits compact JSON)'
 complete -c hbctl -n "__fish_hbctl_using_subcommand attachment; and __fish_seen_subcommand_from upload" -l dry-run -d 'Preview mutating requests without hitting the server (redacts Authorization)'
@@ -449,6 +552,10 @@ complete -c hbctl -n "__fish_hbctl_using_subcommand attachment; and __fish_seen_
 complete -c hbctl -n "__fish_hbctl_using_subcommand attachment; and __fish_seen_subcommand_from help" -f -a "delete" -d 'Delete an attachment from an item'
 complete -c hbctl -n "__fish_hbctl_using_subcommand attachment; and __fish_seen_subcommand_from help" -f -a "help" -d 'Print this message or the help of the given subcommand(s)'
 complete -c hbctl -n "__fish_hbctl_using_subcommand search" -l tag -d 'Filter by tag name or UUID' -r
+complete -c hbctl -n "__fish_hbctl_using_subcommand search" -l type -d 'Filter by entity type name or UUID' -r
+complete -c hbctl -n "__fish_hbctl_using_subcommand search" -l parent -d 'Filter by parent item name, ID, or \'none\' for top-level items' -r
+complete -c hbctl -n "__fish_hbctl_using_subcommand search" -l limit -d 'Maximum number of matching results to return' -r
+complete -c hbctl -n "__fish_hbctl_using_subcommand search" -l warranty-expiring -d 'Only include items with a warranty expiring within the next DAYS days (excludes lifetime warranties)' -r
 complete -c hbctl -n "__fish_hbctl_using_subcommand search" -l model -d 'Filter by model number (exact or substring, case-insensitive)' -r
 complete -c hbctl -n "__fish_hbctl_using_subcommand search" -l serial -d 'Filter by serial number (exact or substring, case-insensitive)' -r
 complete -c hbctl -n "__fish_hbctl_using_subcommand search" -l manufacturer -d 'Filter by manufacturer (exact or substring, case-insensitive)' -r
@@ -461,6 +568,10 @@ plain\t''"
 complete -c hbctl -n "__fish_hbctl_using_subcommand search" -l select -d 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)' -r
 complete -c hbctl -n "__fish_hbctl_using_subcommand search" -s C -l config -d 'Path to explicit TOML configuration file' -r -F
 complete -c hbctl -n "__fish_hbctl_using_subcommand search" -s P -l profile -d 'Named configuration profile (env: HBCTL_PROFILE)' -r
+complete -c hbctl -n "__fish_hbctl_using_subcommand search" -l include-archived -d 'Include archived items in search results'
+complete -c hbctl -n "__fish_hbctl_using_subcommand search" -l archived-only -d 'Only search archived items (implies --include-archived)'
+complete -c hbctl -n "__fish_hbctl_using_subcommand search" -l any -d 'Match items satisfying ANY provided filter (OR) instead of ALL filters (AND)'
+complete -c hbctl -n "__fish_hbctl_using_subcommand search" -l with-path -d 'Include full location/parent breadcrumb path for each matching item'
 complete -c hbctl -n "__fish_hbctl_using_subcommand search" -l json -d 'Shorthand for --output json (emits compact JSON)'
 complete -c hbctl -n "__fish_hbctl_using_subcommand search" -l dry-run -d 'Preview mutating requests without hitting the server (redacts Authorization)'
 complete -c hbctl -n "__fish_hbctl_using_subcommand search" -s q -l quiet -d 'Output only created/affected IDs for shell piping'
@@ -742,11 +853,114 @@ complete -c hbctl -n "__fish_hbctl_using_subcommand status" -l json -d 'Shorthan
 complete -c hbctl -n "__fish_hbctl_using_subcommand status" -l dry-run -d 'Preview mutating requests without hitting the server (redacts Authorization)'
 complete -c hbctl -n "__fish_hbctl_using_subcommand status" -s q -l quiet -d 'Output only created/affected IDs for shell piping'
 complete -c hbctl -n "__fish_hbctl_using_subcommand status" -s h -l help -d 'Print help'
+complete -c hbctl -n "__fish_hbctl_using_subcommand api" -s d -l data -d 'Inline JSON request body' -r
+complete -c hbctl -n "__fish_hbctl_using_subcommand api" -l from-json -d 'Read JSON request body from a file path or \'-\' for stdin' -r
+complete -c hbctl -n "__fish_hbctl_using_subcommand api" -l query -d 'Query parameter KEY=VALUE (repeatable; appended to any inline path query)' -r
+complete -c hbctl -n "__fish_hbctl_using_subcommand api" -l url -d 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)' -r
+complete -c hbctl -n "__fish_hbctl_using_subcommand api" -l api-key -d 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)' -r
+complete -c hbctl -n "__fish_hbctl_using_subcommand api" -l output -d 'Output format (table, json, plain) [env: HBCTL_OUTPUT]' -r -f -a "table\t''
+json\t''
+plain\t''"
+complete -c hbctl -n "__fish_hbctl_using_subcommand api" -l select -d 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)' -r
+complete -c hbctl -n "__fish_hbctl_using_subcommand api" -s C -l config -d 'Path to explicit TOML configuration file' -r -F
+complete -c hbctl -n "__fish_hbctl_using_subcommand api" -s P -l profile -d 'Named configuration profile (env: HBCTL_PROFILE)' -r
+complete -c hbctl -n "__fish_hbctl_using_subcommand api" -l json -d 'Shorthand for --output json (emits compact JSON)'
+complete -c hbctl -n "__fish_hbctl_using_subcommand api" -l dry-run -d 'Preview mutating requests without hitting the server (redacts Authorization)'
+complete -c hbctl -n "__fish_hbctl_using_subcommand api" -s q -l quiet -d 'Output only created/affected IDs for shell piping'
+complete -c hbctl -n "__fish_hbctl_using_subcommand api" -s h -l help -d 'Print help'
+complete -c hbctl -n "__fish_hbctl_using_subcommand maintenance; and not __fish_seen_subcommand_from list create update delete help" -l url -d 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)' -r
+complete -c hbctl -n "__fish_hbctl_using_subcommand maintenance; and not __fish_seen_subcommand_from list create update delete help" -l api-key -d 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)' -r
+complete -c hbctl -n "__fish_hbctl_using_subcommand maintenance; and not __fish_seen_subcommand_from list create update delete help" -l output -d 'Output format (table, json, plain) [env: HBCTL_OUTPUT]' -r -f -a "table\t''
+json\t''
+plain\t''"
+complete -c hbctl -n "__fish_hbctl_using_subcommand maintenance; and not __fish_seen_subcommand_from list create update delete help" -l select -d 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)' -r
+complete -c hbctl -n "__fish_hbctl_using_subcommand maintenance; and not __fish_seen_subcommand_from list create update delete help" -s C -l config -d 'Path to explicit TOML configuration file' -r -F
+complete -c hbctl -n "__fish_hbctl_using_subcommand maintenance; and not __fish_seen_subcommand_from list create update delete help" -s P -l profile -d 'Named configuration profile (env: HBCTL_PROFILE)' -r
+complete -c hbctl -n "__fish_hbctl_using_subcommand maintenance; and not __fish_seen_subcommand_from list create update delete help" -l json -d 'Shorthand for --output json (emits compact JSON)'
+complete -c hbctl -n "__fish_hbctl_using_subcommand maintenance; and not __fish_seen_subcommand_from list create update delete help" -l dry-run -d 'Preview mutating requests without hitting the server (redacts Authorization)'
+complete -c hbctl -n "__fish_hbctl_using_subcommand maintenance; and not __fish_seen_subcommand_from list create update delete help" -s q -l quiet -d 'Output only created/affected IDs for shell piping'
+complete -c hbctl -n "__fish_hbctl_using_subcommand maintenance; and not __fish_seen_subcommand_from list create update delete help" -s h -l help -d 'Print help'
+complete -c hbctl -n "__fish_hbctl_using_subcommand maintenance; and not __fish_seen_subcommand_from list create update delete help" -f -a "list" -d 'List maintenance log entries (globally or for a specific entity)'
+complete -c hbctl -n "__fish_hbctl_using_subcommand maintenance; and not __fish_seen_subcommand_from list create update delete help" -f -a "create" -d 'Create a maintenance log entry on an entity'
+complete -c hbctl -n "__fish_hbctl_using_subcommand maintenance; and not __fish_seen_subcommand_from list create update delete help" -f -a "update" -d 'Update an existing maintenance log entry by entry ID'
+complete -c hbctl -n "__fish_hbctl_using_subcommand maintenance; and not __fish_seen_subcommand_from list create update delete help" -f -a "delete" -d 'Delete a maintenance log entry by entry ID'
+complete -c hbctl -n "__fish_hbctl_using_subcommand maintenance; and not __fish_seen_subcommand_from list create update delete help" -f -a "help" -d 'Print this message or the help of the given subcommand(s)'
+complete -c hbctl -n "__fish_hbctl_using_subcommand maintenance; and __fish_seen_subcommand_from list" -l status -d 'Filter by maintenance status (both, completed, scheduled)' -r -f -a "both\t''
+completed\t''
+scheduled\t''"
+complete -c hbctl -n "__fish_hbctl_using_subcommand maintenance; and __fish_seen_subcommand_from list" -l url -d 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)' -r
+complete -c hbctl -n "__fish_hbctl_using_subcommand maintenance; and __fish_seen_subcommand_from list" -l api-key -d 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)' -r
+complete -c hbctl -n "__fish_hbctl_using_subcommand maintenance; and __fish_seen_subcommand_from list" -l output -d 'Output format (table, json, plain) [env: HBCTL_OUTPUT]' -r -f -a "table\t''
+json\t''
+plain\t''"
+complete -c hbctl -n "__fish_hbctl_using_subcommand maintenance; and __fish_seen_subcommand_from list" -l select -d 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)' -r
+complete -c hbctl -n "__fish_hbctl_using_subcommand maintenance; and __fish_seen_subcommand_from list" -s C -l config -d 'Path to explicit TOML configuration file' -r -F
+complete -c hbctl -n "__fish_hbctl_using_subcommand maintenance; and __fish_seen_subcommand_from list" -s P -l profile -d 'Named configuration profile (env: HBCTL_PROFILE)' -r
+complete -c hbctl -n "__fish_hbctl_using_subcommand maintenance; and __fish_seen_subcommand_from list" -l json -d 'Shorthand for --output json (emits compact JSON)'
+complete -c hbctl -n "__fish_hbctl_using_subcommand maintenance; and __fish_seen_subcommand_from list" -l dry-run -d 'Preview mutating requests without hitting the server (redacts Authorization)'
+complete -c hbctl -n "__fish_hbctl_using_subcommand maintenance; and __fish_seen_subcommand_from list" -s q -l quiet -d 'Output only created/affected IDs for shell piping'
+complete -c hbctl -n "__fish_hbctl_using_subcommand maintenance; and __fish_seen_subcommand_from list" -s h -l help -d 'Print help'
+complete -c hbctl -n "__fish_hbctl_using_subcommand maintenance; and __fish_seen_subcommand_from create" -l name -d 'Maintenance task/entry name' -r
+complete -c hbctl -n "__fish_hbctl_using_subcommand maintenance; and __fish_seen_subcommand_from create" -l completed-date -d 'Completion date (YYYY-MM-DD or YYYY-MM)' -r
+complete -c hbctl -n "__fish_hbctl_using_subcommand maintenance; and __fish_seen_subcommand_from create" -l scheduled-date -d 'Scheduled date (YYYY-MM-DD or YYYY-MM)' -r
+complete -c hbctl -n "__fish_hbctl_using_subcommand maintenance; and __fish_seen_subcommand_from create" -l cost -d 'Maintenance cost (e.g. 29.99 or $29.99)' -r
+complete -c hbctl -n "__fish_hbctl_using_subcommand maintenance; and __fish_seen_subcommand_from create" -l description -d 'Maintenance description or notes' -r
+complete -c hbctl -n "__fish_hbctl_using_subcommand maintenance; and __fish_seen_subcommand_from create" -l url -d 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)' -r
+complete -c hbctl -n "__fish_hbctl_using_subcommand maintenance; and __fish_seen_subcommand_from create" -l api-key -d 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)' -r
+complete -c hbctl -n "__fish_hbctl_using_subcommand maintenance; and __fish_seen_subcommand_from create" -l output -d 'Output format (table, json, plain) [env: HBCTL_OUTPUT]' -r -f -a "table\t''
+json\t''
+plain\t''"
+complete -c hbctl -n "__fish_hbctl_using_subcommand maintenance; and __fish_seen_subcommand_from create" -l select -d 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)' -r
+complete -c hbctl -n "__fish_hbctl_using_subcommand maintenance; and __fish_seen_subcommand_from create" -s C -l config -d 'Path to explicit TOML configuration file' -r -F
+complete -c hbctl -n "__fish_hbctl_using_subcommand maintenance; and __fish_seen_subcommand_from create" -s P -l profile -d 'Named configuration profile (env: HBCTL_PROFILE)' -r
+complete -c hbctl -n "__fish_hbctl_using_subcommand maintenance; and __fish_seen_subcommand_from create" -l json -d 'Shorthand for --output json (emits compact JSON)'
+complete -c hbctl -n "__fish_hbctl_using_subcommand maintenance; and __fish_seen_subcommand_from create" -l dry-run -d 'Preview mutating requests without hitting the server (redacts Authorization)'
+complete -c hbctl -n "__fish_hbctl_using_subcommand maintenance; and __fish_seen_subcommand_from create" -s q -l quiet -d 'Output only created/affected IDs for shell piping'
+complete -c hbctl -n "__fish_hbctl_using_subcommand maintenance; and __fish_seen_subcommand_from create" -s h -l help -d 'Print help'
+complete -c hbctl -n "__fish_hbctl_using_subcommand maintenance; and __fish_seen_subcommand_from update" -l name -d 'Updated maintenance task/entry name' -r
+complete -c hbctl -n "__fish_hbctl_using_subcommand maintenance; and __fish_seen_subcommand_from update" -l completed-date -d 'Updated completion date (YYYY-MM-DD or YYYY-MM)' -r
+complete -c hbctl -n "__fish_hbctl_using_subcommand maintenance; and __fish_seen_subcommand_from update" -l scheduled-date -d 'Updated scheduled date (YYYY-MM-DD or YYYY-MM)' -r
+complete -c hbctl -n "__fish_hbctl_using_subcommand maintenance; and __fish_seen_subcommand_from update" -l cost -d 'Updated maintenance cost (e.g. 29.99 or $29.99)' -r
+complete -c hbctl -n "__fish_hbctl_using_subcommand maintenance; and __fish_seen_subcommand_from update" -l description -d 'Updated maintenance description or notes' -r
+complete -c hbctl -n "__fish_hbctl_using_subcommand maintenance; and __fish_seen_subcommand_from update" -l url -d 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)' -r
+complete -c hbctl -n "__fish_hbctl_using_subcommand maintenance; and __fish_seen_subcommand_from update" -l api-key -d 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)' -r
+complete -c hbctl -n "__fish_hbctl_using_subcommand maintenance; and __fish_seen_subcommand_from update" -l output -d 'Output format (table, json, plain) [env: HBCTL_OUTPUT]' -r -f -a "table\t''
+json\t''
+plain\t''"
+complete -c hbctl -n "__fish_hbctl_using_subcommand maintenance; and __fish_seen_subcommand_from update" -l select -d 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)' -r
+complete -c hbctl -n "__fish_hbctl_using_subcommand maintenance; and __fish_seen_subcommand_from update" -s C -l config -d 'Path to explicit TOML configuration file' -r -F
+complete -c hbctl -n "__fish_hbctl_using_subcommand maintenance; and __fish_seen_subcommand_from update" -s P -l profile -d 'Named configuration profile (env: HBCTL_PROFILE)' -r
+complete -c hbctl -n "__fish_hbctl_using_subcommand maintenance; and __fish_seen_subcommand_from update" -l json -d 'Shorthand for --output json (emits compact JSON)'
+complete -c hbctl -n "__fish_hbctl_using_subcommand maintenance; and __fish_seen_subcommand_from update" -l dry-run -d 'Preview mutating requests without hitting the server (redacts Authorization)'
+complete -c hbctl -n "__fish_hbctl_using_subcommand maintenance; and __fish_seen_subcommand_from update" -s q -l quiet -d 'Output only created/affected IDs for shell piping'
+complete -c hbctl -n "__fish_hbctl_using_subcommand maintenance; and __fish_seen_subcommand_from update" -s h -l help -d 'Print help'
+complete -c hbctl -n "__fish_hbctl_using_subcommand maintenance; and __fish_seen_subcommand_from delete" -l url -d 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)' -r
+complete -c hbctl -n "__fish_hbctl_using_subcommand maintenance; and __fish_seen_subcommand_from delete" -l api-key -d 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)' -r
+complete -c hbctl -n "__fish_hbctl_using_subcommand maintenance; and __fish_seen_subcommand_from delete" -l output -d 'Output format (table, json, plain) [env: HBCTL_OUTPUT]' -r -f -a "table\t''
+json\t''
+plain\t''"
+complete -c hbctl -n "__fish_hbctl_using_subcommand maintenance; and __fish_seen_subcommand_from delete" -l select -d 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)' -r
+complete -c hbctl -n "__fish_hbctl_using_subcommand maintenance; and __fish_seen_subcommand_from delete" -s C -l config -d 'Path to explicit TOML configuration file' -r -F
+complete -c hbctl -n "__fish_hbctl_using_subcommand maintenance; and __fish_seen_subcommand_from delete" -s P -l profile -d 'Named configuration profile (env: HBCTL_PROFILE)' -r
+complete -c hbctl -n "__fish_hbctl_using_subcommand maintenance; and __fish_seen_subcommand_from delete" -l force -d 'Skip interactive confirmation prompt'
+complete -c hbctl -n "__fish_hbctl_using_subcommand maintenance; and __fish_seen_subcommand_from delete" -l json -d 'Shorthand for --output json (emits compact JSON)'
+complete -c hbctl -n "__fish_hbctl_using_subcommand maintenance; and __fish_seen_subcommand_from delete" -l dry-run -d 'Preview mutating requests without hitting the server (redacts Authorization)'
+complete -c hbctl -n "__fish_hbctl_using_subcommand maintenance; and __fish_seen_subcommand_from delete" -s q -l quiet -d 'Output only created/affected IDs for shell piping'
+complete -c hbctl -n "__fish_hbctl_using_subcommand maintenance; and __fish_seen_subcommand_from delete" -s h -l help -d 'Print help'
+complete -c hbctl -n "__fish_hbctl_using_subcommand maintenance; and __fish_seen_subcommand_from help" -f -a "list" -d 'List maintenance log entries (globally or for a specific entity)'
+complete -c hbctl -n "__fish_hbctl_using_subcommand maintenance; and __fish_seen_subcommand_from help" -f -a "create" -d 'Create a maintenance log entry on an entity'
+complete -c hbctl -n "__fish_hbctl_using_subcommand maintenance; and __fish_seen_subcommand_from help" -f -a "update" -d 'Update an existing maintenance log entry by entry ID'
+complete -c hbctl -n "__fish_hbctl_using_subcommand maintenance; and __fish_seen_subcommand_from help" -f -a "delete" -d 'Delete a maintenance log entry by entry ID'
+complete -c hbctl -n "__fish_hbctl_using_subcommand maintenance; and __fish_seen_subcommand_from help" -f -a "help" -d 'Print this message or the help of the given subcommand(s)'
 complete -c hbctl -n "__fish_hbctl_using_subcommand export" -l tag -d 'Filter by tag name or UUID' -r
 complete -c hbctl -n "__fish_hbctl_using_subcommand export" -l has-field -d 'Require items to have the named custom field' -r
 complete -c hbctl -n "__fish_hbctl_using_subcommand export" -l field -d 'Custom field column(s) to include in export (repeatable)' -r
-complete -c hbctl -n "__fish_hbctl_using_subcommand export" -l sort -d 'Sort exported items by name or id' -r -f -a "name\t''
-id\t''"
+complete -c hbctl -n "__fish_hbctl_using_subcommand export" -l sort -d 'Sort exported items (name, id, purchase-price, purchase-date, updated-at, asset-id)' -r -f -a "name\t''
+id\t''
+purchase-price\t''
+purchase-date\t''
+updated-at\t''
+asset-id\t''"
 complete -c hbctl -n "__fish_hbctl_using_subcommand export" -l format -d 'Export format (json, csv, markdown)' -r -f -a "json\t''
 csv\t''
 markdown\t''"
@@ -822,19 +1036,21 @@ complete -c hbctl -n "__fish_hbctl_using_subcommand self-update" -l json -d 'Sho
 complete -c hbctl -n "__fish_hbctl_using_subcommand self-update" -l dry-run -d 'Preview mutating requests without hitting the server (redacts Authorization)'
 complete -c hbctl -n "__fish_hbctl_using_subcommand self-update" -s q -l quiet -d 'Output only created/affected IDs for shell piping'
 complete -c hbctl -n "__fish_hbctl_using_subcommand self-update" -s h -l help -d 'Print help'
-complete -c hbctl -n "__fish_hbctl_using_subcommand help; and not __fish_seen_subcommand_from auth item attachment search field tag entity-types status export completions man update help" -f -a "auth" -d 'Authenticate with a remote Homebox instance (login, status, logout, refresh)'
-complete -c hbctl -n "__fish_hbctl_using_subcommand help; and not __fish_seen_subcommand_from auth item attachment search field tag entity-types status export completions man update help" -f -a "item" -d 'Manage inventory items (/api/v1/entities)'
-complete -c hbctl -n "__fish_hbctl_using_subcommand help; and not __fish_seen_subcommand_from auth item attachment search field tag entity-types status export completions man update help" -f -a "attachment" -d 'Manage item attachments (/api/v1/entities/{id}/attachments)'
-complete -c hbctl -n "__fish_hbctl_using_subcommand help; and not __fish_seen_subcommand_from auth item attachment search field tag entity-types status export completions man update help" -f -a "search" -d 'Full-text and structured item search'
-complete -c hbctl -n "__fish_hbctl_using_subcommand help; and not __fish_seen_subcommand_from auth item attachment search field tag entity-types status export completions man update help" -f -a "field" -d 'List, get, set, or delete typed custom fields on an item'
-complete -c hbctl -n "__fish_hbctl_using_subcommand help; and not __fish_seen_subcommand_from auth item attachment search field tag entity-types status export completions man update help" -f -a "tag" -d 'Manage tags (/api/v1/tags)'
-complete -c hbctl -n "__fish_hbctl_using_subcommand help; and not __fish_seen_subcommand_from auth item attachment search field tag entity-types status export completions man update help" -f -a "entity-types" -d 'Manage Homebox entity types (/api/v1/entity-types)'
-complete -c hbctl -n "__fish_hbctl_using_subcommand help; and not __fish_seen_subcommand_from auth item attachment search field tag entity-types status export completions man update help" -f -a "status" -d 'Check remote Homebox server connectivity and version (/api/v1/status)'
-complete -c hbctl -n "__fish_hbctl_using_subcommand help; and not __fish_seen_subcommand_from auth item attachment search field tag entity-types status export completions man update help" -f -a "export" -d 'Export filtered items to JSON, CSV, or Markdown'
-complete -c hbctl -n "__fish_hbctl_using_subcommand help; and not __fish_seen_subcommand_from auth item attachment search field tag entity-types status export completions man update help" -f -a "completions" -d 'Generate shell completion scripts'
-complete -c hbctl -n "__fish_hbctl_using_subcommand help; and not __fish_seen_subcommand_from auth item attachment search field tag entity-types status export completions man update help" -f -a "man" -d 'Generate UNIX roff man page'
-complete -c hbctl -n "__fish_hbctl_using_subcommand help; and not __fish_seen_subcommand_from auth item attachment search field tag entity-types status export completions man update help" -f -a "update" -d 'Check for and install the latest hbctl release from GitHub'
-complete -c hbctl -n "__fish_hbctl_using_subcommand help; and not __fish_seen_subcommand_from auth item attachment search field tag entity-types status export completions man update help" -f -a "help" -d 'Print this message or the help of the given subcommand(s)'
+complete -c hbctl -n "__fish_hbctl_using_subcommand help; and not __fish_seen_subcommand_from auth item attachment search field tag entity-types status api maintenance export completions man update help" -f -a "auth" -d 'Authenticate with a remote Homebox instance (login, status, logout, refresh)'
+complete -c hbctl -n "__fish_hbctl_using_subcommand help; and not __fish_seen_subcommand_from auth item attachment search field tag entity-types status api maintenance export completions man update help" -f -a "item" -d 'Manage inventory items (/api/v1/entities)'
+complete -c hbctl -n "__fish_hbctl_using_subcommand help; and not __fish_seen_subcommand_from auth item attachment search field tag entity-types status api maintenance export completions man update help" -f -a "attachment" -d 'Manage item attachments (/api/v1/entities/{id}/attachments)'
+complete -c hbctl -n "__fish_hbctl_using_subcommand help; and not __fish_seen_subcommand_from auth item attachment search field tag entity-types status api maintenance export completions man update help" -f -a "search" -d 'Full-text and structured item search'
+complete -c hbctl -n "__fish_hbctl_using_subcommand help; and not __fish_seen_subcommand_from auth item attachment search field tag entity-types status api maintenance export completions man update help" -f -a "field" -d 'List, get, set, or delete typed custom fields on an item'
+complete -c hbctl -n "__fish_hbctl_using_subcommand help; and not __fish_seen_subcommand_from auth item attachment search field tag entity-types status api maintenance export completions man update help" -f -a "tag" -d 'Manage tags (/api/v1/tags)'
+complete -c hbctl -n "__fish_hbctl_using_subcommand help; and not __fish_seen_subcommand_from auth item attachment search field tag entity-types status api maintenance export completions man update help" -f -a "entity-types" -d 'Manage Homebox entity types (/api/v1/entity-types)'
+complete -c hbctl -n "__fish_hbctl_using_subcommand help; and not __fish_seen_subcommand_from auth item attachment search field tag entity-types status api maintenance export completions man update help" -f -a "status" -d 'Check remote Homebox server connectivity and version (/api/v1/status)'
+complete -c hbctl -n "__fish_hbctl_using_subcommand help; and not __fish_seen_subcommand_from auth item attachment search field tag entity-types status api maintenance export completions man update help" -f -a "api" -d 'Issue a raw authenticated HTTP request against any Homebox API endpoint'
+complete -c hbctl -n "__fish_hbctl_using_subcommand help; and not __fish_seen_subcommand_from auth item attachment search field tag entity-types status api maintenance export completions man update help" -f -a "maintenance" -d 'Manage maintenance log entries (/api/v1/maintenance)'
+complete -c hbctl -n "__fish_hbctl_using_subcommand help; and not __fish_seen_subcommand_from auth item attachment search field tag entity-types status api maintenance export completions man update help" -f -a "export" -d 'Export filtered items to JSON, CSV, or Markdown'
+complete -c hbctl -n "__fish_hbctl_using_subcommand help; and not __fish_seen_subcommand_from auth item attachment search field tag entity-types status api maintenance export completions man update help" -f -a "completions" -d 'Generate shell completion scripts'
+complete -c hbctl -n "__fish_hbctl_using_subcommand help; and not __fish_seen_subcommand_from auth item attachment search field tag entity-types status api maintenance export completions man update help" -f -a "man" -d 'Generate UNIX roff man page'
+complete -c hbctl -n "__fish_hbctl_using_subcommand help; and not __fish_seen_subcommand_from auth item attachment search field tag entity-types status api maintenance export completions man update help" -f -a "update" -d 'Check for and install the latest hbctl release from GitHub'
+complete -c hbctl -n "__fish_hbctl_using_subcommand help; and not __fish_seen_subcommand_from auth item attachment search field tag entity-types status api maintenance export completions man update help" -f -a "help" -d 'Print this message or the help of the given subcommand(s)'
 complete -c hbctl -n "__fish_hbctl_using_subcommand help; and __fish_seen_subcommand_from auth" -f -a "login" -d 'Authenticate with Homebox via API key (--with-token) or email/password'
 complete -c hbctl -n "__fish_hbctl_using_subcommand help; and __fish_seen_subcommand_from auth" -f -a "status" -d 'Check authentication status and validate the active session'
 complete -c hbctl -n "__fish_hbctl_using_subcommand help; and __fish_seen_subcommand_from auth" -f -a "logout" -d 'Remove stored credentials from OS keyring and local fallback store'
@@ -848,6 +1064,8 @@ complete -c hbctl -n "__fish_hbctl_using_subcommand help; and __fish_seen_subcom
 complete -c hbctl -n "__fish_hbctl_using_subcommand help; and __fish_seen_subcommand_from item" -f -a "import" -d 'Bulk import items from JSON or CSV (file or \'-\' for stdin)'
 complete -c hbctl -n "__fish_hbctl_using_subcommand help; and __fish_seen_subcommand_from item" -f -a "dedup" -d 'Detect (and optionally delete or merge) duplicate items'
 complete -c hbctl -n "__fish_hbctl_using_subcommand help; and __fish_seen_subcommand_from item" -f -a "move" -d 'Move an item under a parent item/location (or \'none\' to unparent)'
+complete -c hbctl -n "__fish_hbctl_using_subcommand help; and __fish_seen_subcommand_from item" -f -a "duplicate" -d 'Duplicate an existing item one or more times'
+complete -c hbctl -n "__fish_hbctl_using_subcommand help; and __fish_seen_subcommand_from item" -f -a "path" -d 'Display the location/parent breadcrumb path for an item'
 complete -c hbctl -n "__fish_hbctl_using_subcommand help; and __fish_seen_subcommand_from item" -f -a "tree" -d 'Render item parent/location hierarchy as a tree'
 complete -c hbctl -n "__fish_hbctl_using_subcommand help; and __fish_seen_subcommand_from attachment" -f -a "upload" -d 'Upload one or more files as item attachments'
 complete -c hbctl -n "__fish_hbctl_using_subcommand help; and __fish_seen_subcommand_from attachment" -f -a "list" -d 'List attachments on an item'
@@ -864,3 +1082,7 @@ complete -c hbctl -n "__fish_hbctl_using_subcommand help; and __fish_seen_subcom
 complete -c hbctl -n "__fish_hbctl_using_subcommand help; and __fish_seen_subcommand_from entity-types" -f -a "list" -d 'List all entity types'
 complete -c hbctl -n "__fish_hbctl_using_subcommand help; and __fish_seen_subcommand_from entity-types" -f -a "create" -d 'Create a new entity type'
 complete -c hbctl -n "__fish_hbctl_using_subcommand help; and __fish_seen_subcommand_from entity-types" -f -a "delete" -d 'Delete an entity type by ID'
+complete -c hbctl -n "__fish_hbctl_using_subcommand help; and __fish_seen_subcommand_from maintenance" -f -a "list" -d 'List maintenance log entries (globally or for a specific entity)'
+complete -c hbctl -n "__fish_hbctl_using_subcommand help; and __fish_seen_subcommand_from maintenance" -f -a "create" -d 'Create a maintenance log entry on an entity'
+complete -c hbctl -n "__fish_hbctl_using_subcommand help; and __fish_seen_subcommand_from maintenance" -f -a "update" -d 'Update an existing maintenance log entry by entry ID'
+complete -c hbctl -n "__fish_hbctl_using_subcommand help; and __fish_seen_subcommand_from maintenance" -f -a "delete" -d 'Delete a maintenance log entry by entry ID'
