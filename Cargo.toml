@@ -1,6 +1,6 @@
 [package]
 name = "hbctl"
-version = "0.1.3"
+version = "0.1.4"
 edition = "2021"
 authors = ["Nicholas Wilde"]
 description = "A fast, agent-friendly Rust CLI for remote Homebox v0.26+ instances"
