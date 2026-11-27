@@ -1,31 +1,51 @@
 # hbctl
 
-> Fast, agent-friendly Rust CLI client for remote Homebox v0.26+ REST APIs.
+> Fast, single-binary, agent-friendly Rust CLI client for interacting with remote Homebox v0.26+ instances over the REST API.
 
-## Docs
+`hbctl` centralizes Homebox inventory management for both interactive terminal workflows and AI-agent automation. It separates `stdout` data (`table`, compact `json` with `--select`, `plain`, `csv`, `markdown`, or `-q` IDs) from `stderr` diagnostics, protects mutations with `GET -> Merge -> PUT` semantics and `--dry-run` previews (`Bearer ***` redaction), and resolves settings across CLI flags, environment variables, `.hbctl.toml`, and `~/.config/hbctl/config.toml` profiles with OS keyring + `0600` file fallback storage.
 
-- [README](docs/README.md): Overview, installation, usage, configuration
-- [Docs Home](docs/index.md): Documentation site homepage
-- [About](docs/about.md): Feature highlights and security/reliability architecture
-- [Installation](docs/installation.md): Homebrew, APT, Scoop, GitHub Releases, Cargo, completions, and man page
-- [Usage](docs/usage.md): Global options, commands, upsert, import, dedup, attachments, search, export
-- [Configuration](docs/configuration.md): Layered precedence, multi-instance profiles, image optimization, env vars
-- [Authentication & Security](docs/security.md): OS keyring + 0600 file fallback, token lifecycle, Bearer redaction
-- [Config Example](assets/config.example.toml): Annotated TOML configuration options
-- [Zensical Config](zensical.toml): Static documentation site configuration and navigation
-- [AGENTS](AGENTS.md): Architecture, module map, and quality gates
+## Documentation
 
-## Source
+- [README](docs/README.md): Project overview, installation quickstart, usage examples, and configuration precedence.
+- [Docs Home](docs/index.md): Static Zensical documentation homepage.
+- [About](docs/about.md): Feature highlights and security/reliability architecture.
+- [Installation](docs/installation.md): Homebrew, APT, Scoop, GitHub Releases, self-update (`hbctl update`), Cargo source builds, shell completions, and man page setup.
+- [Usage](docs/usage.md): Complete CLI reference covering global flags, items, attachments, search, fields, tags, entity types, maintenance, stats, templates, barcodes, labels, QR codes, actions, notifiers, config, raw API, exports, and backups.
+- [Configuration](docs/configuration.md): Layered precedence, multi-instance `[profiles.<name>]`, image auto-optimization settings, and environment variables.
+- [Authentication & Security](docs/security.md): OS keyring + `0600` file fallback, token lifecycle, `Bearer ***` masking, notifier URL redaction, and backup sanitization.
+- [Config Example](assets/config.example.toml): Annotated TOML configuration template for single and multi-profile setups.
+- [AGENTS](AGENTS.md): Repository architecture, module map, coding conventions, and quality gates.
 
-- [src/cli.rs](src/cli.rs): CLI flags and subcommands
-- [src/config.rs](src/config.rs): Layered configuration precedence
-- [src/client/mod.rs](src/client/mod.rs): Homebox v0.26+ REST client
-- [src/dedup.rs](src/dedup.rs): Two-pass deduplication engine
-- [src/output.rs](src/output.rs): Table, compact JSON, plain, CSV, Markdown renderers
+## Core Source Modules
+
+- [CLI Parser](src/cli.rs): `clap` derive parser, global options, subcommands, shell completions, and man page generator.
+- [Configuration](src/config.rs): Layered config loader, URL/`HOMEBOX_IP` normalization, profile resolution, and secret redaction.
+- [Credential Store](src/auth_store.rs): Cross-platform OS keyring storage with `0600` file fallback (`credentials.json`) scoped per profile.
+- [HTTP Client](src/client/mod.rs): Homebox v0.26+ REST client with retry/backoff, `GET -> Merge -> PUT`, follow-up `PUT` for custom fields, concurrent hydration, and streaming attachment downloads.
+- [API Models](src/client/models.rs): Serde models with Go-`null` tolerance, typed custom fields, warranty/insurance/sold/archived fields, templates, barcodes, notifiers, stats, and maintenance.
+- [Entity & Tag Resolver](src/client/resolve.rs): Name/UUID resolution and auto-creation helpers for tags and entity types.
+- [Command Dispatcher](src/commands/mod.rs): Top-level command routing and shared item ID / rendering helpers across 20 command modules.
+- [Backup Command](src/commands/backup.rs): Portable full-inventory directory and `.tar.gz` archive backup generator with `manifest.json` and attachment disambiguation.
+- [Deduplication Engine](src/dedup.rs): Two-pass exact and Jaccard token similarity duplicate detector and deterministic keeper selector.
+- [Image Optimizer](src/image_opt.rs): In-memory EXIF-aware image resizing and JPEG/PNG/WebP compression pipeline.
+- [Output Renderers](src/output.rs): `table`, compact `json` (`--select`), `plain`, `csv`, `markdown`, `--dry-run`, and `--quiet` formatters.
+- [Self-Updater](src/update.rs): GitHub release checker and in-place binary updater (`hbctl update` / `hbctl self-update`).
+- [Domain Errors](src/error.rs): Typed `HbctlError` variants via `thiserror`.
+
+## Automation & Tooling
+
+- [Taskfile](Taskfile.yml): Task runner definitions for `check`, `test`, `fmt`, `clippy`, `lint:md`, `completions`, `man`, `docs:build`, `coverage`, and cross-compilation builds.
+- [Cargo Manifest](Cargo.toml): Rust crate dependencies, release/CI build profiles, and `.deb` package metadata.
+- [Zensical Config](zensical.toml): Static documentation site configuration and navigation tree.
+- [Release Script](scripts/release.sh): Automated semantic version bump, validation, tagging, and push helper.
+- [Release Summary Script](scripts/release_summary.py): Categorized GitHub release notes generator.
 
 ## Optional
 
-- [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md): Development workflow, quality gates, and DCO guidelines
-- [docs/CODE_OF_CONDUCT.md](docs/CODE_OF_CONDUCT.md): Contributor Covenant code of conduct
-- [pyproject.toml](pyproject.toml): Python environment (`zensical` >=0.0.45) via `uv`
-- [.github/workflows/docs.yml](.github/workflows/docs.yml): GitHub Pages deployment workflow for Zensical site
+- [Contributing Guide](docs/CONTRIBUTING.md): Development workflow, quality gates, and DCO sign-off guidelines.
+- [Code of Conduct](docs/CODE_OF_CONDUCT.md): Contributor Covenant community guidelines.
+- [License](LICENSE): Apache License 2.0 text.
+- [Python Environment](pyproject.toml): `uv`-managed documentation dependencies (`zensical`).
+- [CI Workflow](.github/workflows/ci.yml): Multi-OS/multi-arch formatting, Clippy, test, Markdown lint, and Coveralls pipeline.
+- [Release Workflow](.github/workflows/release.yml): Cross-compiled release builds, SHA-256 checksums, `.deb`, Homebrew, and Scoop publishing.
+- [Docs Workflow](.github/workflows/docs.yml): Two-job Zensical build and GitHub Pages deployment workflow.

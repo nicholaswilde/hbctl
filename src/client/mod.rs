@@ -1,7 +1,7 @@
 pub mod models;
 pub mod resolve;
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashSet};
 use std::fs::{self, File};
 use std::io;
 use std::path::Path;
@@ -18,14 +18,19 @@ use serde_json::{json, Value};
 use url::Url;
 
 use crate::client::models::{
-    merge_entity_patch, upsert_custom_fields, Attachment, CreateEntityRequest,
-    CreateEntityTypeRequest, CreateMaintenanceRequest, Entity, EntityPatch, EntityPathEntry,
-    EntityPathResponse, EntityType, ListResponse, LoginResponse, MaintenanceEntry, ServerStatus,
-    Tag, UpdateMaintenanceRequest, UserProfile, UserSelfResponse,
+    merge_entity_patch, upsert_custom_fields, ActionResult, ApplyTemplateRequest,
+    AssetLookupResponse, Attachment, BarcodeProduct, BarcodeSearchResponse, CreateEntityRequest,
+    CreateEntityTypeRequest, CreateExternalAttachmentRequest, CreateMaintenanceRequest,
+    CreateNotifierRequest, Entity, EntityPatch, EntityPathEntry, EntityPathResponse,
+    EntityTemplate, EntityTemplateSummary, EntityType, GroupStatistics, ListResponse,
+    LoginResponse, MaintenanceEntry, Notifier, OrganizerStatistic, PurchasePriceStatistics,
+    ServerStatus, Tag, TestNotifierRequest, UpdateAttachmentRequest, UpdateMaintenanceRequest,
+    UpdateNotifierRequest, UpsertTemplateRequest, UserProfile, UserSelfResponse,
 };
+use crate::client::resolve::{is_asset_id_like, normalize_asset_id};
 use crate::config::{
-    normalize_auth_header, normalize_base_url, redact_auth_header, redact_secret, AppConfig,
-    DEFAULT_DOWNLOAD_TIMEOUT_SECS, DEFAULT_TIMEOUT_SECS,
+    normalize_auth_header, normalize_base_url, redact_auth_header, redact_notifier_url,
+    redact_secret, AppConfig, DEFAULT_DOWNLOAD_TIMEOUT_SECS, DEFAULT_TIMEOUT_SECS,
 };
 use crate::error::{HbctlError, Result};
 
@@ -234,6 +239,14 @@ pub struct FetchedRemoteFile {
     pub content_disposition: Option<String>,
 }
 
+/// Binary payload and response headers returned by Homebox media endpoints (labels, QR codes).
+#[derive(Debug, Clone)]
+pub struct DownloadedBinary {
+    pub bytes: Vec<u8>,
+    pub content_type: Option<String>,
+    pub content_disposition: Option<String>,
+}
+
 /// Decoded payload returned by `HomeboxClient::raw_request`.
 #[derive(Debug, Clone, PartialEq)]
 pub enum ApiResponseBody {
@@ -358,11 +371,28 @@ impl HomeboxClient {
         }
     }
 
+    fn redact_error_with_url(&self, text: &str, sensitive_url: Option<&str>) -> String {
+        let mut out = redact_secret(text, &self.raw_secret);
+        if let Some(url) = sensitive_url.map(str::trim).filter(|u| !u.is_empty()) {
+            let redacted = redact_notifier_url(url);
+            out = out.replace(url, &redacted);
+        }
+        out
+    }
+
     fn handle_response<T: DeserializeOwned>(&self, resp: Response) -> Result<T> {
+        self.handle_response_with_url_redaction(resp, None)
+    }
+
+    fn handle_response_with_url_redaction<T: DeserializeOwned>(
+        &self,
+        resp: Response,
+        sensitive_url: Option<&str>,
+    ) -> Result<T> {
         let status = resp.status();
         let text = resp.text()?;
         if !status.is_success() {
-            let safe_msg = redact_secret(&text, &self.raw_secret);
+            let safe_msg = self.redact_error_with_url(&text, sensitive_url);
             return Err(HbctlError::Http {
                 status: status.as_u16(),
                 message: safe_msg,
@@ -372,16 +402,44 @@ impl HomeboxClient {
     }
 
     fn handle_empty_response(&self, resp: Response) -> Result<()> {
+        self.handle_empty_response_with_url_redaction(resp, None)
+    }
+
+    fn handle_empty_response_with_url_redaction(
+        &self,
+        resp: Response,
+        sensitive_url: Option<&str>,
+    ) -> Result<()> {
         let status = resp.status();
         if !status.is_success() {
             let text = resp.text().unwrap_or_default();
-            let safe_msg = redact_secret(&text, &self.raw_secret);
+            let safe_msg = self.redact_error_with_url(&text, sensitive_url);
             return Err(HbctlError::Http {
                 status: status.as_u16(),
                 message: safe_msg,
             });
         }
         Ok(())
+    }
+
+    fn handle_optional_json_response<T: DeserializeOwned + Default>(
+        &self,
+        resp: Response,
+    ) -> Result<T> {
+        let status = resp.status();
+        let text = resp.text()?;
+        if !status.is_success() {
+            let safe_msg = redact_secret(&text, &self.raw_secret);
+            return Err(HbctlError::Http {
+                status: status.as_u16(),
+                message: safe_msg,
+            });
+        }
+        if text.trim().is_empty() {
+            return Ok(T::default());
+        }
+        let parsed: Option<T> = serde_json::from_str(&text)?;
+        Ok(parsed.unwrap_or_default())
     }
 
     // -------------------------------------------------------------------------
@@ -464,6 +522,157 @@ impl HomeboxClient {
         let url = self.endpoint(&format!("entities/{id}"));
         let resp = self.send_with_retry(RetryMode::Idempotent, || {
             Ok(self.http.get(&url).header(AUTHORIZATION, &self.auth_header))
+        })?;
+        self.handle_response(resp)
+    }
+
+    /// Look up matching entities by Homebox asset ID via `GET /api/v1/assets/{id}`.
+    pub fn get_entities_by_asset_id(&self, asset_id: &str) -> Result<Vec<Entity>> {
+        let clean = normalize_asset_id(asset_id);
+        if clean.is_empty() {
+            return Err(HbctlError::InvalidInput(
+                "asset ID cannot be empty".to_string(),
+            ));
+        }
+        let mut url = Url::parse(&self.endpoint("assets"))
+            .map_err(|e| HbctlError::InvalidInput(format!("invalid assets URL: {e}")))?;
+        url.path_segments_mut()
+            .map_err(|_| HbctlError::InvalidInput("cannot modify assets URL path".to_string()))?
+            .push(&clean);
+        let url_str: String = url.into();
+        let resp = self.send_with_retry(RetryMode::Idempotent, || {
+            Ok(self
+                .http
+                .get(&url_str)
+                .header(AUTHORIZATION, &self.auth_header))
+        })?;
+        let parsed: AssetLookupResponse = self.handle_response(resp)?;
+        Ok(parsed.into_entities())
+    }
+
+    /// Resolve a user-supplied ID (UUID or asset ID) into a Homebox entity UUID.
+    ///
+    /// When `force_asset_id` is false, only numeric/dashed asset IDs (`is_asset_id_like`)
+    /// trigger `GET /api/v1/assets/{id}`; other IDs pass through untouched.
+    pub fn resolve_entity_id(&self, raw_id: &str, force_asset_id: bool) -> Result<String> {
+        let trimmed = raw_id.trim();
+        if trimmed.is_empty() {
+            return Err(HbctlError::InvalidInput(
+                "item ID cannot be empty".to_string(),
+            ));
+        }
+        if !force_asset_id && !is_asset_id_like(trimmed) {
+            return Ok(trimmed.to_string());
+        }
+
+        let clean = normalize_asset_id(trimmed);
+        let matches = self.get_entities_by_asset_id(&clean)?;
+        match matches.len() {
+            0 => Err(HbctlError::NotFound {
+                kind: "asset".to_string(),
+                query: clean,
+            }),
+            1 => Ok(matches[0].id.clone()),
+            _ => {
+                let exact: Vec<&Entity> = matches
+                    .iter()
+                    .filter(|e| {
+                        e.asset_id
+                            .as_deref()
+                            .map(normalize_asset_id)
+                            .is_some_and(|a| a == clean)
+                    })
+                    .collect();
+                if exact.len() == 1 {
+                    return Ok(exact[0].id.clone());
+                }
+                let ids: Vec<&str> = matches.iter().map(|e| e.id.as_str()).collect();
+                Err(HbctlError::InvalidInput(format!(
+                    "asset ID '{clean}' matched {} items ({}); specify an entity UUID instead",
+                    matches.len(),
+                    ids.join(", ")
+                )))
+            }
+        }
+    }
+
+    /// Resolve multiple entity or asset IDs concurrently/sequentially, deduplicating while preserving order.
+    pub fn resolve_entity_ids(
+        &self,
+        raw_ids: &[String],
+        force_asset_id: bool,
+    ) -> Result<Vec<String>> {
+        let mut seen = HashSet::new();
+        let mut resolved = Vec::with_capacity(raw_ids.len());
+        for raw in raw_ids {
+            let id = self.resolve_entity_id(raw, force_asset_id)?;
+            if seen.insert(id.clone()) {
+                resolved.push(id);
+            }
+        }
+        Ok(resolved)
+    }
+
+    /// Fetch a binary (or text) payload from an authenticated endpoint such as `/labelmaker/*` or `/qrcode`.
+    pub fn get_binary_endpoint(
+        &self,
+        path: &str,
+        query: &[(&str, String)],
+    ) -> Result<DownloadedBinary> {
+        let url = self.endpoint(path);
+        let resp = self.send_with_retry(RetryMode::Idempotent, || {
+            let mut req = self
+                .download_http
+                .get(&url)
+                .header(AUTHORIZATION, &self.auth_header);
+            if !query.is_empty() {
+                req = req.query(query);
+            }
+            Ok(req)
+        })?;
+
+        let status = resp.status();
+        let content_type = resp
+            .headers()
+            .get(CONTENT_TYPE)
+            .and_then(|v| v.to_str().ok())
+            .and_then(|s| s.split(';').next())
+            .map(|s| s.trim().to_ascii_lowercase())
+            .filter(|s| !s.is_empty());
+        let content_disposition = resp
+            .headers()
+            .get(CONTENT_DISPOSITION)
+            .and_then(|v| v.to_str().ok())
+            .map(ToOwned::to_owned);
+
+        if !status.is_success() {
+            let text = resp.text().unwrap_or_default();
+            let safe_msg = redact_secret(&text, &self.raw_secret);
+            return Err(HbctlError::Http {
+                status: status.as_u16(),
+                message: safe_msg,
+            });
+        }
+
+        let bytes = resp.bytes()?.to_vec();
+        Ok(DownloadedBinary {
+            bytes,
+            content_type,
+            content_disposition,
+        })
+    }
+
+    /// Invoke a server maintenance action (`POST /api/v1/actions/{action}`).
+    pub fn run_action(&self, action: &str) -> Result<ActionResult> {
+        let clean = action.trim().trim_start_matches('/');
+        let url = self.endpoint(&format!("actions/{clean}"));
+        let resp = self.send_with_retry(RetryMode::SafeMutation, || {
+            Ok(self
+                .http
+                .post(&url)
+                .header(AUTHORIZATION, &self.auth_header)
+                .header(CONTENT_TYPE, "application/json")
+                .json(&json!({})))
         })?;
         self.handle_response(resp)
     }
@@ -885,6 +1094,17 @@ impl HomeboxClient {
         remote_name: &str,
         bytes: Vec<u8>,
     ) -> Result<Attachment> {
+        self.upload_attachment_bytes_with_primary(entity_id, remote_name, bytes, false)
+    }
+
+    /// Upload raw attachment bytes under the given `remote_name`, optionally marking as primary.
+    pub fn upload_attachment_bytes_with_primary(
+        &self,
+        entity_id: &str,
+        remote_name: &str,
+        bytes: Vec<u8>,
+        primary: bool,
+    ) -> Result<Attachment> {
         let effective_name = remote_name.trim();
         if effective_name.is_empty() {
             return Err(HbctlError::InvalidInput(
@@ -906,10 +1126,13 @@ impl HomeboxClient {
                 .mime_str(mime.essence_str())
                 .map_err(|e| HbctlError::InvalidInput(format!("invalid MIME type: {e}")))?;
 
-            let form = multipart::Form::new()
+            let mut form = multipart::Form::new()
                 .part("file", file_part)
                 .text("name", effective_name.to_string())
                 .text("type", att_type);
+            if primary {
+                form = form.text("primary", "true");
+            }
 
             Ok(self
                 .http
@@ -918,7 +1141,6 @@ impl HomeboxClient {
                 .multipart(form))
         })?;
 
-        // Homebox may return either the created Attachment directly or the updated Entity
         let status = resp.status();
         let text = resp.text()?;
         if !status.is_success() {
@@ -929,17 +1151,108 @@ impl HomeboxClient {
             });
         }
 
-        if let Ok(att) = serde_json::from_str::<Attachment>(&text) {
+        self.decode_attachment_response(&text, None, None)
+    }
+
+    fn decode_attachment_response(
+        &self,
+        text: &str,
+        preferred_id: Option<&str>,
+        fallback: Option<Attachment>,
+    ) -> Result<Attachment> {
+        if let Ok(att) = serde_json::from_str::<Attachment>(text) {
             if !att.id.is_empty() && !att.extra.contains_key("attachments") {
                 return Ok(att);
             }
         }
-        if let Ok(ent) = serde_json::from_str::<Entity>(&text) {
+        if let Ok(ent) = serde_json::from_str::<Entity>(text) {
+            if let Some(target_id) = preferred_id {
+                if let Some(matched) = ent.attachments.iter().find(|a| a.id == target_id) {
+                    return Ok(matched.clone());
+                }
+            }
             if let Some(last) = ent.attachments.into_iter().last() {
                 return Ok(last);
             }
         }
-        serde_json::from_str::<Attachment>(&text).map_err(HbctlError::from)
+        if let Some(fb) = fallback {
+            if serde_json::from_str::<Value>(text).is_ok() {
+                return Ok(fb);
+            }
+        }
+        serde_json::from_str::<Attachment>(text).map_err(HbctlError::from)
+    }
+
+    /// Update attachment metadata (`PUT /api/v1/entities/{entity_id}/attachments/{attachment_id}`).
+    pub fn update_attachment(
+        &self,
+        entity_id: &str,
+        attachment_id: &str,
+        req: &UpdateAttachmentRequest,
+    ) -> Result<Attachment> {
+        let url = self.endpoint(&format!("entities/{entity_id}/attachments/{attachment_id}"));
+        let resp = self.send_with_retry(RetryMode::Idempotent, || {
+            Ok(self
+                .http
+                .put(&url)
+                .header(AUTHORIZATION, &self.auth_header)
+                .header(CONTENT_TYPE, "application/json")
+                .json(req))
+        })?;
+
+        let status = resp.status();
+        let text = resp.text()?;
+        if !status.is_success() {
+            let safe_msg = redact_secret(&text, &self.raw_secret);
+            return Err(HbctlError::Http {
+                status: status.as_u16(),
+                message: safe_msg,
+            });
+        }
+
+        let fallback = Attachment {
+            id: attachment_id.to_string(),
+            title: req.title.clone(),
+            attachment_type: req.attachment_type.clone(),
+            primary: req.primary,
+            ..Default::default()
+        };
+        self.decode_attachment_response(&text, Some(attachment_id), Some(fallback))
+    }
+
+    /// Add an external link attachment (`POST /api/v1/entities/{entity_id}/attachments/external`).
+    pub fn create_external_attachment(
+        &self,
+        entity_id: &str,
+        req: &CreateExternalAttachmentRequest,
+    ) -> Result<Attachment> {
+        let url = self.endpoint(&format!("entities/{entity_id}/attachments/external"));
+        let resp = self.send_with_retry(RetryMode::SafeMutation, || {
+            Ok(self
+                .http
+                .post(&url)
+                .header(AUTHORIZATION, &self.auth_header)
+                .header(CONTENT_TYPE, "application/json")
+                .json(req))
+        })?;
+
+        let status = resp.status();
+        let text = resp.text()?;
+        if !status.is_success() {
+            let safe_msg = redact_secret(&text, &self.raw_secret);
+            return Err(HbctlError::Http {
+                status: status.as_u16(),
+                message: safe_msg,
+            });
+        }
+
+        let fallback = Attachment {
+            title: req.title.clone().or_else(|| Some(req.external_id.clone())),
+            mime_type: Some("link/url".to_string()),
+            attachment_type: req.attachment_type.clone(),
+            ..Default::default()
+        };
+        self.decode_attachment_response(&text, None, Some(fallback))
     }
 
     /// Stream an attachment directly to disk using `download_timeout_secs`.
@@ -1363,6 +1676,235 @@ impl HomeboxClient {
                 .header(AUTHORIZATION, &self.auth_header))
         })?;
         self.handle_empty_response(resp)
+    }
+
+    // -------------------------------------------------------------------------
+    // Group Statistics (`/api/v1/groups/statistics*`)
+    // -------------------------------------------------------------------------
+
+    /// Fetch group-wide overview statistics (`GET /api/v1/groups/statistics`).
+    pub fn get_group_statistics(&self) -> Result<GroupStatistics> {
+        let url = self.endpoint("groups/statistics");
+        let resp = self.send_with_retry(RetryMode::Idempotent, || {
+            Ok(self.http.get(&url).header(AUTHORIZATION, &self.auth_header))
+        })?;
+        self.handle_optional_json_response(resp)
+    }
+
+    /// Fetch tag statistics (`GET /api/v1/groups/statistics/tags`).
+    pub fn get_tag_statistics(&self) -> Result<Vec<OrganizerStatistic>> {
+        let url = self.endpoint("groups/statistics/tags");
+        let resp = self.send_with_retry(RetryMode::Idempotent, || {
+            Ok(self.http.get(&url).header(AUTHORIZATION, &self.auth_header))
+        })?;
+        self.handle_optional_json_response(resp)
+    }
+
+    /// Fetch location statistics (`GET /api/v1/groups/statistics/locations`).
+    pub fn get_location_statistics(&self) -> Result<Vec<OrganizerStatistic>> {
+        let url = self.endpoint("groups/statistics/locations");
+        let resp = self.send_with_retry(RetryMode::Idempotent, || {
+            Ok(self.http.get(&url).header(AUTHORIZATION, &self.auth_header))
+        })?;
+        self.handle_optional_json_response(resp)
+    }
+
+    /// Fetch purchase price statistics over time (`GET /api/v1/groups/statistics/purchase-price`).
+    pub fn get_purchase_price_statistics(
+        &self,
+        start: Option<&str>,
+        end: Option<&str>,
+    ) -> Result<PurchasePriceStatistics> {
+        let url = self.endpoint("groups/statistics/purchase-price");
+        let resp = self.send_with_retry(RetryMode::Idempotent, || {
+            let mut req = self.http.get(&url).header(AUTHORIZATION, &self.auth_header);
+            if let Some(s) = start.map(str::trim).filter(|s| !s.is_empty()) {
+                req = req.query(&[("start", s)]);
+            }
+            if let Some(e) = end.map(str::trim).filter(|s| !s.is_empty()) {
+                req = req.query(&[("end", e)]);
+            }
+            Ok(req)
+        })?;
+        self.handle_optional_json_response(resp)
+    }
+
+    // -------------------------------------------------------------------------
+    // Entity Templates (`/api/v1/templates*`)
+    // -------------------------------------------------------------------------
+
+    /// List all entity templates (`GET /api/v1/templates`).
+    pub fn list_templates(&self) -> Result<Vec<EntityTemplateSummary>> {
+        let url = self.endpoint("templates");
+        let resp = self.send_with_retry(RetryMode::Idempotent, || {
+            Ok(self.http.get(&url).header(AUTHORIZATION, &self.auth_header))
+        })?;
+        let parsed: Option<ListResponse<EntityTemplateSummary>> =
+            self.handle_optional_json_response(resp)?;
+        Ok(parsed.map(|p| p.into_parts().0).unwrap_or_default())
+    }
+
+    /// Fetch a single entity template (`GET /api/v1/templates/{id}`).
+    pub fn get_template(&self, id: &str) -> Result<EntityTemplate> {
+        let url = self.endpoint(&format!("templates/{id}"));
+        let resp = self.send_with_retry(RetryMode::Idempotent, || {
+            Ok(self.http.get(&url).header(AUTHORIZATION, &self.auth_header))
+        })?;
+        self.handle_response(resp)
+    }
+
+    /// Create an entity template (`POST /api/v1/templates`).
+    pub fn create_template(&self, req: &UpsertTemplateRequest) -> Result<EntityTemplate> {
+        let url = self.endpoint("templates");
+        let resp = self.send_with_retry(RetryMode::SafeMutation, || {
+            Ok(self
+                .http
+                .post(&url)
+                .header(AUTHORIZATION, &self.auth_header)
+                .header(CONTENT_TYPE, "application/json")
+                .json(req))
+        })?;
+        self.handle_response(resp)
+    }
+
+    /// Update an entity template (`PUT /api/v1/templates/{id}`).
+    pub fn update_template(&self, id: &str, req: &UpsertTemplateRequest) -> Result<EntityTemplate> {
+        let url = self.endpoint(&format!("templates/{id}"));
+        let resp = self.send_with_retry(RetryMode::Idempotent, || {
+            Ok(self
+                .http
+                .put(&url)
+                .header(AUTHORIZATION, &self.auth_header)
+                .header(CONTENT_TYPE, "application/json")
+                .json(req))
+        })?;
+        self.handle_response(resp)
+    }
+
+    /// Delete an entity template (`DELETE /api/v1/templates/{id}`).
+    pub fn delete_template(&self, id: &str) -> Result<()> {
+        let url = self.endpoint(&format!("templates/{id}"));
+        let resp = self.send_with_retry(RetryMode::Idempotent, || {
+            Ok(self
+                .http
+                .delete(&url)
+                .header(AUTHORIZATION, &self.auth_header))
+        })?;
+        self.handle_empty_response(resp)
+    }
+
+    /// Instantiate a new item from a template (`POST /api/v1/templates/{id}/create-item`).
+    pub fn apply_template(&self, id: &str, req: &ApplyTemplateRequest) -> Result<Entity> {
+        let url = self.endpoint(&format!("templates/{id}/create-item"));
+        let resp = self.send_with_retry(RetryMode::SafeMutation, || {
+            Ok(self
+                .http
+                .post(&url)
+                .header(AUTHORIZATION, &self.auth_header)
+                .header(CONTENT_TYPE, "application/json")
+                .json(req))
+        })?;
+        self.handle_response(resp)
+    }
+
+    // -------------------------------------------------------------------------
+    // Barcode / Product Search (`/api/v1/products/search-from-barcode`)
+    // -------------------------------------------------------------------------
+
+    /// Search product metadata for a barcode (`GET /api/v1/products/search-from-barcode?productEAN=...`).
+    pub fn search_barcode(&self, code: &str) -> Result<Vec<BarcodeProduct>> {
+        let trimmed = code.trim();
+        if trimmed.is_empty() {
+            return Err(HbctlError::InvalidInput(
+                "barcode cannot be empty".to_string(),
+            ));
+        }
+        let url = self.endpoint("products/search-from-barcode");
+        let resp = self.send_with_retry(RetryMode::Idempotent, || {
+            Ok(self
+                .http
+                .get(&url)
+                .header(AUTHORIZATION, &self.auth_header)
+                .query(&[("productEAN", trimmed)]))
+        })?;
+        if resp.status() == reqwest::StatusCode::NO_CONTENT {
+            return Ok(Vec::new());
+        }
+        let parsed: Option<BarcodeSearchResponse> = self.handle_optional_json_response(resp)?;
+        Ok(parsed
+            .map(BarcodeSearchResponse::into_vec)
+            .unwrap_or_default())
+    }
+
+    // -------------------------------------------------------------------------
+    // Notifiers (`/api/v1/notifiers*`)
+    // -------------------------------------------------------------------------
+
+    /// List configured Shoutrrr notifiers (`GET /api/v1/notifiers`).
+    pub fn list_notifiers(&self) -> Result<Vec<Notifier>> {
+        let url = self.endpoint("notifiers");
+        let resp = self.send_with_retry(RetryMode::Idempotent, || {
+            Ok(self.http.get(&url).header(AUTHORIZATION, &self.auth_header))
+        })?;
+        let parsed: Option<ListResponse<Notifier>> = self.handle_optional_json_response(resp)?;
+        Ok(parsed.map(|p| p.into_parts().0).unwrap_or_default())
+    }
+
+    /// Create a Shoutrrr notifier (`POST /api/v1/notifiers`).
+    pub fn create_notifier(&self, req: &CreateNotifierRequest) -> Result<Notifier> {
+        let url = self.endpoint("notifiers");
+        let resp = self.send_with_retry(RetryMode::SafeMutation, || {
+            Ok(self
+                .http
+                .post(&url)
+                .header(AUTHORIZATION, &self.auth_header)
+                .header(CONTENT_TYPE, "application/json")
+                .json(req))
+        })?;
+        self.handle_response_with_url_redaction(resp, Some(&req.url))
+    }
+
+    /// Update a Shoutrrr notifier (`PUT /api/v1/notifiers/{id}`).
+    pub fn update_notifier(&self, id: &str, req: &UpdateNotifierRequest) -> Result<Notifier> {
+        let url = self.endpoint(&format!("notifiers/{id}"));
+        let resp = self.send_with_retry(RetryMode::Idempotent, || {
+            Ok(self
+                .http
+                .put(&url)
+                .header(AUTHORIZATION, &self.auth_header)
+                .header(CONTENT_TYPE, "application/json")
+                .json(req))
+        })?;
+        self.handle_response_with_url_redaction(resp, req.url.as_deref())
+    }
+
+    /// Delete a Shoutrrr notifier (`DELETE /api/v1/notifiers/{id}`).
+    pub fn delete_notifier(&self, id: &str) -> Result<()> {
+        let url = self.endpoint(&format!("notifiers/{id}"));
+        let resp = self.send_with_retry(RetryMode::Idempotent, || {
+            Ok(self
+                .http
+                .delete(&url)
+                .header(AUTHORIZATION, &self.auth_header))
+        })?;
+        self.handle_empty_response(resp)
+    }
+
+    /// Trigger a test notification (`POST /api/v1/notifiers/test`).
+    pub fn test_notifier(&self, url_target: &str) -> Result<()> {
+        let url = self.endpoint("notifiers/test");
+        let body = TestNotifierRequest {
+            url: url_target.to_string(),
+        };
+        let resp = self.send_with_retry(RetryMode::SafeMutation, || {
+            Ok(self
+                .http
+                .post(&url)
+                .header(AUTHORIZATION, &self.auth_header)
+                .header(CONTENT_TYPE, "application/json")
+                .json(&body))
+        })?;
+        self.handle_empty_response_with_url_redaction(resp, Some(url_target))
     }
 }
 
@@ -2451,5 +2993,267 @@ mod tests {
             Method::OPTIONS
         );
         assert!(HomeboxClient::parse_http_method("TRACE").is_err());
+    }
+
+    #[test]
+    fn test_group_statistics_client_methods_and_null_responses() {
+        let mut server = Server::new();
+        let client = test_client(&server.url());
+
+        let m_overview = server
+            .mock("GET", "/api/v1/groups/statistics")
+            .with_status(200)
+            .with_body(
+                r#"{"totalItems":12,"totalItemPrice":1450.25,"totalLocations":3,"totalTags":5,"totalUsers":1,"totalWithWarranty":4}"#,
+            )
+            .expect(1)
+            .create();
+        let overview = client.get_group_statistics().expect("group stats");
+        assert_eq!(overview.total_items, 12);
+        assert!((overview.total_item_price - 1450.25).abs() < 1e-6);
+        assert_eq!(overview.total_with_warranty, 4);
+        m_overview.assert();
+
+        let m_tags_null = server
+            .mock("GET", "/api/v1/groups/statistics/tags")
+            .with_status(200)
+            .with_body("null")
+            .expect(1)
+            .create();
+        assert!(client.get_tag_statistics().expect("null tags").is_empty());
+        m_tags_null.assert();
+
+        let m_locs = server
+            .mock("GET", "/api/v1/groups/statistics/locations")
+            .with_status(200)
+            .with_body(r#"[{"id":"loc-1","name":"Garage","total":800.0}]"#)
+            .expect(1)
+            .create();
+        let locs = client.get_location_statistics().expect("loc stats");
+        assert_eq!(locs.len(), 1);
+        assert_eq!(locs[0].name, "Garage");
+        m_locs.assert();
+
+        let m_pp = server
+            .mock("GET", "/api/v1/groups/statistics/purchase-price")
+            .match_query(Matcher::AllOf(vec![
+                Matcher::UrlEncoded("start".into(), "2026-01-01".into()),
+                Matcher::UrlEncoded("end".into(), "2026-11-27".into()),
+            ]))
+            .with_status(200)
+            .with_body(
+                r#"{"valueAtStart":100.0,"valueAtEnd":1450.25,"start":"2026-01-01","end":"2026-11-27","entries":null}"#,
+            )
+            .expect(1)
+            .create();
+        let pp = client
+            .get_purchase_price_statistics(Some("2026-01-01"), Some("2026-11-27"))
+            .expect("purchase price stats");
+        assert!((pp.value_at_end - 1450.25).abs() < 1e-6);
+        assert!(pp.entries.is_empty());
+        m_pp.assert();
+
+        // HTTP error redacts raw API key
+        let m_err = server
+            .mock("GET", "/api/v1/groups/statistics")
+            .with_status(401)
+            .with_body("unauthorized with Bearer hb_super_secret_key")
+            .expect(1)
+            .create();
+        let err = client.get_group_statistics().unwrap_err();
+        let msg = err.to_string();
+        assert!(msg.contains("Bearer ***"));
+        assert!(!msg.contains("hb_super_secret_key"));
+        m_err.assert();
+    }
+
+    #[test]
+    fn test_wave5_templates_barcode_and_notifiers_client_methods() {
+        let mut server = Server::new();
+        let client = test_client(&server.url());
+
+        // Templates CRUD + apply
+        let m_tpl_list = server
+            .mock("GET", "/api/v1/templates")
+            .with_status(200)
+            .with_body(r#"[{"id":"tpl-1","name":"Electronics","description":"Gadgets"}]"#)
+            .expect(1)
+            .create();
+        let tpls = client.list_templates().expect("list templates");
+        assert_eq!(tpls.len(), 1);
+        assert_eq!(tpls[0].name, "Electronics");
+        m_tpl_list.assert();
+
+        let m_tpl_get = server
+            .mock("GET", "/api/v1/templates/tpl-1")
+            .with_status(200)
+            .with_body(
+                r#"{"id":"tpl-1","name":"Electronics","defaultName":"Device","defaultQuantity":1.0,"fields":null}"#,
+            )
+            .expect(1)
+            .create();
+        let tpl = client.get_template("tpl-1").expect("get template");
+        assert_eq!(tpl.default_name, "Device");
+        m_tpl_get.assert();
+
+        let create_req = UpsertTemplateRequest {
+            name: "Electronics".to_string(),
+            default_name: Some("Device".to_string()),
+            ..Default::default()
+        };
+        let m_tpl_create = server
+            .mock("POST", "/api/v1/templates")
+            .match_body(Matcher::PartialJson(json!({ "name": "Electronics" })))
+            .with_status(201)
+            .with_body(r#"{"id":"tpl-1","name":"Electronics","defaultName":"Device"}"#)
+            .expect(1)
+            .create();
+        assert_eq!(client.create_template(&create_req).unwrap().id, "tpl-1");
+        m_tpl_create.assert();
+
+        let m_tpl_update = server
+            .mock("PUT", "/api/v1/templates/tpl-1")
+            .with_status(200)
+            .with_body(r#"{"id":"tpl-1","name":"Updated"}"#)
+            .expect(1)
+            .create();
+        assert_eq!(
+            client.update_template("tpl-1", &create_req).unwrap().name,
+            "Updated"
+        );
+        m_tpl_update.assert();
+
+        let m_tpl_apply = server
+            .mock("POST", "/api/v1/templates/tpl-1/create-item")
+            .match_body(Matcher::PartialJson(json!({ "name": "Router" })))
+            .with_status(201)
+            .with_body(r#"{"id":"ent-9","name":"Router","quantity":1}"#)
+            .expect(1)
+            .create();
+        let created_item = client
+            .apply_template(
+                "tpl-1",
+                &ApplyTemplateRequest {
+                    name: "Router".to_string(),
+                    ..Default::default()
+                },
+            )
+            .expect("apply template");
+        assert_eq!(created_item.id, "ent-9");
+        m_tpl_apply.assert();
+
+        let m_tpl_delete = server
+            .mock("DELETE", "/api/v1/templates/tpl-1")
+            .with_status(204)
+            .expect(1)
+            .create();
+        client.delete_template("tpl-1").expect("delete template");
+        m_tpl_delete.assert();
+
+        // Barcode search: 200 array + 204 no content
+        let m_bar_ok = server
+            .mock("GET", "/api/v1/products/search-from-barcode")
+            .match_query(Matcher::UrlEncoded(
+                "productEAN".into(),
+                "5035048748428".into(),
+            ))
+            .with_status(200)
+            .with_body(
+                r#"[{"search_engine_name":"upcitemdb.com","barcode":"5035048748428","manufacturer":"DeWalt","modelNumber":"DCD771","item":{"name":"DeWalt Drill","description":"20V"}}]"#,
+            )
+            .expect(1)
+            .create();
+        let products = client.search_barcode("5035048748428").unwrap();
+        assert_eq!(products.len(), 1);
+        assert_eq!(products[0].effective_name(), Some("DeWalt Drill"));
+        m_bar_ok.assert();
+
+        let m_bar_204 = server
+            .mock("GET", "/api/v1/products/search-from-barcode")
+            .match_query(Matcher::UrlEncoded("productEAN".into(), "000000".into()))
+            .with_status(204)
+            .expect(1)
+            .create();
+        assert!(client.search_barcode("000000").unwrap().is_empty());
+        m_bar_204.assert();
+
+        // Notifiers CRUD + test + error redaction
+        let m_not_list = server
+            .mock("GET", "/api/v1/notifiers")
+            .with_status(200)
+            .with_body(r#"[{"id":"not-1","name":"Discord","isActive":true,"url":"discord://secret_tok@123"}]"#)
+            .expect(1)
+            .create();
+        let notifiers = client.list_notifiers().unwrap();
+        assert_eq!(notifiers.len(), 1);
+        m_not_list.assert();
+
+        let m_not_create = server
+            .mock("POST", "/api/v1/notifiers")
+            .with_status(201)
+            .with_body(r#"{"id":"not-1","name":"Discord","isActive":true,"url":"discord://secret_tok@123"}"#)
+            .expect(1)
+            .create();
+        let created_not = client
+            .create_notifier(&CreateNotifierRequest {
+                name: "Discord".to_string(),
+                url: "discord://secret_tok@123".to_string(),
+                is_active: true,
+            })
+            .unwrap();
+        assert_eq!(created_not.id, "not-1");
+        m_not_create.assert();
+
+        let m_not_update = server
+            .mock("PUT", "/api/v1/notifiers/not-1")
+            .with_status(200)
+            .with_body(r#"{"id":"not-1","name":"Discord Updated","isActive":false,"url":"discord://secret_tok@123"}"#)
+            .expect(1)
+            .create();
+        let upd_not = client
+            .update_notifier(
+                "not-1",
+                &UpdateNotifierRequest {
+                    name: "Discord Updated".to_string(),
+                    is_active: false,
+                    url: None,
+                },
+            )
+            .unwrap();
+        assert!(!upd_not.is_active);
+        m_not_update.assert();
+
+        let m_not_test = server
+            .mock("POST", "/api/v1/notifiers/test")
+            .match_body(Matcher::PartialJson(
+                json!({ "url": "discord://secret_tok@123" }),
+            ))
+            .with_status(204)
+            .expect(1)
+            .create();
+        client.test_notifier("discord://secret_tok@123").unwrap();
+        m_not_test.assert();
+
+        let m_not_test_err = server
+            .mock("POST", "/api/v1/notifiers/test")
+            .with_status(400)
+            .with_body("failed dialing discord://secret_tok@123")
+            .expect(1)
+            .create();
+        let err_msg = client
+            .test_notifier("discord://secret_tok@123")
+            .unwrap_err()
+            .to_string();
+        assert!(err_msg.contains("discord://***@123"));
+        assert!(!err_msg.contains("secret_tok"));
+        m_not_test_err.assert();
+
+        let m_not_del = server
+            .mock("DELETE", "/api/v1/notifiers/not-1")
+            .with_status(204)
+            .expect(1)
+            .create();
+        client.delete_notifier("not-1").unwrap();
+        m_not_del.assert();
     }
 }

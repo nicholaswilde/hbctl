@@ -1054,6 +1054,175 @@ pub struct PaginatedResponse<T> {
     pub total: Option<i64>,
 }
 
+/// Response from `GET /api/v1/assets/{id}` (paginated `{items}`, bare array, or single entity).
+#[derive(Debug, Clone, Deserialize)]
+#[serde(untagged)]
+pub enum AssetLookupResponse {
+    Paginated {
+        #[serde(deserialize_with = "deserialize_null_vec")]
+        items: Vec<Entity>,
+    },
+    Array(Vec<Entity>),
+    Single(Box<Entity>),
+}
+
+impl AssetLookupResponse {
+    pub fn into_entities(self) -> Vec<Entity> {
+        match self {
+            Self::Paginated { items } | Self::Array(items) => items,
+            Self::Single(entity) => vec![*entity],
+        }
+    }
+}
+
+/// Response payload from `POST /api/v1/actions/*`.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ActionResult {
+    #[serde(default)]
+    pub completed: u64,
+
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// Group-wide overview statistics from `GET /api/v1/groups/statistics`.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+pub struct GroupStatistics {
+    #[serde(
+        rename = "totalUsers",
+        default,
+        deserialize_with = "deserialize_null_default"
+    )]
+    pub total_users: u64,
+
+    #[serde(
+        rename = "totalItems",
+        default,
+        deserialize_with = "deserialize_null_default"
+    )]
+    pub total_items: u64,
+
+    #[serde(
+        rename = "totalLocations",
+        default,
+        deserialize_with = "deserialize_null_default"
+    )]
+    pub total_locations: u64,
+
+    #[serde(
+        rename = "totalTags",
+        alias = "totalLabels",
+        default,
+        deserialize_with = "deserialize_null_default"
+    )]
+    pub total_tags: u64,
+
+    #[serde(
+        rename = "totalItemPrice",
+        default,
+        deserialize_with = "deserialize_null_default"
+    )]
+    pub total_item_price: f64,
+
+    #[serde(
+        rename = "totalWithWarranty",
+        default,
+        deserialize_with = "deserialize_null_default"
+    )]
+    pub total_with_warranty: u64,
+
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// Organizer breakdown entry from `/api/v1/groups/statistics/tags` or `/locations`.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+pub struct OrganizerStatistic {
+    #[serde(default, deserialize_with = "deserialize_null_default")]
+    pub id: String,
+
+    #[serde(default, deserialize_with = "deserialize_null_default")]
+    pub name: String,
+
+    #[serde(default, deserialize_with = "deserialize_null_default")]
+    pub total: f64,
+
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// Single price entry in `/api/v1/groups/statistics/purchase-price`.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+pub struct ValueOverTimeEntry {
+    #[serde(default, deserialize_with = "deserialize_null_default")]
+    pub date: String,
+
+    #[serde(default, deserialize_with = "deserialize_null_default")]
+    pub value: f64,
+
+    #[serde(default, deserialize_with = "deserialize_null_default")]
+    pub name: String,
+
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// Purchase value over time statistics from `GET /api/v1/groups/statistics/purchase-price`.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+pub struct PurchasePriceStatistics {
+    #[serde(
+        rename = "valueAtStart",
+        default,
+        deserialize_with = "deserialize_null_default"
+    )]
+    pub value_at_start: f64,
+
+    #[serde(
+        rename = "valueAtEnd",
+        default,
+        deserialize_with = "deserialize_null_default"
+    )]
+    pub value_at_end: f64,
+
+    #[serde(default, deserialize_with = "deserialize_null_default")]
+    pub start: String,
+
+    #[serde(default, deserialize_with = "deserialize_null_default")]
+    pub end: String,
+
+    #[serde(default, deserialize_with = "deserialize_null_vec")]
+    pub entries: Vec<ValueOverTimeEntry>,
+
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// Request payload for `PUT /api/v1/entities/{id}/attachments/{attachment_id}`.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]
+pub struct UpdateAttachmentRequest {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub title: Option<String>,
+
+    #[serde(rename = "type", skip_serializing_if = "Option::is_none")]
+    pub attachment_type: Option<String>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub primary: Option<bool>,
+}
+
+/// Request payload for `POST /api/v1/entities/{id}/attachments/external`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct CreateExternalAttachmentRequest {
+    pub source_type: String,
+    pub external_id: String,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub title: Option<String>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub attachment_type: Option<String>,
+}
+
 /// Payload for creating a new entity (`POST /api/v1/entities`).
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct CreateEntityRequest {
@@ -1304,6 +1473,415 @@ pub struct EntityPatch {
         skip_serializing_if = "std::ops::Not::not"
     )]
     pub fill_missing: bool,
+}
+
+// -----------------------------------------------------------------------------
+// Entity Templates (`/api/v1/templates*`)
+// -----------------------------------------------------------------------------
+
+/// Lightweight reference (`id` + `name`) embedded in `EntityTemplate`.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TemplateRef {
+    #[serde(default, deserialize_with = "deserialize_null_default")]
+    pub id: String,
+
+    #[serde(default, deserialize_with = "deserialize_null_default")]
+    pub name: String,
+}
+
+/// Summary record returned by `GET /api/v1/templates`.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EntityTemplateSummary {
+    #[serde(default, deserialize_with = "deserialize_null_default")]
+    pub id: String,
+
+    #[serde(default, deserialize_with = "deserialize_null_default")]
+    pub name: String,
+
+    #[serde(default, deserialize_with = "deserialize_null_default")]
+    pub description: String,
+
+    #[serde(default, deserialize_with = "deserialize_null_default")]
+    pub created_at: String,
+
+    #[serde(default, deserialize_with = "deserialize_null_default")]
+    pub updated_at: String,
+
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// Full entity template returned by `GET /api/v1/templates/{id}`, `POST`, and `PUT`.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EntityTemplate {
+    #[serde(default, deserialize_with = "deserialize_null_default")]
+    pub id: String,
+
+    #[serde(default, deserialize_with = "deserialize_null_default")]
+    pub name: String,
+
+    #[serde(default, deserialize_with = "deserialize_null_default")]
+    pub description: String,
+
+    #[serde(default, deserialize_with = "deserialize_null_default")]
+    pub notes: String,
+
+    #[serde(default, deserialize_with = "deserialize_null_default")]
+    pub default_name: String,
+
+    #[serde(default, deserialize_with = "deserialize_null_default")]
+    pub default_description: String,
+
+    #[serde(default, deserialize_with = "deserialize_null_default")]
+    pub default_quantity: f64,
+
+    #[serde(default, deserialize_with = "deserialize_null_default")]
+    pub default_insured: bool,
+
+    #[serde(default, deserialize_with = "deserialize_null_default")]
+    pub default_manufacturer: String,
+
+    #[serde(default, deserialize_with = "deserialize_null_default")]
+    pub default_model_number: String,
+
+    #[serde(default, deserialize_with = "deserialize_null_default")]
+    pub default_lifetime_warranty: bool,
+
+    #[serde(default, deserialize_with = "deserialize_null_default")]
+    pub default_warranty_details: String,
+
+    #[serde(default)]
+    pub default_location: Option<TemplateRef>,
+
+    #[serde(default, deserialize_with = "deserialize_null_vec")]
+    pub default_tags: Vec<TemplateRef>,
+
+    #[serde(default, deserialize_with = "deserialize_null_default")]
+    pub include_warranty_fields: bool,
+
+    #[serde(default, deserialize_with = "deserialize_null_default")]
+    pub include_purchase_fields: bool,
+
+    #[serde(default, deserialize_with = "deserialize_null_default")]
+    pub include_sold_fields: bool,
+
+    #[serde(default, deserialize_with = "deserialize_null_vec")]
+    pub fields: Vec<CustomField>,
+
+    #[serde(default, deserialize_with = "deserialize_null_default")]
+    pub created_at: String,
+
+    #[serde(default, deserialize_with = "deserialize_null_default")]
+    pub updated_at: String,
+
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+impl EntityTemplate {
+    /// Convert an existing `EntityTemplate` into an `UpsertTemplateRequest` for `GET -> Merge -> PUT`.
+    pub fn to_update_request(&self) -> UpsertTemplateRequest {
+        UpsertTemplateRequest {
+            id: (!self.id.is_empty()).then(|| self.id.clone()),
+            name: self.name.clone(),
+            description: self.description.clone(),
+            notes: self.notes.clone(),
+            default_name: (!self.default_name.is_empty()).then(|| self.default_name.clone()),
+            default_description: (!self.default_description.is_empty())
+                .then(|| self.default_description.clone()),
+            default_quantity: (self.default_quantity != 0.0).then_some(self.default_quantity),
+            default_insured: self.default_insured,
+            default_manufacturer: (!self.default_manufacturer.is_empty())
+                .then(|| self.default_manufacturer.clone()),
+            default_model_number: (!self.default_model_number.is_empty())
+                .then(|| self.default_model_number.clone()),
+            default_lifetime_warranty: self.default_lifetime_warranty,
+            default_warranty_details: (!self.default_warranty_details.is_empty())
+                .then(|| self.default_warranty_details.clone()),
+            default_location_id: self
+                .default_location
+                .as_ref()
+                .map(|l| l.id.clone())
+                .filter(|s| !s.is_empty()),
+            default_tag_ids: Some(self.default_tags.iter().map(|t| t.id.clone()).collect()),
+            include_warranty_fields: self.include_warranty_fields,
+            include_purchase_fields: self.include_purchase_fields,
+            include_sold_fields: self.include_sold_fields,
+            fields: self.fields.clone(),
+        }
+    }
+}
+
+/// Request payload for `POST /api/v1/templates` and `PUT /api/v1/templates/{id}`.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UpsertTemplateRequest {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub id: Option<String>,
+
+    pub name: String,
+
+    #[serde(default)]
+    pub description: String,
+
+    #[serde(default)]
+    pub notes: String,
+
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub default_name: Option<String>,
+
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub default_description: Option<String>,
+
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub default_quantity: Option<f64>,
+
+    #[serde(default)]
+    pub default_insured: bool,
+
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub default_manufacturer: Option<String>,
+
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub default_model_number: Option<String>,
+
+    #[serde(default)]
+    pub default_lifetime_warranty: bool,
+
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub default_warranty_details: Option<String>,
+
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub default_location_id: Option<String>,
+
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub default_tag_ids: Option<Vec<String>>,
+
+    #[serde(default)]
+    pub include_warranty_fields: bool,
+
+    #[serde(default)]
+    pub include_purchase_fields: bool,
+
+    #[serde(default)]
+    pub include_sold_fields: bool,
+
+    #[serde(default)]
+    pub fields: Vec<CustomField>,
+}
+
+/// Request payload for `POST /api/v1/templates/{id}/create-item`.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ApplyTemplateRequest {
+    pub name: String,
+
+    #[serde(default)]
+    pub description: String,
+
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub parent_id: Option<String>,
+
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub location_id: Option<String>,
+
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub entity_type_id: Option<String>,
+
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub tag_ids: Vec<String>,
+
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub quantity: Option<f64>,
+}
+
+// -----------------------------------------------------------------------------
+// Barcode / Product Search (`/api/v1/products/search-from-barcode`)
+// -----------------------------------------------------------------------------
+
+/// Nested item metadata returned inside `BarcodeProduct`.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BarcodeItem {
+    #[serde(default, deserialize_with = "deserialize_null_default")]
+    pub name: String,
+
+    #[serde(default, deserialize_with = "deserialize_null_default")]
+    pub description: String,
+
+    #[serde(default, deserialize_with = "deserialize_null_default")]
+    pub manufacturer: String,
+
+    #[serde(default, deserialize_with = "deserialize_null_default")]
+    pub model_number: String,
+
+    #[serde(default)]
+    pub quantity: Option<i64>,
+
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// Product match returned by `GET /api/v1/products/search-from-barcode`.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BarcodeProduct {
+    #[serde(
+        rename = "search_engine_name",
+        alias = "searchEngineName",
+        default,
+        deserialize_with = "deserialize_null_default"
+    )]
+    pub search_engine_name: String,
+
+    #[serde(default, deserialize_with = "deserialize_null_default")]
+    pub barcode: String,
+
+    #[serde(default, deserialize_with = "deserialize_null_default")]
+    pub manufacturer: String,
+
+    #[serde(default, deserialize_with = "deserialize_null_default")]
+    pub model_number: String,
+
+    #[serde(default, deserialize_with = "deserialize_null_default")]
+    pub notes: String,
+
+    #[serde(
+        rename = "imageURL",
+        alias = "imageUrl",
+        default,
+        deserialize_with = "deserialize_null_default"
+    )]
+    pub image_url: String,
+
+    #[serde(default, deserialize_with = "deserialize_null_default")]
+    pub image_base64: String,
+
+    #[serde(default, deserialize_with = "deserialize_null_default")]
+    pub item: BarcodeItem,
+
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+impl BarcodeProduct {
+    pub fn effective_name(&self) -> Option<&str> {
+        let s = self.item.name.trim();
+        (!s.is_empty()).then_some(s)
+    }
+
+    pub fn effective_description(&self) -> Option<&str> {
+        let s = self.item.description.trim();
+        (!s.is_empty()).then_some(s)
+    }
+
+    pub fn effective_manufacturer(&self) -> Option<&str> {
+        let top = self.manufacturer.trim();
+        if !top.is_empty() {
+            return Some(top);
+        }
+        let nested = self.item.manufacturer.trim();
+        (!nested.is_empty()).then_some(nested)
+    }
+
+    pub fn effective_model_number(&self) -> Option<&str> {
+        let top = self.model_number.trim();
+        if !top.is_empty() {
+            return Some(top);
+        }
+        let nested = self.item.model_number.trim();
+        (!nested.is_empty()).then_some(nested)
+    }
+}
+
+/// Accepts either an array or single object from `/api/v1/products/search-from-barcode`.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(untagged)]
+pub enum BarcodeSearchResponse {
+    Many(Vec<BarcodeProduct>),
+    One(Box<BarcodeProduct>),
+}
+
+impl BarcodeSearchResponse {
+    pub fn into_vec(self) -> Vec<BarcodeProduct> {
+        match self {
+            Self::Many(items) => items,
+            Self::One(item) => vec![*item],
+        }
+    }
+}
+
+// -----------------------------------------------------------------------------
+// Notifiers (`/api/v1/notifiers*`)
+// -----------------------------------------------------------------------------
+
+/// Homebox Shoutrrr notifier configuration returned by `/api/v1/notifiers`.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Notifier {
+    #[serde(default, deserialize_with = "deserialize_null_default")]
+    pub id: String,
+
+    #[serde(default, deserialize_with = "deserialize_null_default")]
+    pub user_id: String,
+
+    #[serde(default, deserialize_with = "deserialize_null_default")]
+    pub group_id: String,
+
+    #[serde(default, deserialize_with = "deserialize_null_default")]
+    pub name: String,
+
+    #[serde(default, deserialize_with = "deserialize_null_default")]
+    pub is_active: bool,
+
+    #[serde(default, deserialize_with = "deserialize_null_default")]
+    pub url: String,
+
+    #[serde(default, deserialize_with = "deserialize_null_default")]
+    pub created_at: String,
+
+    #[serde(default, deserialize_with = "deserialize_null_default")]
+    pub updated_at: String,
+
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+impl Notifier {
+    /// Return a copy with credentials in `url` redacted for safe display.
+    pub fn redacted(&self) -> Self {
+        let mut copy = self.clone();
+        copy.url = crate::config::redact_notifier_url(&self.url);
+        copy
+    }
+}
+
+/// Request payload for `POST /api/v1/notifiers`.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CreateNotifierRequest {
+    pub name: String,
+    pub url: String,
+    pub is_active: bool,
+}
+
+/// Request payload for `PUT /api/v1/notifiers/{id}`.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UpdateNotifierRequest {
+    pub name: String,
+    pub is_active: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub url: Option<String>,
+}
+
+/// Request payload for `POST /api/v1/notifiers/test`.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TestNotifierRequest {
+    pub url: String,
 }
 
 /// Upsert a slice of custom fields into `existing` by case-insensitive field name
@@ -2626,5 +3204,170 @@ mod tests {
         let null_resp: EntityPathResponse = serde_json::from_value(Value::Null).unwrap();
         assert!(null_resp.into_entries().is_empty());
         assert_eq!(format_breadcrumb(&[]), "");
+    }
+
+    #[test]
+    fn test_statistics_models_go_null_tolerance_and_aliases() {
+        let stats: GroupStatistics = serde_json::from_value(json!({
+            "totalUsers": 2,
+            "totalItems": 48,
+            "totalLocations": 6,
+            "totalLabels": 11,
+            "totalItemPrice": 3250.75,
+            "totalWithWarranty": 14
+        }))
+        .unwrap();
+        assert_eq!(stats.total_users, 2);
+        assert_eq!(stats.total_items, 48);
+        assert_eq!(stats.total_locations, 6);
+        assert_eq!(stats.total_tags, 11);
+        assert!((stats.total_item_price - 3250.75).abs() < 1e-6);
+        assert_eq!(stats.total_with_warranty, 14);
+
+        let stats_null: GroupStatistics = serde_json::from_value(json!({
+            "totalUsers": null,
+            "totalItems": null,
+            "totalLocations": null,
+            "totalTags": null,
+            "totalItemPrice": null,
+            "totalWithWarranty": null
+        }))
+        .unwrap();
+        assert_eq!(stats_null, GroupStatistics::default());
+
+        let stats_empty: GroupStatistics = serde_json::from_value(json!({})).unwrap();
+        assert_eq!(stats_empty, GroupStatistics::default());
+
+        let org: OrganizerStatistic = serde_json::from_value(json!({
+            "id": null,
+            "name": "Garage",
+            "total": null
+        }))
+        .unwrap();
+        assert_eq!(org.id, "");
+        assert_eq!(org.name, "Garage");
+        assert_eq!(org.total, 0.0);
+
+        let pp_null: PurchasePriceStatistics = serde_json::from_value(json!({
+            "valueAtStart": null,
+            "valueAtEnd": 500.5,
+            "start": null,
+            "end": "2026-11-27T00:00:00Z",
+            "entries": null
+        }))
+        .unwrap();
+        assert_eq!(pp_null.value_at_start, 0.0);
+        assert!((pp_null.value_at_end - 500.5).abs() < 1e-6);
+        assert_eq!(pp_null.start, "");
+        assert_eq!(pp_null.end, "2026-11-27T00:00:00Z");
+        assert!(pp_null.entries.is_empty());
+
+        let pp_full: PurchasePriceStatistics = serde_json::from_value(json!({
+            "valueAtStart": 100.0,
+            "valueAtEnd": 250.0,
+            "start": "2026-01-01",
+            "end": "2026-11-27",
+            "entries": [{ "date": "2026-05-01", "name": null, "value": 150.0 }]
+        }))
+        .unwrap();
+        assert_eq!(pp_full.entries.len(), 1);
+        assert_eq!(pp_full.entries[0].date, "2026-05-01");
+        assert_eq!(pp_full.entries[0].name, "");
+        assert!((pp_full.entries[0].value - 150.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_wave5_models_deserialization_and_helpers() {
+        // EntityTemplate tolerates Go nulls and converts cleanly for PUT
+        let tpl: EntityTemplate = serde_json::from_value(json!({
+            "id": "tpl-1",
+            "name": "Power Tool",
+            "description": null,
+            "notes": null,
+            "defaultName": "Cordless Drill",
+            "defaultDescription": null,
+            "defaultQuantity": 1.0,
+            "defaultInsured": true,
+            "defaultManufacturer": "DeWalt",
+            "defaultModelNumber": "DCD771",
+            "defaultLifetimeWarranty": false,
+            "defaultWarrantyDetails": null,
+            "defaultLocation": { "id": "loc-1", "name": "Garage" },
+            "defaultTags": [{ "id": "tag-1", "name": "Tools" }],
+            "includeWarrantyFields": true,
+            "includePurchaseFields": null,
+            "includeSoldFields": false,
+            "fields": null,
+            "createdAt": "2026-11-27T00:00:00Z",
+            "updatedAt": "2026-11-27T00:00:00Z"
+        }))
+        .unwrap();
+        assert_eq!(tpl.id, "tpl-1");
+        assert_eq!(tpl.description, "");
+        assert!(tpl.fields.is_empty());
+        assert_eq!(
+            tpl.default_location.as_ref().map(|l| l.id.as_str()),
+            Some("loc-1")
+        );
+
+        let update_req = tpl.to_update_request();
+        assert_eq!(update_req.id.as_deref(), Some("tpl-1"));
+        assert_eq!(update_req.default_name.as_deref(), Some("Cordless Drill"));
+        assert_eq!(update_req.default_description, None);
+        assert_eq!(update_req.default_location_id.as_deref(), Some("loc-1"));
+        assert_eq!(
+            update_req.default_tag_ids.as_deref(),
+            Some(&["tag-1".to_string()][..])
+        );
+
+        // BarcodeProduct top-level vs nested fallback + BarcodeSearchResponse
+        let resp_many: BarcodeSearchResponse = serde_json::from_value(json!([
+            {
+                "search_engine_name": "upcitemdb.com",
+                "barcode": "5035048748428",
+                "manufacturer": "",
+                "modelNumber": "DCD771",
+                "notes": null,
+                "imageURL": "https://img.example.com/1.jpg",
+                "imageBase64": null,
+                "item": {
+                    "name": "DeWalt Drill",
+                    "description": "20V Max",
+                    "manufacturer": "DeWalt",
+                    "modelNumber": "OLD-MOD",
+                    "quantity": 1
+                }
+            }
+        ]))
+        .unwrap();
+        let products = resp_many.into_vec();
+        assert_eq!(products.len(), 1);
+        assert_eq!(products[0].effective_name(), Some("DeWalt Drill"));
+        assert_eq!(products[0].effective_description(), Some("20V Max"));
+        assert_eq!(products[0].effective_manufacturer(), Some("DeWalt"));
+        assert_eq!(products[0].effective_model_number(), Some("DCD771"));
+
+        let resp_one: BarcodeSearchResponse = serde_json::from_value(json!({
+            "barcode": "123456",
+            "item": { "name": "Single Match" }
+        }))
+        .unwrap();
+        assert_eq!(resp_one.into_vec().len(), 1);
+
+        // Notifier deserialization + redaction
+        let notifier: Notifier = serde_json::from_value(json!({
+            "id": "not-1",
+            "userId": "u-1",
+            "groupId": "g-1",
+            "name": "Discord Alerts",
+            "isActive": true,
+            "url": "discord://secret_tok@999999",
+            "createdAt": null,
+            "updatedAt": null
+        }))
+        .unwrap();
+        let redacted = notifier.redacted();
+        assert_eq!(redacted.url, "discord://***@999999");
+        assert!(!redacted.url.contains("secret_tok"));
     }
 }

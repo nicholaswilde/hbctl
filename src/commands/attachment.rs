@@ -7,10 +7,13 @@ use serde::Serialize;
 use serde_json::json;
 
 use crate::cli::{
-    AttachmentArgs, AttachmentCommands, AttachmentDeleteArgs, AttachmentDownloadArgs,
-    AttachmentListArgs, AttachmentUploadArgs,
+    AttachmentAddLinkArgs, AttachmentArgs, AttachmentCommands, AttachmentDeleteArgs,
+    AttachmentDownloadArgs, AttachmentListArgs, AttachmentSetPrimaryArgs, AttachmentUpdateArgs,
+    AttachmentUploadArgs,
 };
-use crate::client::models::{Attachment, Entity};
+use crate::client::models::{
+    Attachment, CreateExternalAttachmentRequest, Entity, UpdateAttachmentRequest,
+};
 use crate::client::resolve::Resolver;
 use crate::client::{DryRunRequest, HomeboxClient, ListEntitiesQuery};
 #[cfg(test)]
@@ -30,16 +33,32 @@ pub const MAX_IMAGE_SIZE_BYTES: u64 = DEFAULT_MAX_IMAGE_KB * 1024;
 pub fn handle(
     args: &AttachmentArgs,
     dry_run: bool,
+    force_asset_id: bool,
     config: &AppConfig,
     ctx: &OutputContext,
     out: &mut dyn Write,
     err: &mut dyn Write,
 ) -> Result<()> {
     match &args.command {
-        AttachmentCommands::Upload(a) => handle_upload(a, dry_run, config, ctx, out, err),
-        AttachmentCommands::List(a) => handle_list(a, config, ctx, out),
-        AttachmentCommands::Download(a) => handle_download(a, dry_run, config, ctx, out, err),
-        AttachmentCommands::Delete(a) => handle_delete(a, dry_run, config, ctx, out),
+        AttachmentCommands::Upload(a) => {
+            handle_upload(a, dry_run, force_asset_id, config, ctx, out, err)
+        }
+        AttachmentCommands::List(a) => handle_list(a, force_asset_id, config, ctx, out),
+        AttachmentCommands::Download(a) => {
+            handle_download(a, dry_run, force_asset_id, config, ctx, out, err)
+        }
+        AttachmentCommands::Delete(a) => {
+            handle_delete(a, dry_run, force_asset_id, config, ctx, out)
+        }
+        AttachmentCommands::SetPrimary(a) => {
+            handle_set_primary(a, dry_run, force_asset_id, config, ctx, out)
+        }
+        AttachmentCommands::Update(a) => {
+            handle_update(a, dry_run, force_asset_id, config, ctx, out)
+        }
+        AttachmentCommands::AddLink(a) => {
+            handle_add_link(a, dry_run, force_asset_id, config, ctx, out)
+        }
     }
 }
 
@@ -49,6 +68,8 @@ struct UploadResult {
     status: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    primary: Option<bool>,
 }
 
 /// Normalized attachment input from `--attach` or `--attach-url`.
@@ -456,16 +477,33 @@ pub fn build_attachment_dry_run(
     remote_name: &str,
     source_label: &str,
 ) -> DryRunRequest {
+    build_attachment_dry_run_with_primary(base_url, item_id, remote_name, source_label, false)
+}
+
+/// Build a redacted dry-run preview for uploading an attachment to `item_id` with optional `primary`.
+pub fn build_attachment_dry_run_with_primary(
+    base_url: &str,
+    item_id: &str,
+    remote_name: &str,
+    source_label: &str,
+    primary: bool,
+) -> DryRunRequest {
     let mime = mime_guess::from_path(remote_name).first_or_octet_stream();
+    let mut body = json!({
+        "name": remote_name,
+        "mimeType": mime.essence_str(),
+        "file": source_label,
+    });
+    if primary {
+        if let Some(obj) = body.as_object_mut() {
+            obj.insert("primary".to_string(), json!(true));
+        }
+    }
     HomeboxClient::build_dry_run(
         base_url,
         "POST",
         &format!("entities/{item_id}/attachments"),
-        Some(json!({
-            "name": remote_name,
-            "mimeType": mime.essence_str(),
-            "file": source_label,
-        })),
+        Some(body),
     )
 }
 
@@ -616,6 +654,7 @@ fn validate_custom_name(raw: &str) -> Result<String> {
 fn handle_upload(
     args: &AttachmentUploadArgs,
     dry_run: bool,
+    force_asset_id: bool,
     config: &AppConfig,
     ctx: &OutputContext,
     out: &mut dyn Write,
@@ -634,6 +673,11 @@ fn handle_upload(
     if total_sources == 0 {
         return Err(HbctlError::InvalidInput(
             "specify at least one file or --attach-url".to_string(),
+        ));
+    }
+    if args.primary && total_sources > 1 {
+        return Err(HbctlError::InvalidInput(
+            "--primary can only be used when uploading a single file or URL".to_string(),
         ));
     }
 
@@ -723,11 +767,12 @@ fn handle_upload(
         let previews: Vec<DryRunRequest> = prepared
             .iter()
             .map(|item| {
-                build_attachment_dry_run(
+                build_attachment_dry_run_with_primary(
                     base_url,
                     &args.item_id,
                     &item.remote_name,
                     &item.source_label,
+                    args.primary,
                 )
             })
             .collect();
@@ -735,7 +780,8 @@ fn handle_upload(
     }
 
     let client = HomeboxClient::from_config(config)?;
-    let existing_entity = client.get_entity(&args.item_id)?;
+    let item_id = client.resolve_entity_id(&args.item_id, force_asset_id)?;
+    let existing_entity = client.get_entity(&item_id)?;
     let mut existing_attachments = existing_entity.attachments;
 
     let mut results = Vec::new();
@@ -758,6 +804,7 @@ fn handle_upload(
                             file: item.remote_name,
                             status: "skipped".to_string(),
                             id: Some(prev.id.clone()),
+                            primary: None,
                         });
                         continue;
                     }
@@ -779,6 +826,7 @@ fn handle_upload(
                             file: item.remote_name,
                             status: "skipped".to_string(),
                             id: Some(prev.id.clone()),
+                            primary: None,
                         });
                         continue;
                     }
@@ -802,6 +850,7 @@ fn handle_upload(
                                 file: name.clone(),
                                 status: "skipped".to_string(),
                                 id: Some(prev.id.clone()),
+                                primary: None,
                             });
                             continue;
                         }
@@ -829,6 +878,7 @@ fn handle_upload(
                             file: resolved_name,
                             status: "skipped".to_string(),
                             id: Some(prev.id.clone()),
+                            primary: None,
                         });
                         continue;
                     }
@@ -868,22 +918,24 @@ fn handle_upload(
                     file: prepared_img.remote_name,
                     status: "skipped".to_string(),
                     id: Some(prev_id.clone()),
+                    primary: None,
                 });
                 continue;
             }
-            client.delete_attachment(&args.item_id, prev_id)?;
+            client.delete_attachment(&item_id, prev_id)?;
             existing_attachments.retain(|a| a.id != *prev_id);
         } else if let Some(ref prev_id) = orig_existing_id {
             if args.overwrite {
-                client.delete_attachment(&args.item_id, prev_id)?;
+                client.delete_attachment(&item_id, prev_id)?;
                 existing_attachments.retain(|a| a.id != *prev_id);
             }
         }
 
-        let uploaded = client.upload_attachment_bytes(
-            &args.item_id,
+        let uploaded = client.upload_attachment_bytes_with_primary(
+            &item_id,
             &prepared_img.remote_name,
             prepared_img.bytes,
+            args.primary,
         )?;
         existing_attachments.push(uploaded.clone());
         uploaded_ids.push(uploaded.id.clone());
@@ -891,6 +943,7 @@ fn handle_upload(
             file: prepared_img.remote_name,
             status: "uploaded".to_string(),
             id: Some(uploaded.id),
+            primary: args.primary.then_some(true),
         });
     }
 
@@ -917,12 +970,14 @@ fn handle_upload(
 
 fn handle_list(
     args: &AttachmentListArgs,
+    force_asset_id: bool,
     config: &AppConfig,
     ctx: &OutputContext,
     out: &mut dyn Write,
 ) -> Result<()> {
     let client = HomeboxClient::from_config(config)?;
-    let entity = client.get_entity(&args.item_id)?;
+    let item_id = client.resolve_entity_id(&args.item_id, force_asset_id)?;
+    let entity = client.get_entity(&item_id)?;
     let attachments = entity.attachments;
 
     if ctx.quiet {
@@ -1057,6 +1112,7 @@ fn disambiguate_download_paths(
 fn handle_download(
     args: &AttachmentDownloadArgs,
     dry_run: bool,
+    force_asset_id: bool,
     config: &AppConfig,
     ctx: &OutputContext,
     out: &mut dyn Write,
@@ -1077,7 +1133,8 @@ fn handle_download(
 
     let client = HomeboxClient::from_config(config)?;
     let entities: Vec<Entity> = if let Some(ref item_id) = args.item_id {
-        vec![client.get_entity(item_id)?]
+        let resolved_id = client.resolve_entity_id(item_id, force_asset_id)?;
+        vec![client.get_entity(&resolved_id)?]
     } else if args.all_items {
         let summary = client.list_entities(&ListEntitiesQuery::default(), true)?;
         client.hydrate_entity_attachments(summary)?
@@ -1091,7 +1148,8 @@ fn handle_download(
         let summary = client.list_entities(&query, true)?;
         client.hydrate_entity_attachments(summary)?
     } else if let Some(ref items_path) = args.items_from {
-        let ids = read_item_ids(items_path)?;
+        let raw_ids = read_item_ids(items_path)?;
+        let ids = client.resolve_entity_ids(&raw_ids, force_asset_id)?;
         client.get_entities_by_ids(&ids)?
     } else {
         unreachable!("validated single-item or bulk selector above");
@@ -1247,6 +1305,7 @@ fn handle_download(
 fn handle_delete(
     args: &AttachmentDeleteArgs,
     dry_run: bool,
+    force_asset_id: bool,
     config: &AppConfig,
     ctx: &OutputContext,
     out: &mut dyn Write,
@@ -1266,14 +1325,15 @@ fn handle_delete(
     }
 
     let client = HomeboxClient::from_config(config)?;
-    client.delete_attachment(&args.item_id, &args.attachment_id)?;
+    let item_id = client.resolve_entity_id(&args.item_id, force_asset_id)?;
+    client.delete_attachment(&item_id, &args.attachment_id)?;
 
     if ctx.quiet {
         return write_quiet_ids(std::slice::from_ref(&args.attachment_id), out);
     }
     if ctx.format == OutputFormat::Json {
         return write_compact_json(
-            &json!({ "itemId": args.item_id, "id": args.attachment_id, "deleted": true }),
+            &json!({ "itemId": item_id, "id": args.attachment_id, "deleted": true }),
             ctx.select.as_deref(),
             out,
         );
@@ -1281,9 +1341,269 @@ fn handle_delete(
     writeln!(
         out,
         "Deleted attachment {} from item {}",
-        args.attachment_id, args.item_id
+        args.attachment_id, item_id
     )?;
     Ok(())
+}
+
+fn render_single_attachment(
+    att: &Attachment,
+    ctx: &OutputContext,
+    out: &mut dyn Write,
+) -> Result<()> {
+    if ctx.quiet {
+        return write_quiet_ids(std::slice::from_ref(&att.id), out);
+    }
+    if ctx.format == OutputFormat::Json {
+        return write_compact_json(att, ctx.select.as_deref(), out);
+    }
+    if let Some(ref select) = ctx.select {
+        return write_selected_table(std::slice::from_ref(att), select, ctx.format, out);
+    }
+
+    let headers = vec![
+        "ID".to_string(),
+        "NAME".to_string(),
+        "TYPE".to_string(),
+        "PRIMARY".to_string(),
+    ];
+    let rows = vec![vec![
+        att.id.clone(),
+        att.effective_name().unwrap_or("").to_string(),
+        att.attachment_type.clone().unwrap_or_default(),
+        att.primary.unwrap_or(false).to_string(),
+    ]];
+    write_table_or_plain(&headers, &rows, ctx.format, out)
+}
+
+fn handle_set_primary(
+    args: &AttachmentSetPrimaryArgs,
+    dry_run: bool,
+    force_asset_id: bool,
+    config: &AppConfig,
+    ctx: &OutputContext,
+    out: &mut dyn Write,
+) -> Result<()> {
+    if dry_run {
+        let base_url = config.require_base_url()?;
+        let preview = HomeboxClient::build_dry_run(
+            base_url,
+            "PUT",
+            &format!(
+                "entities/{}/attachments/{}",
+                args.item_id, args.attachment_id
+            ),
+            Some(json!({ "type": "photo", "primary": true })),
+        );
+        return write_dry_run(&[preview], ctx, out);
+    }
+
+    let client = HomeboxClient::from_config(config)?;
+    let item_id = client.resolve_entity_id(&args.item_id, force_asset_id)?;
+    let entity = client.get_entity(&item_id)?;
+    let existing = entity
+        .attachments
+        .iter()
+        .find(|a| a.id == args.attachment_id)
+        .ok_or_else(|| HbctlError::NotFound {
+            kind: "attachment".to_string(),
+            query: args.attachment_id.clone(),
+        })?;
+
+    let req = UpdateAttachmentRequest {
+        title: existing.title.clone().or_else(|| existing.name.clone()),
+        attachment_type: existing
+            .attachment_type
+            .clone()
+            .filter(|s| !s.trim().is_empty())
+            .or_else(|| Some("photo".to_string())),
+        primary: Some(true),
+    };
+    let updated = client.update_attachment(&item_id, &args.attachment_id, &req)?;
+    render_single_attachment(&updated, ctx, out)
+}
+
+fn handle_update(
+    args: &AttachmentUpdateArgs,
+    dry_run: bool,
+    force_asset_id: bool,
+    config: &AppConfig,
+    ctx: &OutputContext,
+    out: &mut dyn Write,
+) -> Result<()> {
+    if args.title.is_none() && args.attachment_type.is_none() && args.primary.is_none() {
+        return Err(HbctlError::InvalidInput(
+            "provide at least one of --title, --type, or --primary".to_string(),
+        ));
+    }
+
+    let title_override = match args.title {
+        Some(ref raw) => {
+            let trimmed = raw.trim();
+            if trimmed.is_empty() {
+                return Err(HbctlError::InvalidInput(
+                    "--title cannot be empty".to_string(),
+                ));
+            }
+            Some(trimmed.to_string())
+        }
+        None => None,
+    };
+    let type_override = match args.attachment_type {
+        Some(ref raw) => {
+            let trimmed = raw.trim();
+            if trimmed.is_empty() {
+                return Err(HbctlError::InvalidInput(
+                    "--type cannot be empty".to_string(),
+                ));
+            }
+            Some(trimmed.to_string())
+        }
+        None => None,
+    };
+
+    if dry_run {
+        let base_url = config.require_base_url()?;
+        let req = UpdateAttachmentRequest {
+            title: title_override,
+            attachment_type: type_override,
+            primary: args.primary,
+        };
+        let preview = HomeboxClient::build_dry_run(
+            base_url,
+            "PUT",
+            &format!(
+                "entities/{}/attachments/{}",
+                args.item_id, args.attachment_id
+            ),
+            Some(serde_json::to_value(&req)?),
+        );
+        return write_dry_run(&[preview], ctx, out);
+    }
+
+    let client = HomeboxClient::from_config(config)?;
+    let item_id = client.resolve_entity_id(&args.item_id, force_asset_id)?;
+    let entity = client.get_entity(&item_id)?;
+    let existing = entity
+        .attachments
+        .iter()
+        .find(|a| a.id == args.attachment_id)
+        .ok_or_else(|| HbctlError::NotFound {
+            kind: "attachment".to_string(),
+            query: args.attachment_id.clone(),
+        })?;
+
+    let req = UpdateAttachmentRequest {
+        title: title_override
+            .or_else(|| existing.title.clone())
+            .or_else(|| existing.name.clone()),
+        attachment_type: type_override
+            .or_else(|| existing.attachment_type.clone())
+            .or_else(|| Some("attachment".to_string())),
+        primary: args.primary.or(existing.primary).or(Some(false)),
+    };
+    let updated = client.update_attachment(&item_id, &args.attachment_id, &req)?;
+    render_single_attachment(&updated, ctx, out)
+}
+
+fn handle_add_link(
+    args: &AttachmentAddLinkArgs,
+    dry_run: bool,
+    force_asset_id: bool,
+    config: &AppConfig,
+    ctx: &OutputContext,
+    out: &mut dyn Write,
+) -> Result<()> {
+    let url_trimmed = args.link.trim();
+    if url_trimmed.is_empty() {
+        return Err(HbctlError::InvalidInput(
+            "external link URL cannot be empty".to_string(),
+        ));
+    }
+    let parsed = url::Url::parse(url_trimmed).map_err(|e| {
+        HbctlError::InvalidInput(format!("invalid external link URL '{url_trimmed}': {e}"))
+    })?;
+    if !matches!(parsed.scheme(), "http" | "https")
+        || parsed.host_str().is_none()
+        || !parsed.username().is_empty()
+        || parsed.password().is_some()
+    {
+        return Err(HbctlError::InvalidInput(format!(
+            "invalid external link URL '{url_trimmed}': expected http(s) URL with host and no userinfo"
+        )));
+    }
+
+    let title = match args.title {
+        Some(ref raw) => {
+            let trimmed = raw.trim();
+            if trimmed.is_empty() {
+                return Err(HbctlError::InvalidInput(
+                    "--title cannot be empty".to_string(),
+                ));
+            }
+            Some(trimmed.to_string())
+        }
+        None => None,
+    };
+    let attachment_type = match args.attachment_type {
+        Some(ref raw) => {
+            let trimmed = raw.trim();
+            if trimmed.is_empty() {
+                return Err(HbctlError::InvalidInput(
+                    "--type cannot be empty".to_string(),
+                ));
+            }
+            Some(trimmed.to_string())
+        }
+        None => None,
+    };
+
+    let req = CreateExternalAttachmentRequest {
+        source_type: "link".to_string(),
+        external_id: url_trimmed.to_string(),
+        title,
+        attachment_type,
+    };
+
+    if dry_run {
+        let base_url = config.require_base_url()?;
+        let preview = HomeboxClient::build_dry_run(
+            base_url,
+            "POST",
+            &format!("entities/{}/attachments/external", args.item_id),
+            Some(serde_json::to_value(&req)?),
+        );
+        return write_dry_run(&[preview], ctx, out);
+    }
+
+    let client = HomeboxClient::from_config(config)?;
+    let item_id = client.resolve_entity_id(&args.item_id, force_asset_id)?;
+    let created = client.create_external_attachment(&item_id, &req)?;
+
+    if ctx.quiet {
+        return write_quiet_ids(std::slice::from_ref(&created.id), out);
+    }
+    if ctx.format == OutputFormat::Json {
+        return write_compact_json(&created, ctx.select.as_deref(), out);
+    }
+    if let Some(ref select) = ctx.select {
+        return write_selected_table(std::slice::from_ref(&created), select, ctx.format, out);
+    }
+
+    let headers = vec![
+        "ID".to_string(),
+        "NAME".to_string(),
+        "MIME".to_string(),
+        "TYPE".to_string(),
+    ];
+    let effective_name = created.effective_name().unwrap_or("").to_string();
+    let rows = vec![vec![
+        created.id,
+        effective_name,
+        created.mime_type.unwrap_or_default(),
+        created.attachment_type.unwrap_or_default(),
+    ]];
+    write_table_or_plain(&headers, &rows, ctx.format, out)
 }
 
 fn matches_download_filters(

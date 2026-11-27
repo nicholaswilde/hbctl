@@ -162,7 +162,7 @@ NEVER commit or stage `.env`, `.hbctl.toml`, API keys (`hb_*`), Bearer tokens, o
 - `src/config.rs` — layered config (`CLI > env/.env > .hbctl.toml > ~/.config/hbctl/config.toml & stored auth > defaults`)
 - `src/error.rs` — typed `HbctlError` (`thiserror`)
 - `src/client/` — `mod.rs` (HTTP client, URL/auth normalization, redaction, `GET -> Merge -> PUT`, follow-up `PUT`, streaming downloads), `models.rs` (Homebox v0.26+ serde types with Go-`null` tolerance), `resolve.rs` (tag/entity-type resolution)
-- `src/commands/` — `mod.rs`, `auth.rs`, `item.rs`, `attachment.rs`, `search.rs`, `field.rs`, `tag.rs`, `entity_type.rs`, `export.rs`
+- `src/commands/` — `mod.rs`, `auth.rs`, `item.rs`, `attachment.rs`, `search.rs`, `field.rs`, `tag.rs`, `entity_type.rs`, `export.rs`, `backup.rs`
 - `src/dedup.rs` — two-pass exact + Jaccard duplicate detector and keeper selector
 - `src/output.rs` — table, compact JSON (`--select`), plain, CSV, Markdown renderers (`stdout` data / `stderr` diagnostics)
 - `src/update.rs` — GitHub release self-updater (`hbctl update` / `hbctl self-update`)

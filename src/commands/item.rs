@@ -12,10 +12,10 @@ use crate::cli::{
 };
 use crate::client::models::{
     entity_warranty_expiring_within, format_breadcrumb, normalize_json_aliases, parse_bool_loose,
-    today_utc_days, upsert_custom_fields, CreateEntityRequest, CustomField, Entity, EntityPatch,
-    FieldValueType,
+    today_utc_days, upsert_custom_fields, BarcodeProduct, CreateEntityRequest, CustomField, Entity,
+    EntityPatch, FieldValueType,
 };
-use crate::client::resolve::Resolver;
+use crate::client::resolve::{is_asset_id_like, Resolver};
 use crate::client::{DryRunRequest, HomeboxClient, ListEntitiesQuery};
 use crate::commands::attachment::{
     attach_targets_to_item, build_target_dry_run, parse_local_attachment_spec,
@@ -36,6 +36,7 @@ use crate::output::{
 pub fn handle(
     args: &ItemArgs,
     dry_run: bool,
+    force_asset_id: bool,
     config: &AppConfig,
     ctx: &OutputContext,
     out: &mut dyn Write,
@@ -43,16 +44,18 @@ pub fn handle(
 ) -> Result<()> {
     match &args.command {
         ItemCommands::List(a) => handle_list(a, config, ctx, out),
-        ItemCommands::Get(a) => handle_get(a, config, ctx, out),
+        ItemCommands::Get(a) => handle_get(a, force_asset_id, config, ctx, out),
         ItemCommands::Create(a) => handle_create(a, dry_run, config, ctx, out, err),
-        ItemCommands::Update(a) => handle_update(a, dry_run, config, ctx, out, err),
+        ItemCommands::Update(a) => handle_update(a, dry_run, force_asset_id, config, ctx, out, err),
         ItemCommands::Upsert(a) => handle_upsert(a, dry_run, config, ctx, out, err),
-        ItemCommands::Delete(a) => handle_delete(a, dry_run, config, ctx, out, err),
+        ItemCommands::Delete(a) => handle_delete(a, dry_run, force_asset_id, config, ctx, out, err),
         ItemCommands::Import(a) => handle_import(a, dry_run, config, ctx, out, err),
         ItemCommands::Dedup(a) => handle_dedup(a, dry_run, config, ctx, out, err),
-        ItemCommands::Move(a) => handle_move(a, dry_run, config, ctx, out, err),
-        ItemCommands::Duplicate(a) => handle_duplicate(a, dry_run, config, ctx, out),
-        ItemCommands::Path(a) => handle_path(a, config, ctx, out),
+        ItemCommands::Move(a) => handle_move(a, dry_run, force_asset_id, config, ctx, out, err),
+        ItemCommands::Duplicate(a) => {
+            handle_duplicate(a, dry_run, force_asset_id, config, ctx, out)
+        }
+        ItemCommands::Path(a) => handle_path(a, force_asset_id, config, ctx, out),
         ItemCommands::Tree(a) => handle_tree(a, config, ctx, out),
     }
 }
@@ -122,14 +125,16 @@ fn handle_list(
 
 fn handle_get(
     args: &ItemGetArgs,
+    force_asset_id: bool,
     config: &AppConfig,
     ctx: &OutputContext,
     out: &mut dyn Write,
 ) -> Result<()> {
     let client = HomeboxClient::from_config(config)?;
-    let entity = client.get_entity(&args.id)?;
+    let id = client.resolve_entity_id(&args.id, force_asset_id)?;
+    let entity = client.get_entity(&id)?;
     if args.with_path {
-        let path = client.get_entity_path(&args.id)?;
+        let path = client.get_entity_path(&id)?;
         return render_entity_with_path(&entity, &path, ctx, out);
     }
     render_entity(&entity, ctx, out)
@@ -632,6 +637,56 @@ fn append_alias_and_cli_fields(
     Ok(())
 }
 
+fn apply_barcode_prefill(parsed: &mut ParsedItemInput, product: &BarcodeProduct) {
+    let name_empty = parsed
+        .name
+        .as_deref()
+        .map(str::trim)
+        .unwrap_or("")
+        .is_empty();
+    if name_empty {
+        if let Some(name) = product.effective_name() {
+            parsed.name = Some(name.to_string());
+        }
+    }
+
+    let desc_empty = parsed
+        .description
+        .as_deref()
+        .map(str::trim)
+        .unwrap_or("")
+        .is_empty();
+    if desc_empty {
+        if let Some(desc) = product.effective_description() {
+            parsed.description = Some(desc.to_string());
+        }
+    }
+
+    let has_non_empty_field = |fields: &[CustomField], name: &str| {
+        fields.iter().any(|f| {
+            f.name.trim().eq_ignore_ascii_case(name) && !f.display_value().trim().is_empty()
+        })
+    };
+
+    if !has_non_empty_field(&parsed.fields, "Manufacturer") {
+        if let Some(manufacturer) = product.effective_manufacturer() {
+            if let Ok(cf) =
+                CustomField::new_typed("Manufacturer", FieldValueType::Text, manufacturer)
+            {
+                upsert_custom_fields(&mut parsed.fields, &[cf]);
+            }
+        }
+    }
+
+    if !has_non_empty_field(&parsed.fields, "Model Number") {
+        if let Some(model) = product.effective_model_number() {
+            if let Ok(cf) = CustomField::new_typed("Model Number", FieldValueType::Text, model) {
+                upsert_custom_fields(&mut parsed.fields, &[cf]);
+            }
+        }
+    }
+}
+
 fn handle_create(
     args: &ItemCreateArgs,
     dry_run: bool,
@@ -640,6 +695,21 @@ fn handle_create(
     out: &mut dyn Write,
     err: &mut dyn Write,
 ) -> Result<()> {
+    let barcode_code = args
+        .from_barcode
+        .as_deref()
+        .map(|raw| {
+            let trimmed = raw.trim();
+            if trimmed.is_empty() {
+                Err(HbctlError::InvalidInput(
+                    "--from-barcode cannot be empty".to_string(),
+                ))
+            } else {
+                Ok(trimmed.to_string())
+            }
+        })
+        .transpose()?;
+
     let mut parsed = if let Some(ref src) = args.from_json {
         let raw_text = read_file_or_stdin(src)?;
         let val: Value = serde_json::from_str(&raw_text)?;
@@ -705,18 +775,29 @@ fn handle_create(
         validate_attachment_targets(&parsed.attachments, att_opts, err)?;
     }
 
-    let name = parsed
-        .name
-        .clone()
-        .filter(|s| !s.trim().is_empty())
-        .ok_or_else(|| {
-            HbctlError::InvalidInput(
-                "item name is required (pass --name or provide in --from-json)".into(),
-            )
-        })?;
-
     if dry_run {
         let base_url = config.require_base_url()?;
+        let mut previews = Vec::new();
+        if let Some(ref code) = barcode_code {
+            previews.push(HomeboxClient::build_api_dry_run(
+                base_url,
+                "GET",
+                "products/search-from-barcode",
+                &[("productEAN".to_string(), code.clone())],
+                None,
+            )?);
+        }
+        let name = parsed
+            .name
+            .clone()
+            .filter(|s| !s.trim().is_empty())
+            .or_else(|| barcode_code.as_ref().map(|c| format!("<from-barcode:{c}>")))
+            .ok_or_else(|| {
+                HbctlError::InvalidInput(
+                    "item name is required (pass --name, --from-barcode, or provide in --from-json)"
+                        .into(),
+                )
+            })?;
         let req_payload = CreateEntityRequest {
             name,
             description: parsed.description.clone(),
@@ -738,12 +819,12 @@ fn handle_create(
             sold_notes: parsed.sold_notes.clone(),
             fields: parsed.fields.clone(),
         };
-        let mut previews = vec![HomeboxClient::build_dry_run(
+        previews.push(HomeboxClient::build_dry_run(
             base_url,
             "POST",
             "entities",
             Some(serde_json::to_value(&req_payload)?),
-        )];
+        ));
         if req_payload.needs_followup_put() {
             let mut put_body = Map::new();
             if !parsed.fields.is_empty() {
@@ -766,6 +847,30 @@ fn handle_create(
     }
 
     let client = HomeboxClient::from_config(config)?;
+    if let Some(ref code) = barcode_code {
+        let products = client.search_barcode(code)?;
+        let product = products
+            .iter()
+            .find(|p| p.effective_name().is_some())
+            .or_else(|| products.first())
+            .ok_or_else(|| HbctlError::NotFound {
+                kind: "barcode product".to_string(),
+                query: code.clone(),
+            })?;
+        apply_barcode_prefill(&mut parsed, product);
+    }
+
+    let name = parsed
+        .name
+        .clone()
+        .filter(|s| !s.trim().is_empty())
+        .ok_or_else(|| {
+            HbctlError::InvalidInput(
+                "item name is required (pass --name, --from-barcode, or provide in --from-json)"
+                    .into(),
+            )
+        })?;
+
     let mut resolver = Resolver::new(&client);
 
     let tag_ids = resolver.resolve_tag_ids(&parsed.tags, true)?;
@@ -834,6 +939,7 @@ fn handle_create(
 fn handle_update(
     args: &ItemUpdateArgs,
     dry_run: bool,
+    force_asset_id: bool,
     config: &AppConfig,
     ctx: &OutputContext,
     out: &mut dyn Write,
@@ -962,7 +1068,13 @@ fn handle_update(
     }
 
     let client = HomeboxClient::from_config(config)?;
-    let resolved = resolve_bulk_targets(&selector, Some(&client), config)?;
+    let mut resolved = resolve_bulk_targets(&selector, Some(&client), config)?;
+    if !resolved.ids.is_empty() {
+        resolved.ids = client.resolve_entity_ids(&resolved.ids, force_asset_id)?;
+        resolved.is_bulk = selector.items_from.is_some()
+            || selector.has_remote_filters()
+            || resolved.ids.len() != 1;
+    }
 
     if resolved.ids.is_empty() {
         if ctx.quiet {
@@ -1533,6 +1645,7 @@ fn handle_upsert(
 fn handle_delete(
     args: &ItemDeleteArgs,
     dry_run: bool,
+    force_asset_id: bool,
     config: &AppConfig,
     ctx: &OutputContext,
     out: &mut dyn Write,
@@ -1559,13 +1672,29 @@ fn handle_delete(
         return write_dry_run(&previews, ctx, out);
     }
 
-    let (resolved, client_opt) = if selector.has_remote_filters() {
+    let (mut resolved, client_opt) = if selector.has_remote_filters() {
         let client = HomeboxClient::from_config(config)?;
         let resolved = resolve_bulk_targets(&selector, Some(&client), config)?;
         (resolved, Some(client))
     } else {
         let resolved = resolve_bulk_targets(&selector, None, config)?;
         (resolved, None)
+    };
+
+    let needs_asset_resolution = !resolved.ids.is_empty()
+        && (force_asset_id || resolved.ids.iter().any(|id| is_asset_id_like(id)));
+    let client_opt = if needs_asset_resolution {
+        let client = match client_opt {
+            Some(c) => c,
+            None => HomeboxClient::from_config(config)?,
+        };
+        resolved.ids = client.resolve_entity_ids(&resolved.ids, force_asset_id)?;
+        resolved.is_bulk = selector.items_from.is_some()
+            || selector.has_remote_filters()
+            || resolved.ids.len() != 1;
+        Some(client)
+    } else {
+        client_opt
     };
 
     if resolved.ids.is_empty() {
@@ -2240,6 +2369,7 @@ fn log_move_result(
 fn handle_move(
     args: &ItemMoveArgs,
     dry_run: bool,
+    force_asset_id: bool,
     config: &AppConfig,
     ctx: &OutputContext,
     out: &mut dyn Write,
@@ -2278,7 +2408,13 @@ fn handle_move(
     }
 
     let client = HomeboxClient::from_config(config)?;
-    let resolved = resolve_bulk_targets(&selector, Some(&client), config)?;
+    let mut resolved = resolve_bulk_targets(&selector, Some(&client), config)?;
+    if !resolved.ids.is_empty() {
+        resolved.ids = client.resolve_entity_ids(&resolved.ids, force_asset_id)?;
+        resolved.is_bulk = selector.items_from.is_some()
+            || selector.has_remote_filters()
+            || resolved.ids.len() != 1;
+    }
 
     if resolved.ids.is_empty() {
         if ctx.quiet {
@@ -2378,6 +2514,7 @@ fn handle_move(
 fn handle_duplicate(
     args: &ItemDuplicateArgs,
     dry_run: bool,
+    force_asset_id: bool,
     config: &AppConfig,
     ctx: &OutputContext,
     out: &mut dyn Write,
@@ -2404,9 +2541,10 @@ fn handle_duplicate(
     }
 
     let client = HomeboxClient::from_config(config)?;
+    let id = client.resolve_entity_id(&args.id, force_asset_id)?;
     let mut created = Vec::with_capacity(args.count);
     for _ in 0..args.count {
-        created.push(client.duplicate_entity(&args.id)?);
+        created.push(client.duplicate_entity(&id)?);
     }
 
     if created.len() == 1 {
@@ -2418,12 +2556,14 @@ fn handle_duplicate(
 
 fn handle_path(
     args: &ItemPathArgs,
+    force_asset_id: bool,
     config: &AppConfig,
     ctx: &OutputContext,
     out: &mut dyn Write,
 ) -> Result<()> {
     let client = HomeboxClient::from_config(config)?;
-    let entries = client.get_entity_path(&args.id)?;
+    let id = client.resolve_entity_id(&args.id, force_asset_id)?;
+    let entries = client.get_entity_path(&id)?;
     let breadcrumb = format_breadcrumb(&entries);
 
     if ctx.quiet {
@@ -2434,7 +2574,7 @@ fn handle_path(
     if ctx.format == OutputFormat::Json {
         return write_compact_json(
             &json!({
-                "id": args.id,
+                "id": id,
                 "breadcrumb": breadcrumb,
                 "path": entries,
             }),
@@ -3038,5 +3178,61 @@ mod tests {
         assert_eq!(cyclic_tree.len(), 1);
         assert_eq!(cyclic_tree[0].children.len(), 1);
         assert!(cyclic_tree[0].children[0].children.is_empty());
+    }
+
+    #[test]
+    fn test_apply_barcode_prefill_respects_overrides() {
+        let product = BarcodeProduct {
+            barcode: "5035048748428".into(),
+            manufacturer: "DeWalt".into(),
+            model_number: "DCD771".into(),
+            item: crate::client::models::BarcodeItem {
+                name: "20V Max Drill".into(),
+                description: "Cordless drill driver".into(),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        // 1. Empty input gets all fields prefilled
+        let mut empty = ParsedItemInput::default();
+        apply_barcode_prefill(&mut empty, &product);
+        assert_eq!(empty.name.as_deref(), Some("20V Max Drill"));
+        assert_eq!(empty.description.as_deref(), Some("Cordless drill driver"));
+        let field_val = |fields: &[CustomField], name: &str| {
+            fields
+                .iter()
+                .find(|f| f.name.eq_ignore_ascii_case(name))
+                .map(CustomField::display_value)
+        };
+        assert_eq!(
+            field_val(&empty.fields, "Manufacturer").as_deref(),
+            Some("DeWalt")
+        );
+        assert_eq!(
+            field_val(&empty.fields, "Model Number").as_deref(),
+            Some("DCD771")
+        );
+
+        // 2. Explicit CLI overrides win over barcode values
+        let mut overridden = ParsedItemInput {
+            name: Some("Custom Drill Name".into()),
+            description: Some("Shop drill".into()),
+            fields: vec![
+                CustomField::new_typed("manufacturer", FieldValueType::Text, "Milwaukee").unwrap(),
+            ],
+            ..Default::default()
+        };
+        apply_barcode_prefill(&mut overridden, &product);
+        assert_eq!(overridden.name.as_deref(), Some("Custom Drill Name"));
+        assert_eq!(overridden.description.as_deref(), Some("Shop drill"));
+        assert_eq!(
+            field_val(&overridden.fields, "Manufacturer").as_deref(),
+            Some("Milwaukee")
+        );
+        assert_eq!(
+            field_val(&overridden.fields, "Model Number").as_deref(),
+            Some("DCD771")
+        );
     }
 }

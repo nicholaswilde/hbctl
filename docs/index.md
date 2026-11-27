@@ -6,7 +6,7 @@
 [![task](https://img.shields.io/badge/Task-Enabled-brightgreen?style=for-the-badge&logo=task&logoColor=white)](https://taskfile.dev/#/)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg?style=for-the-badge)](https://github.com/nicholaswilde/hbctl/blob/main/LICENSE)
 
-A fast, zero-dependency, agent-friendly Rust CLI client for interacting with remote Homebox v0.26+ instances over the REST API. Centralizes inventory CRUD, upsert, bulk import, deduplication, multi-file attachment management, typed custom fields, tag/entity-type resolution, and filtered exports.
+A fast, zero-dependency, agent-friendly Rust CLI client for interacting with remote [Homebox][2] v0.26+ instances over the REST API. Centralizes inventory CRUD, upsert, bulk operations and import, deduplication, attachment management, maintenance logs, statistics, templates, barcode lookup, labels/QR codes, notifiers, filtered exports, and portable full-inventory backups.
 
 !!! warning
     This project is currently in a `v0.X.X` development stage. Features and configurations are subject to change, and breaking changes may be introduced at any time.
@@ -77,6 +77,14 @@ hbctl attachment download <ITEM_ID> --all --ext pdf --out ./manuals
 # Export filtered Markdown table
 hbctl export --tag electronics --field Manufacturer --field Voltage --format markdown
 
+# Inspect inventory stats, maintenance, and effective config
+hbctl stats overview --warranty-days 30
+hbctl maintenance list --status scheduled
+hbctl config show
+
+# Create a portable .tar.gz full-inventory backup
+hbctl backup --out ./homebox-backup.tar.gz
+
 # Check for or install the latest GitHub release
 hbctl update --check
 ```
@@ -99,3 +107,4 @@ This project was started in 2026 by [Nicholas Wilde].
 
 [Nicholas Wilde]: https://github.com/nicholaswilde/
 [1]: https://github.com/nicholaswilde/hbctl/blob/main/LICENSE
+[2]: https://homebox.software/

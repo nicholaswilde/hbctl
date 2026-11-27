@@ -39,7 +39,9 @@ hbctl auth logout
 
 ## :shield: Secret Redaction & Dry-Run Safety
 
-- **`Bearer ***` Masking:** `hbctl auth status`, `--dry-run` request previews, and HTTP diagnostics always redact the `Authorization` header to `Bearer ***`.
+- **`Bearer ***` Masking:** `hbctl auth status`, `hbctl config show`, `--dry-run` request previews, and HTTP diagnostics always redact the `Authorization` header to `Bearer ***`.
+- **Notifier URL Redaction:** `hbctl notifier list` and `hbctl notifier test` mask embedded Shoutrrr tokens, passwords, and query credentials unless `--reveal` is explicitly passed on `notifier list`.
+- **Portable Backup Sanitization:** `hbctl backup` strips URL userinfo from `sourceUrl` and never writes API keys or tokens into `manifest.json`.
 - **Diagnostic Scrubbing:** Error handlers pass messages through `redact_secret` so accidental occurrences of the active API key or JWT are replaced with `***` before printing to `stderr`.
 - **Safe Mutation Preview:** Prefix any mutating command (`item create`, `item update`, `item upsert`, `item delete`, `attachment upload`, `tag create`, etc.) with `--dry-run` to inspect the HTTP method, target URL, redacted headers, and JSON body without modifying Homebox.
 

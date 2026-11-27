@@ -175,6 +175,8 @@ pub fn write_table_or_plain(
             writeln!(out, "{}", serde_json::to_string(&objects)?)?;
             Ok(())
         }
+        OutputFormat::Csv => write_csv(headers, rows, out),
+        OutputFormat::Markdown => write_markdown_table(headers, rows, out),
     }
 }
 
@@ -537,5 +539,32 @@ mod tests {
         )
         .unwrap();
         assert_eq!(String::from_utf8(csv_buf).unwrap(), "A,B\n1,2\n");
+
+        // write_table_or_plain with Csv and Markdown
+        let mut csv_tbl = Vec::new();
+        write_table_or_plain(
+            &["METRIC".into(), "VALUE".into()],
+            &[vec!["totalItems".into(), "42".into()]],
+            OutputFormat::Csv,
+            &mut csv_tbl,
+        )
+        .unwrap();
+        assert_eq!(
+            String::from_utf8(csv_tbl).unwrap(),
+            "METRIC,VALUE\ntotalItems,42\n"
+        );
+
+        let mut md_tbl = Vec::new();
+        write_table_or_plain(
+            &["METRIC".into(), "VALUE".into()],
+            &[vec!["totalItems".into(), "42".into()]],
+            OutputFormat::Markdown,
+            &mut md_tbl,
+        )
+        .unwrap();
+        assert_eq!(
+            String::from_utf8(md_tbl).unwrap(),
+            "| METRIC | VALUE |\n| --- | --- |\n| totalItems | 42 |\n"
+        );
     }
 }

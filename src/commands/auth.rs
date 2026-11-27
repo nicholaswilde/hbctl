@@ -8,7 +8,7 @@ use crate::auth_store::{credential_account_key, AutoSecretStore, SecretStore, To
 use crate::cli::{AuthArgs, AuthCommands, AuthLoginArgs, AuthLogoutArgs, AuthRefreshArgs};
 use crate::client::HomeboxClient;
 use crate::config::{
-    default_user_config_path, normalize_base_url, redact_auth_header, AppConfig, ConfigFile,
+    normalize_base_url, redact_auth_header, resolve_config_target_path, AppConfig, ConfigFile,
     OutputFormat, ProfileConfig,
 };
 use crate::error::{HbctlError, Result};
@@ -72,15 +72,6 @@ fn update_config_auth_metadata(
         cfg_file.expires_at = expires_at.map(ToOwned::to_owned);
         cfg_file.credential_backend = Some(backend.to_string());
     }
-}
-
-fn resolve_config_target_path(explicit: Option<&PathBuf>) -> Result<PathBuf> {
-    if let Some(p) = explicit {
-        return Ok(p.clone());
-    }
-    default_user_config_path().ok_or_else(|| {
-        HbctlError::Config("unable to determine ~/.config/hbctl/config.toml path".into())
-    })
 }
 
 fn read_stdin_trimmed() -> Result<String> {

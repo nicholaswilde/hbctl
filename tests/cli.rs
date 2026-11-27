@@ -7710,3 +7710,2333 @@ fn test_item_path_and_with_path_for_get_and_search() {
     m_search_list.assert();
     m_search_path.assert();
 }
+
+#[test]
+fn test_wave3_asset_id_resolution_across_commands() {
+    if !can_execute_binary() {
+        return;
+    }
+    let mut server = Server::new();
+    let dir = tempdir().unwrap();
+
+    let asset_body = r#"{"items":[{"id":"uuid-item-1","name":"Oscilloscope","assetId":"000-001","quantity":1}],"page":1,"pageSize":50,"total":1}"#;
+    let entity_body = r#"{
+        "id":"uuid-item-1",
+        "name":"Oscilloscope",
+        "assetId":"000-001",
+        "quantity":1,
+        "fields":[{"name":"Bandwidth","type":"text","value":"100MHz","textValue":"100MHz"}],
+        "attachments":[{"id":"att-1","title":"manual.pdf","mimeType":"application/pdf","type":"manual","primary":false}]
+    }"#;
+
+    // Auto-detected asset ID `000-001` across item, field, and attachment commands:
+    let m_asset = server
+        .mock("GET", "/api/v1/assets/000-001")
+        .with_status(200)
+        .with_body(asset_body)
+        .expect(10)
+        .create();
+    let m_get = server
+        .mock("GET", "/api/v1/entities/uuid-item-1")
+        .with_status(200)
+        .with_body(entity_body)
+        .expect(6)
+        .create();
+    let m_put = server
+        .mock("PUT", "/api/v1/entities/uuid-item-1")
+        .with_status(200)
+        .with_body(entity_body)
+        .expect(3)
+        .create();
+    let m_path = server
+        .mock("GET", "/api/v1/entities/uuid-item-1/path")
+        .with_status(200)
+        .with_body(r#"[{"id":"loc-1","name":"Lab"},{"id":"uuid-item-1","name":"Oscilloscope"}]"#)
+        .expect(1)
+        .create();
+    let m_dup = server
+        .mock("POST", "/api/v1/entities/uuid-item-1/duplicate")
+        .with_status(201)
+        .with_body(r#"{"id":"uuid-item-2","name":"Oscilloscope","quantity":1,"fields":[]}"#)
+        .expect(1)
+        .create();
+    let m_del_ent = server
+        .mock("DELETE", "/api/v1/entities/uuid-item-1")
+        .with_status(204)
+        .expect(1)
+        .create();
+    let m_att_dl = server
+        .mock("GET", "/api/v1/entities/uuid-item-1/attachments/att-1")
+        .with_status(200)
+        .with_body(b"PDFDATA")
+        .expect(1)
+        .create();
+    let m_att_del = server
+        .mock("DELETE", "/api/v1/entities/uuid-item-1/attachments/att-1")
+        .with_status(204)
+        .expect(1)
+        .create();
+
+    // 1. item get / update / path / duplicate / move / delete
+    hbctl(&server.url())
+        .args(["--json", "item", "get", "000-001"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"id\":\"uuid-item-1\""));
+
+    hbctl(&server.url())
+        .args([
+            "--json",
+            "item",
+            "update",
+            "000-001",
+            "--description",
+            "Bench scope",
+        ])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"id\":\"uuid-item-1\""));
+
+    hbctl(&server.url())
+        .args(["--json", "item", "path", "000-001"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Lab > Oscilloscope"));
+
+    hbctl(&server.url())
+        .args(["--json", "item", "duplicate", "000-001"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"id\":\"uuid-item-2\""));
+
+    hbctl(&server.url())
+        .args(["--json", "item", "move", "000-001", "none"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"id\":\"uuid-item-1\""));
+
+    hbctl(&server.url())
+        .args(["--json", "item", "delete", "000-001", "-y"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"id\":\"uuid-item-1\""));
+
+    // 2. field list / get / set / delete
+    hbctl(&server.url())
+        .args(["--json", "field", "list", "000-001"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Bandwidth"));
+
+    hbctl(&server.url())
+        .args(["--json", "field", "set", "000-001", "Voltage", "12V"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Voltage"));
+
+    // 3. attachment list / download / delete
+    let dl_path = dir.path().join("manual.pdf");
+    hbctl(&server.url())
+        .args([
+            "--json",
+            "attachment",
+            "download",
+            "000-001",
+            "att-1",
+            "--out",
+            dl_path.to_str().unwrap(),
+        ])
+        .assert()
+        .success();
+    assert_eq!(fs::read(&dl_path).unwrap(), b"PDFDATA");
+
+    hbctl(&server.url())
+        .args(["--json", "attachment", "delete", "000-001", "att-1"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"itemId\":\"uuid-item-1\""));
+
+    m_asset.assert();
+    m_get.assert();
+    m_put.assert();
+    m_path.assert();
+    m_dup.assert();
+    m_del_ent.assert();
+    m_att_dl.assert();
+    m_att_del.assert();
+
+    // 4. Forced --asset-id on non-numeric ID + 0-match & ambiguous error paths
+    let m_forced = server
+        .mock("GET", "/api/v1/assets/A-99")
+        .with_status(200)
+        .with_body(r#"{"id":"uuid-item-1","name":"Oscilloscope","quantity":1}"#)
+        .expect(1)
+        .create();
+    let m_get_forced = server
+        .mock("GET", "/api/v1/entities/uuid-item-1")
+        .with_status(200)
+        .with_body(entity_body)
+        .expect(1)
+        .create();
+    hbctl(&server.url())
+        .args(["--asset-id", "--json", "field", "get", "A-99", "Bandwidth"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("100MHz"));
+    m_forced.assert();
+    m_get_forced.assert();
+
+    let m_empty = server
+        .mock("GET", "/api/v1/assets/999-999")
+        .with_status(200)
+        .with_body(r#"{"items":[]}"#)
+        .expect(1)
+        .create();
+    hbctl(&server.url())
+        .args(["item", "get", "999-999"])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("asset not found"));
+    m_empty.assert();
+
+    let m_ambig = server
+        .mock("GET", "/api/v1/assets/000-002")
+        .with_status(200)
+        .with_body(r#"{"items":[{"id":"u1","name":"A","quantity":1},{"id":"u2","name":"B","quantity":1}]}"#)
+        .expect(1)
+        .create();
+    hbctl(&server.url())
+        .args(["item", "get", "000-002"])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("matched 2 items"));
+    m_ambig.assert();
+}
+
+#[test]
+fn test_wave3_label_qr_and_actions() {
+    if !can_execute_binary() {
+        return;
+    }
+    let mut server = Server::new();
+    let dir = tempdir().unwrap();
+
+    // 1. label: item download, asset auto-detect, location kind, stdout '-', --print, overwrite guard
+    let png_bytes = b"\x89PNG\r\n\x1a\nLABEL";
+    let m_label_item = server
+        .mock("GET", "/api/v1/labelmaker/item/ent-1")
+        .with_status(200)
+        .with_header("content-type", "image/png")
+        .with_body(png_bytes)
+        .expect(1)
+        .create();
+    let item_label = dir.path().join("item.png");
+    let lbl_out = hbctl(&server.url())
+        .args([
+            "--json",
+            "label",
+            "ent-1",
+            "--out",
+            item_label.to_str().unwrap(),
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let lbl_json: Value = serde_json::from_slice(&lbl_out).unwrap();
+    assert_eq!(lbl_json["kind"], "item");
+    assert_eq!(lbl_json["bytes"], png_bytes.len());
+    assert_eq!(fs::read(&item_label).unwrap(), png_bytes);
+    m_label_item.assert();
+
+    // Overwrite guard when file exists
+    let m_label_overwrite = server
+        .mock("GET", "/api/v1/labelmaker/item/ent-1")
+        .with_status(200)
+        .with_header("content-type", "image/png")
+        .with_body(png_bytes)
+        .expect(2)
+        .create();
+    hbctl(&server.url())
+        .args(["label", "ent-1", "--out", item_label.to_str().unwrap()])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("already exists"));
+    hbctl(&server.url())
+        .args([
+            "label",
+            "ent-1",
+            "--out",
+            item_label.to_str().unwrap(),
+            "--overwrite",
+        ])
+        .assert()
+        .success();
+    m_label_overwrite.assert();
+
+    // Asset auto-detect and stdout '-'
+    let m_label_asset = server
+        .mock("GET", "/api/v1/labelmaker/asset/000-042")
+        .with_status(200)
+        .with_header("content-type", "image/png")
+        .with_body(b"ASSET_LABEL")
+        .expect(1)
+        .create();
+    hbctl(&server.url())
+        .args(["label", "#000-042", "--out", "-"])
+        .assert()
+        .success()
+        .stdout(predicate::eq(&b"ASSET_LABEL"[..]));
+    m_label_asset.assert();
+
+    // Location --print
+    let m_label_print = server
+        .mock("GET", "/api/v1/labelmaker/location/loc-9")
+        .match_query(Matcher::UrlEncoded("print".into(), "true".into()))
+        .with_status(200)
+        .with_body("Printed!")
+        .expect(1)
+        .create();
+    let print_out = hbctl(&server.url())
+        .args(["--json", "label", "loc-9", "--kind", "location", "--print"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let print_val: Value = serde_json::from_slice(&print_out).unwrap();
+    assert_eq!(print_val["kind"], "location");
+    assert_eq!(print_val["printed"], true);
+    assert_eq!(print_val["message"], "Printed!");
+    m_label_print.assert();
+
+    // label --dry-run
+    let dry_label: Value = serde_json::from_slice(
+        &hbctl("http://127.0.0.1:1")
+            .args(["--dry-run", "--json", "label", "000-001", "--print"])
+            .assert()
+            .success()
+            .get_output()
+            .stdout,
+    )
+    .unwrap();
+    assert_eq!(dry_label[0]["method"], "GET");
+    assert_eq!(
+        dry_label[0]["url"],
+        "http://127.0.0.1:1/api/v1/labelmaker/asset/000-001?print=true"
+    );
+    assert_eq!(dry_label[0]["headers"]["Authorization"], "Bearer ***");
+
+    // 2. qr: item URL, asset URL, --raw, stdout '-', --dry-run
+    let expected_item_data = format!("{}/item/ent-1", server.url());
+    let m_qr_item = server
+        .mock("GET", "/api/v1/qrcode")
+        .match_query(Matcher::UrlEncoded(
+            "data".into(),
+            expected_item_data.clone(),
+        ))
+        .with_status(200)
+        .with_header("content-type", "image/jpeg")
+        .with_body(b"JPGQR")
+        .expect(1)
+        .create();
+    let qr_file = dir.path().join("item.jpg");
+    let qr_out = hbctl(&server.url())
+        .args(["--json", "qr", "ent-1", "--out", qr_file.to_str().unwrap()])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let qr_json: Value = serde_json::from_slice(&qr_out).unwrap();
+    assert_eq!(qr_json["data"], expected_item_data);
+    assert_eq!(fs::read(&qr_file).unwrap(), b"JPGQR");
+    m_qr_item.assert();
+
+    let expected_asset_data = format!("{}/a/000-007", server.url());
+    let m_qr_asset = server
+        .mock("GET", "/api/v1/qrcode")
+        .match_query(Matcher::UrlEncoded("data".into(), expected_asset_data))
+        .with_status(200)
+        .with_header("content-type", "image/jpeg")
+        .with_body(b"ASSETQR")
+        .expect(1)
+        .create();
+    hbctl(&server.url())
+        .args(["qr", "000-007", "-o", "-"])
+        .assert()
+        .success()
+        .stdout(predicate::eq(&b"ASSETQR"[..]));
+    m_qr_asset.assert();
+
+    let m_qr_raw = server
+        .mock("GET", "/api/v1/qrcode")
+        .match_query(Matcher::UrlEncoded("data".into(), "custom-payload".into()))
+        .with_status(200)
+        .with_header("content-type", "image/jpeg")
+        .with_body(b"RAWQR")
+        .expect(1)
+        .create();
+    hbctl(&server.url())
+        .args(["qr", "custom-payload", "--raw", "-o", "-"])
+        .assert()
+        .success()
+        .stdout(predicate::eq(&b"RAWQR"[..]));
+    m_qr_raw.assert();
+
+    let dry_qr: Value = serde_json::from_slice(
+        &hbctl("http://127.0.0.1:1")
+            .args(["--dry-run", "--json", "qr", "000-001"])
+            .assert()
+            .success()
+            .get_output()
+            .stdout,
+    )
+    .unwrap();
+    assert_eq!(dry_qr[0]["method"], "GET");
+    assert_eq!(
+        dry_qr[0]["url"],
+        "http://127.0.0.1:1/api/v1/qrcode?data=http%3A%2F%2F127.0.0.1%3A1%2Fa%2F000-001"
+    );
+
+    // 3. actions ensure-asset-ids & create-missing-thumbnails
+    let m_act_assets = server
+        .mock("POST", "/api/v1/actions/ensure-asset-ids")
+        .with_status(200)
+        .with_body(r#"{"completed":7}"#)
+        .expect(1)
+        .create();
+    let act1_out = hbctl(&server.url())
+        .args(["--json", "actions", "ensure-asset-ids"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let act1_val: Value = serde_json::from_slice(&act1_out).unwrap();
+    assert_eq!(act1_val["action"], "ensure-asset-ids");
+    assert_eq!(act1_val["completed"], 7);
+    m_act_assets.assert();
+
+    let m_act_thumbs = server
+        .mock("POST", "/api/v1/actions/create-missing-thumbnails")
+        .with_status(200)
+        .with_body(r#"{"completed":3}"#)
+        .expect(1)
+        .create();
+    hbctl(&server.url())
+        .args(["-q", "actions", "create-missing-thumbnails"])
+        .assert()
+        .success()
+        .stdout(predicate::eq("3\n"));
+    m_act_thumbs.assert();
+
+    let dry_act: Value = serde_json::from_slice(
+        &hbctl("http://127.0.0.1:1")
+            .args(["--dry-run", "--json", "actions", "ensure-asset-ids"])
+            .assert()
+            .success()
+            .get_output()
+            .stdout,
+    )
+    .unwrap();
+    assert_eq!(dry_act[0]["method"], "POST");
+    assert_eq!(
+        dry_act[0]["url"],
+        "http://127.0.0.1:1/api/v1/actions/ensure-asset-ids"
+    );
+    assert_eq!(dry_act[0]["headers"]["Authorization"], "Bearer ***");
+}
+
+#[test]
+fn test_wave3_attachment_primary_update_and_add_link() {
+    if !can_execute_binary() {
+        return;
+    }
+    let mut server = Server::new();
+    let dir = tempdir().unwrap();
+
+    let photo = dir.path().join("front.jpg");
+    fs::write(&photo, b"fake-jpeg").unwrap();
+    let doc = dir.path().join("doc.pdf");
+    fs::write(&doc, b"fake-pdf").unwrap();
+
+    // 1. upload --primary rejects multiple files
+    hbctl(&server.url())
+        .args([
+            "attachment",
+            "upload",
+            "ent-1",
+            photo.to_str().unwrap(),
+            doc.to_str().unwrap(),
+            "--primary",
+        ])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("--primary can only be used"));
+
+    // 2. upload --primary dry-run & live multipart check
+    let dry_up: Value = serde_json::from_slice(
+        &hbctl("http://127.0.0.1:1")
+            .args([
+                "--dry-run",
+                "--json",
+                "attachment",
+                "upload",
+                "ent-1",
+                photo.to_str().unwrap(),
+                "--primary",
+            ])
+            .assert()
+            .success()
+            .get_output()
+            .stdout,
+    )
+    .unwrap();
+    assert_eq!(dry_up[0]["body"]["primary"], true);
+
+    let m_get_up = server
+        .mock("GET", "/api/v1/entities/ent-1")
+        .with_status(200)
+        .with_body(r#"{"id":"ent-1","name":"Camera","quantity":1,"attachments":[]}"#)
+        .expect(1)
+        .create();
+    let m_post_up = server
+        .mock("POST", "/api/v1/entities/ent-1/attachments")
+        .match_body(Matcher::AllOf(vec![
+            Matcher::Regex(r#"name="primary""#.into()),
+            Matcher::Regex(r#"true"#.into()),
+            Matcher::Regex(r#"front\.jpg"#.into()),
+        ]))
+        .with_status(201)
+        .with_body(r#"{"id":"att-new","title":"front.jpg","mimeType":"image/jpeg","type":"photo","primary":true}"#)
+        .expect(1)
+        .create();
+    let up_out = hbctl(&server.url())
+        .args([
+            "--json",
+            "attachment",
+            "upload",
+            "ent-1",
+            photo.to_str().unwrap(),
+            "--primary",
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let up_val: Value = serde_json::from_slice(&up_out).unwrap();
+    assert_eq!(up_val[0]["status"], "uploaded");
+    assert_eq!(up_val[0]["primary"], true);
+    m_get_up.assert();
+    m_post_up.assert();
+
+    // 3. set-primary (GET -> Merge -> PUT) + missing attachment error + dry-run
+    let entity_with_atts = r#"{
+        "id":"ent-1",
+        "name":"Camera",
+        "quantity":1,
+        "attachments":[
+            {"id":"att-1","title":"Side View","mimeType":"image/jpeg","type":"photo","primary":true},
+            {"id":"att-2","title":"Front View","mimeType":"image/jpeg","type":"photo","primary":false}
+        ]
+    }"#;
+    let m_get_sp = server
+        .mock("GET", "/api/v1/entities/ent-1")
+        .with_status(200)
+        .with_body(entity_with_atts)
+        .expect(2)
+        .create();
+    let m_put_sp = server
+        .mock("PUT", "/api/v1/entities/ent-1/attachments/att-2")
+        .match_body(Matcher::AllOf(vec![
+            Matcher::Regex(r#""title":"Front View""#.into()),
+            Matcher::Regex(r#""type":"photo""#.into()),
+            Matcher::Regex(r#""primary":true"#.into()),
+        ]))
+        .with_status(200)
+        .with_body(r#"{"id":"att-2","title":"Front View","type":"photo","primary":true}"#)
+        .expect(1)
+        .create();
+    let sp_out = hbctl(&server.url())
+        .args(["--json", "attachment", "set-primary", "ent-1", "att-2"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let sp_val: Value = serde_json::from_slice(&sp_out).unwrap();
+    assert_eq!(sp_val["id"], "att-2");
+    assert_eq!(sp_val["primary"], true);
+
+    hbctl(&server.url())
+        .args(["attachment", "set-primary", "ent-1", "att-missing"])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("attachment not found"));
+    m_get_sp.assert();
+    m_put_sp.assert();
+
+    let dry_sp: Value = serde_json::from_slice(
+        &hbctl("http://127.0.0.1:1")
+            .args([
+                "--dry-run",
+                "--json",
+                "attachment",
+                "set-primary",
+                "ent-1",
+                "att-2",
+            ])
+            .assert()
+            .success()
+            .get_output()
+            .stdout,
+    )
+    .unwrap();
+    assert_eq!(dry_sp[0]["method"], "PUT");
+    assert_eq!(
+        dry_sp[0]["url"],
+        "http://127.0.0.1:1/api/v1/entities/ent-1/attachments/att-2"
+    );
+    assert_eq!(dry_sp[0]["body"]["primary"], true);
+
+    // 4. attachment update: validation + GET -> Merge -> PUT preserving existing fields + dry-run
+    hbctl(&server.url())
+        .args(["attachment", "update", "ent-1", "att-2"])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("provide at least one"));
+
+    let m_get_upd = server
+        .mock("GET", "/api/v1/entities/ent-1")
+        .with_status(200)
+        .with_body(entity_with_atts)
+        .expect(1)
+        .create();
+    let m_put_upd = server
+        .mock("PUT", "/api/v1/entities/ent-1/attachments/att-1")
+        .match_body(Matcher::AllOf(vec![
+            Matcher::Regex(r#""title":"Renamed Side""#.into()),
+            Matcher::Regex(r#""type":"photo""#.into()),
+            Matcher::Regex(r#""primary":true"#.into()),
+        ]))
+        .with_status(200)
+        .with_body(r#"{"id":"att-1","title":"Renamed Side","type":"photo","primary":true}"#)
+        .expect(1)
+        .create();
+    let upd_out = hbctl(&server.url())
+        .args([
+            "--json",
+            "attachment",
+            "update",
+            "ent-1",
+            "att-1",
+            "--title",
+            "Renamed Side",
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let upd_val: Value = serde_json::from_slice(&upd_out).unwrap();
+    assert_eq!(upd_val["title"], "Renamed Side");
+    m_get_upd.assert();
+    m_put_upd.assert();
+
+    let dry_upd: Value = serde_json::from_slice(
+        &hbctl("http://127.0.0.1:1")
+            .args([
+                "--dry-run",
+                "--json",
+                "attachment",
+                "update",
+                "ent-1",
+                "att-1",
+                "--type",
+                "manual",
+                "--primary=false",
+            ])
+            .assert()
+            .success()
+            .get_output()
+            .stdout,
+    )
+    .unwrap();
+    assert_eq!(dry_upd[0]["method"], "PUT");
+    assert_eq!(dry_upd[0]["body"]["type"], "manual");
+    assert_eq!(dry_upd[0]["body"]["primary"], false);
+
+    // 5. attachment add-link: validation, dry-run, live POST /external
+    hbctl(&server.url())
+        .args([
+            "attachment",
+            "add-link",
+            "ent-1",
+            "ftp://example.com/manual.pdf",
+        ])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("expected http(s) URL"));
+
+    hbctl(&server.url())
+        .args([
+            "attachment",
+            "add-link",
+            "ent-1",
+            "https://user:pass@example.com/manual.pdf",
+        ])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("no userinfo"));
+
+    let dry_link: Value = serde_json::from_slice(
+        &hbctl("http://127.0.0.1:1")
+            .args([
+                "--dry-run",
+                "--json",
+                "attachment",
+                "add-link",
+                "ent-1",
+                "https://example.com/manual.pdf",
+                "--title",
+                "Online Manual",
+                "--type",
+                "manual",
+            ])
+            .assert()
+            .success()
+            .get_output()
+            .stdout,
+    )
+    .unwrap();
+    assert_eq!(dry_link[0]["method"], "POST");
+    assert_eq!(
+        dry_link[0]["url"],
+        "http://127.0.0.1:1/api/v1/entities/ent-1/attachments/external"
+    );
+    assert_eq!(dry_link[0]["body"]["source_type"], "link");
+    assert_eq!(
+        dry_link[0]["body"]["external_id"],
+        "https://example.com/manual.pdf"
+    );
+    assert_eq!(dry_link[0]["body"]["title"], "Online Manual");
+    assert_eq!(dry_link[0]["body"]["attachment_type"], "manual");
+
+    let m_post_link = server
+        .mock("POST", "/api/v1/entities/ent-1/attachments/external")
+        .match_body(Matcher::AllOf(vec![
+            Matcher::Regex(r#""source_type":"link""#.into()),
+            Matcher::Regex(r#""external_id":"https://example\.com/manual\.pdf""#.into()),
+            Matcher::Regex(r#""title":"Online Manual""#.into()),
+            Matcher::Regex(r#""attachment_type":"manual""#.into()),
+        ]))
+        .with_status(201)
+        .with_body(r#"{"id":"ent-1","name":"Camera","quantity":1,"attachments":[{"id":"att-link-1","title":"Online Manual","mimeType":"link/url","type":"manual"}]}"#)
+        .expect(1)
+        .create();
+    let link_out = hbctl(&server.url())
+        .args([
+            "--json",
+            "attachment",
+            "add-link",
+            "ent-1",
+            "https://example.com/manual.pdf",
+            "--title",
+            "Online Manual",
+            "--type",
+            "manual",
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let link_val: Value = serde_json::from_slice(&link_out).unwrap();
+    assert_eq!(link_val["id"], "att-link-1");
+    assert_eq!(link_val["mimeType"], "link/url");
+    m_post_link.assert();
+}
+
+fn hbctl_bare_with_xdg(xdg_dir: &std::path::Path) -> Command {
+    let mut cmd = Command::new(env!("CARGO_BIN_EXE_hbctl"));
+    for var in [
+        "HBCTL_URL",
+        "HBCTL_API_KEY",
+        "HBCTL_OUTPUT",
+        "HBCTL_CONFIG",
+        "HBCTL_PROFILE",
+        "HOMEBOX_URL",
+        "HOMEBOX_IP",
+        "HOMEBOX_API_KEY",
+    ] {
+        cmd.env_remove(var);
+    }
+    cmd.env("XDG_CONFIG_HOME", xdg_dir)
+        .env("HBCTL_INSECURE_STORAGE", "1");
+    cmd
+}
+
+fn ymd_from_unix_days(days: i64) -> String {
+    let z = days + 719_468;
+    let era = z.div_euclid(146_097);
+    let doe = (z - era * 146_097) as u64;
+    let yoe = (doe - doe / 1460 + doe / 36524 - doe / 146_096) / 365;
+    let y = (yoe as i64) + era * 400;
+    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+    let mp = (5 * doy + 2) / 153;
+    let d = doy - (153 * mp + 2) / 5 + 1;
+    let m = if mp < 10 { mp + 3 } else { mp - 9 };
+    let year = y + i64::from(m <= 2);
+    format!("{year:04}-{m:02}-{d:02}")
+}
+
+#[test]
+fn test_stats_overview_breakdowns_and_output_formats() {
+    if !can_execute_binary() {
+        return;
+    }
+    let mut server = Server::new();
+
+    let m_overview = server
+        .mock("GET", "/api/v1/groups/statistics")
+        .with_status(200)
+        .with_body(
+            json!({
+                "totalItems": 42,
+                "totalItemPrice": 1234.50,
+                "totalLocations": 4,
+                "totalTags": 7,
+                "totalUsers": 2,
+                "totalWithWarranty": 9
+            })
+            .to_string(),
+        )
+        .expect(7)
+        .create();
+
+    let m_sched = server
+        .mock("GET", "/api/v1/maintenance")
+        .match_query(Matcher::UrlEncoded("status".into(), "scheduled".into()))
+        .with_status(200)
+        .with_body(r#"[{"id":"m-1","name":"Filter"},{"id":"m-2","name":"Battery"}]"#)
+        .expect(7)
+        .create();
+
+    let today = hbctl::client::models::today_utc_days();
+    let soon_date = ymd_from_unix_days(today + 10);
+    let later_date = ymd_from_unix_days(today + 90);
+
+    let m_entities = server
+        .mock("GET", "/api/v1/entities")
+        .match_query(Matcher::Any)
+        .with_status(200)
+        .with_body(
+            json!([
+                {
+                    "id": "ent-1",
+                    "name": "Laptop",
+                    "quantity": 1,
+                    "purchasePrice": 1000.0,
+                    "entityType": { "id": "et-item", "name": "Item", "isLocation": false },
+                    "warrantyExpires": soon_date,
+                    "lifetimeWarranty": false,
+                    "fields": []
+                },
+                {
+                    "id": "ent-2",
+                    "name": "Multimeter",
+                    "quantity": 1,
+                    "purchasePrice": 234.50,
+                    "entityType": { "id": "et-item", "name": "Item", "isLocation": false },
+                    "warrantyExpires": later_date,
+                    "lifetimeWarranty": false,
+                    "fields": []
+                },
+                {
+                    "id": "ent-3",
+                    "name": "Garage",
+                    "quantity": 1,
+                    "entityType": { "id": "et-loc", "name": "Location", "isLocation": true },
+                    "fields": []
+                }
+            ])
+            .to_string(),
+        )
+        .expect(2)
+        .create();
+
+    // 1. Overview in table, json (--select), plain, csv, markdown, md alias, quiet, warranty-days
+    hbctl(&server.url())
+        .args(["stats"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("totalItems"))
+        .stdout(predicate::str::contains("1234.50"))
+        .stdout(predicate::str::contains("upcomingMaintenance"));
+
+    let ov_json: Value = serde_json::from_slice(
+        &hbctl(&server.url())
+            .args([
+                "--json",
+                "--select",
+                "totalItems,upcomingMaintenance",
+                "stats",
+            ])
+            .assert()
+            .success()
+            .get_output()
+            .stdout,
+    )
+    .unwrap();
+    assert_eq!(ov_json["totalItems"], 42);
+    assert_eq!(ov_json["upcomingMaintenance"], 2);
+    assert!(ov_json.get("totalUsers").is_none());
+
+    hbctl(&server.url())
+        .args(["--output", "plain", "stats"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("totalItems\t42\n"));
+
+    hbctl(&server.url())
+        .args(["--output", "csv", "stats"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("METRIC,VALUE\ntotalItems,42\n"));
+
+    hbctl(&server.url())
+        .args(["--output", "markdown", "stats"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(
+            "| METRIC | VALUE |\n| --- | --- |\n",
+        ));
+
+    hbctl(&server.url())
+        .args(["--output", "md", "-q", "stats"])
+        .assert()
+        .success()
+        .stdout(predicate::eq("42\n"));
+
+    let ov_warranty: Value = serde_json::from_slice(
+        &hbctl(&server.url())
+            .args(["--json", "stats", "--warranty-days", "30"])
+            .assert()
+            .success()
+            .get_output()
+            .stdout,
+    )
+    .unwrap();
+    assert_eq!(ov_warranty["warrantyExpiringDays"], 30);
+    assert_eq!(ov_warranty["warrantyExpiring"], 1);
+
+    // Dry-run overview
+    let dry_ov: Value = serde_json::from_slice(
+        &hbctl("http://127.0.0.1:1")
+            .args(["--dry-run", "--json", "stats", "--warranty-days", "30"])
+            .assert()
+            .success()
+            .get_output()
+            .stdout,
+    )
+    .unwrap();
+    assert_eq!(dry_ov.as_array().unwrap().len(), 3);
+    assert_eq!(
+        dry_ov[0]["url"],
+        "http://127.0.0.1:1/api/v1/groups/statistics"
+    );
+
+    // 2. Tags (populated + Go null)
+    let m_tags = server
+        .mock("GET", "/api/v1/groups/statistics/tags")
+        .with_status(200)
+        .with_body(r#"[{"id":"tag-1","name":"Tools","total":550.25}]"#)
+        .expect(1)
+        .create();
+    hbctl(&server.url())
+        .args(["--output", "csv", "stats", "tags"])
+        .assert()
+        .success()
+        .stdout(predicate::eq("ID,NAME,TOTAL\ntag-1,Tools,550.25\n"));
+    m_tags.assert();
+
+    let m_tags_null = server
+        .mock("GET", "/api/v1/groups/statistics/tags")
+        .with_status(200)
+        .with_body("null")
+        .expect(1)
+        .create();
+    let tags_null: Value = serde_json::from_slice(
+        &hbctl(&server.url())
+            .args(["--json", "stats", "tags"])
+            .assert()
+            .success()
+            .get_output()
+            .stdout,
+    )
+    .unwrap();
+    assert_eq!(tags_null, json!([]));
+    m_tags_null.assert();
+
+    // 3. Locations
+    let m_locs = server
+        .mock("GET", "/api/v1/groups/statistics/locations")
+        .with_status(200)
+        .with_body(r#"[{"id":"loc-1","name":"Garage","total":999.0}]"#)
+        .expect(1)
+        .create();
+    hbctl(&server.url())
+        .args(["stats", "locations"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Garage"))
+        .stdout(predicate::str::contains("999.00"));
+    m_locs.assert();
+
+    // 4. Entity types breakdown
+    let m_types = server
+        .mock("GET", "/api/v1/entity-types")
+        .with_status(200)
+        .with_body(
+            json!([
+                { "id": "et-item", "name": "Item", "isLocation": false },
+                { "id": "et-loc", "name": "Location", "isLocation": true }
+            ])
+            .to_string(),
+        )
+        .expect(1)
+        .create();
+    let types_json: Value = serde_json::from_slice(
+        &hbctl(&server.url())
+            .args(["--json", "stats", "entity-types"])
+            .assert()
+            .success()
+            .get_output()
+            .stdout,
+    )
+    .unwrap();
+    assert_eq!(types_json[0]["name"], "Item");
+    assert_eq!(types_json[0]["count"], 2);
+    assert_eq!(types_json[0]["totalPrice"], 1234.5);
+    assert_eq!(types_json[1]["name"], "Location");
+    assert_eq!(types_json[1]["isLocation"], true);
+    assert_eq!(types_json[1]["count"], 1);
+    m_types.assert();
+
+    // 5. Purchase price over time + invalid date check
+    let m_pp = server
+        .mock("GET", "/api/v1/groups/statistics/purchase-price")
+        .match_query(Matcher::AllOf(vec![
+            Matcher::UrlEncoded("start".into(), "2026-01-01".into()),
+            Matcher::UrlEncoded("end".into(), "2026-11-27".into()),
+        ]))
+        .with_status(200)
+        .with_body(
+            json!({
+                "valueAtStart": 200.0,
+                "valueAtEnd": 1234.50,
+                "start": "2026-01-01T00:00:00Z",
+                "end": "2026-11-27T00:00:00Z",
+                "entries": [
+                    { "date": "2026-06-15T12:00:00Z", "name": "Laptop", "value": 1000.0 }
+                ]
+            })
+            .to_string(),
+        )
+        .expect(1)
+        .create();
+    hbctl(&server.url())
+        .args([
+            "--output",
+            "markdown",
+            "stats",
+            "purchase-price",
+            "--start",
+            "2026-01-01",
+            "--end",
+            "2026-11-27",
+        ])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(
+            "| 2026-01-01 | (start) | 200.00 |",
+        ))
+        .stdout(predicate::str::contains(
+            "| 2026-06-15 | Laptop | 1000.00 |",
+        ))
+        .stdout(predicate::str::contains("| 2026-11-27 | (end) | 1234.50 |"));
+    m_pp.assert();
+
+    hbctl(&server.url())
+        .args(["stats", "purchase-price", "--start", "not-a-date"])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("expected YYYY-MM-DD"));
+
+    m_overview.assert();
+    m_sched.assert();
+    m_entities.assert();
+}
+
+#[test]
+fn test_config_show_profiles_and_use() {
+    if !can_execute_binary() {
+        return;
+    }
+    let dir = tempdir().unwrap();
+    let xdg_dir = dir.path().join("xdg");
+    let cfg_dir = xdg_dir.join("hbctl");
+    fs::create_dir_all(&cfg_dir).unwrap();
+    let user_cfg = cfg_dir.join("config.toml");
+
+    fs::write(
+        &user_cfg,
+        r#"
+default_profile = "homelab"
+timeout_secs = 45
+
+[profiles.homelab]
+url = "http://homelab.local:7745"
+api_key = "hb_super_secret_homelab_key"
+output = "table"
+
+[profiles.staging]
+url = "http://alice:topsecret@staging.local:7745"
+api_key = "hb_staging_secret_value"
+timeout_secs = 15
+"#,
+    )
+    .unwrap();
+
+    let project_dir = dir.path().join("workspace");
+    fs::create_dir_all(&project_dir).unwrap();
+    fs::write(
+        project_dir.join(".hbctl.toml"),
+        r#"
+[profiles.localdev]
+url = "http://127.0.0.1:7745"
+"#,
+    )
+    .unwrap();
+
+    // 1. config show (table + json) redacts API key and never leaks secret
+    let show_table = hbctl_bare_with_xdg(&xdg_dir)
+        .current_dir(&project_dir)
+        .args(["config", "show"])
+        .assert()
+        .success();
+    show_table
+        .stdout(predicate::str::contains("homelab"))
+        .stdout(predicate::str::contains("Bearer ***"))
+        .stdout(predicate::str::contains("hb_super_secret_homelab_key").not())
+        .stderr(predicate::str::contains("hb_super_secret_homelab_key").not());
+
+    let show_json: Value = serde_json::from_slice(
+        &hbctl_bare_with_xdg(&xdg_dir)
+            .current_dir(&project_dir)
+            .args(["--json", "config", "show"])
+            .assert()
+            .success()
+            .get_output()
+            .stdout,
+    )
+    .unwrap();
+    assert_eq!(show_json["profile"], "homelab");
+    assert_eq!(show_json["authorization"], "Bearer ***");
+    assert_eq!(show_json["authenticated"], true);
+    assert_eq!(show_json["timeoutSecs"], 45);
+    assert!(!serde_json::to_string(&show_json)
+        .unwrap()
+        .contains("hb_super_secret_homelab_key"));
+
+    // 2. --profile staging redacts URL embedded password and token
+    let staging_out = hbctl_bare_with_xdg(&xdg_dir)
+        .current_dir(&project_dir)
+        .args(["--profile", "staging", "--json", "config", "show"])
+        .assert()
+        .success();
+    let staging_str = String::from_utf8(staging_out.get_output().stdout.clone()).unwrap();
+    assert!(!staging_str.contains("topsecret"));
+    assert!(!staging_str.contains("hb_staging_secret_value"));
+    let staging_val: Value = serde_json::from_str(&staging_str).unwrap();
+    assert_eq!(staging_val["profile"], "staging");
+    assert_eq!(
+        staging_val["url"],
+        "http://alice:***@staging.local:7745/api/v1"
+    );
+    assert_eq!(staging_val["authorization"], "Bearer ***");
+
+    // 3. config profiles (table + json)
+    hbctl_bare_with_xdg(&xdg_dir)
+        .current_dir(&project_dir)
+        .args(["config", "profiles"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("homelab"))
+        .stdout(predicate::str::contains("staging"))
+        .stdout(predicate::str::contains("localdev"))
+        .stdout(predicate::str::contains("topsecret").not());
+
+    let profiles_json: Value = serde_json::from_slice(
+        &hbctl_bare_with_xdg(&xdg_dir)
+            .current_dir(&project_dir)
+            .args(["--json", "config", "profiles"])
+            .assert()
+            .success()
+            .get_output()
+            .stdout,
+    )
+    .unwrap();
+    let arr = profiles_json.as_array().unwrap();
+    assert_eq!(arr.len(), 3);
+    assert_eq!(arr[0]["name"], "homelab");
+    assert_eq!(arr[0]["active"], true);
+    assert_eq!(arr[0]["default"], true);
+    assert_eq!(arr[1]["name"], "localdev");
+    assert_eq!(arr[2]["name"], "staging");
+    assert_eq!(arr[2]["active"], false);
+    assert_eq!(arr[2]["default"], false);
+
+    // 4. config use staging --dry-run does not modify config.toml
+    let before = fs::read_to_string(&user_cfg).unwrap();
+    hbctl_bare_with_xdg(&xdg_dir)
+        .args(["--dry-run", "config", "use", "staging"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(
+            r#"[dry-run] set default_profile = "staging""#,
+        ));
+    assert_eq!(fs::read_to_string(&user_cfg).unwrap(), before);
+
+    // 5. config use staging updates default_profile and preserves profiles
+    let use_json: Value = serde_json::from_slice(
+        &hbctl_bare_with_xdg(&xdg_dir)
+            .args(["--json", "config", "use", "staging"])
+            .assert()
+            .success()
+            .get_output()
+            .stdout,
+    )
+    .unwrap();
+    assert_eq!(use_json["profile"], "staging");
+    assert_eq!(use_json["previousDefault"], "homelab");
+
+    let after_show: Value = serde_json::from_slice(
+        &hbctl_bare_with_xdg(&xdg_dir)
+            .current_dir(&project_dir)
+            .args(["--json", "config", "show"])
+            .assert()
+            .success()
+            .get_output()
+            .stdout,
+    )
+    .unwrap();
+    assert_eq!(after_show["profile"], "staging");
+
+    // 6. config use nonexistent fails cleanly listing available profiles
+    hbctl_bare_with_xdg(&xdg_dir)
+        .args(["config", "use", "nonexistent"])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("not found"))
+        .stderr(predicate::str::contains("available: homelab, staging"));
+}
+
+#[test]
+fn test_template_crud_apply_and_dry_run() {
+    if !can_execute_binary() {
+        return;
+    }
+    let mut server = Server::new();
+
+    // 1. template list
+    let m_list = server
+        .mock("GET", "/api/v1/templates")
+        .match_header("authorization", "Bearer hb_test_secret_token_999")
+        .with_status(200)
+        .with_header("content-type", "application/json")
+        .with_body(
+            json!([{
+                "id": "tpl-1",
+                "name": "Power Tool",
+                "description": "Cordless shop tools",
+                "createdAt": "2026-11-27T00:00:00Z",
+                "updatedAt": "2026-11-27T01:00:00Z"
+            }])
+            .to_string(),
+        )
+        .expect(1)
+        .create();
+
+    hbctl(&server.url())
+        .args(["template", "list"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("tpl-1"))
+        .stdout(predicate::str::contains("Power Tool"));
+    m_list.assert();
+
+    // 2. template get (--json)
+    let m_get = server
+        .mock("GET", "/api/v1/templates/tpl-1")
+        .with_status(200)
+        .with_header("content-type", "application/json")
+        .with_body(
+            json!({
+                "id": "tpl-1",
+                "name": "Power Tool",
+                "description": "Cordless shop tools",
+                "notes": "Store batteries separately",
+                "defaultName": "Cordless Drill",
+                "defaultDescription": "20V Max tool",
+                "defaultQuantity": 1.0,
+                "defaultInsured": true,
+                "defaultManufacturer": "DeWalt",
+                "defaultModelNumber": "DCD771",
+                "defaultLifetimeWarranty": false,
+                "defaultWarrantyDetails": "3-year limited",
+                "defaultLocation": { "id": "loc-garage", "name": "Garage" },
+                "defaultTags": [{ "id": "tag-tools", "name": "Tools" }],
+                "includeWarrantyFields": true,
+                "includePurchaseFields": true,
+                "includeSoldFields": false,
+                "fields": [{ "id": "f-1", "name": "Voltage", "type": "text", "textValue": "20V" }]
+            })
+            .to_string(),
+        )
+        .expect(1)
+        .create();
+
+    let get_json: Value = serde_json::from_slice(
+        &hbctl(&server.url())
+            .args(["--json", "template", "get", "tpl-1"])
+            .assert()
+            .success()
+            .get_output()
+            .stdout,
+    )
+    .unwrap();
+    assert_eq!(get_json["name"], "Power Tool");
+    assert_eq!(get_json["defaultManufacturer"], "DeWalt");
+    m_get.assert();
+
+    // 3. template create --dry-run (no HTTP) + live create
+    hbctl(&server.url())
+        .args([
+            "--dry-run",
+            "template",
+            "create",
+            "--name",
+            "Sensor Kit",
+            "--default-name",
+            "Sensor",
+            "--field",
+            "Voltage=3.3V",
+        ])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("POST"))
+        .stdout(predicate::str::contains("/api/v1/templates"))
+        .stdout(predicate::str::contains("Bearer ***"));
+
+    let m_tags = server
+        .mock("GET", "/api/v1/tags")
+        .with_status(200)
+        .with_body(r#"[{"id":"tag-tools","name":"Tools"}]"#)
+        .expect(1)
+        .create();
+    let m_create = server
+        .mock("POST", "/api/v1/templates")
+        .match_body(Matcher::AllOf(vec![
+            Matcher::PartialJson(json!({
+                "name": "Power Tool",
+                "defaultName": "Cordless Drill",
+                "defaultTagIds": ["tag-tools"]
+            })),
+            Matcher::Regex("\"Voltage\"".to_string()),
+        ]))
+        .with_status(201)
+        .with_body(
+            json!({
+                "id": "tpl-new",
+                "name": "Power Tool",
+                "defaultName": "Cordless Drill",
+                "defaultTags": [{ "id": "tag-tools", "name": "Tools" }],
+                "fields": [{ "name": "Voltage", "type": "text", "textValue": "20V" }]
+            })
+            .to_string(),
+        )
+        .expect(1)
+        .create();
+
+    hbctl(&server.url())
+        .args([
+            "--json",
+            "template",
+            "create",
+            "--name",
+            "Power Tool",
+            "--default-name",
+            "Cordless Drill",
+            "--default-tag",
+            "Tools",
+            "--field",
+            "Voltage=20V",
+        ])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("tpl-new"));
+    m_tags.assert();
+    m_create.assert();
+
+    // 4. template update (GET -> Merge -> PUT preserving existing defaults/fields)
+    let m_upd_get = server
+        .mock("GET", "/api/v1/templates/tpl-1")
+        .with_status(200)
+        .with_body(
+            json!({
+                "id": "tpl-1",
+                "name": "Power Tool",
+                "description": "Cordless shop tools",
+                "defaultName": "Cordless Drill",
+                "defaultQuantity": 1.0,
+                "defaultManufacturer": "DeWalt",
+                "defaultLocation": { "id": "loc-garage", "name": "Garage" },
+                "defaultTags": [{ "id": "tag-tools", "name": "Tools" }],
+                "fields": [{ "id": "f-1", "name": "Voltage", "type": "text", "textValue": "20V" }]
+            })
+            .to_string(),
+        )
+        .expect(1)
+        .create();
+
+    let m_upd_put = server
+        .mock("PUT", "/api/v1/templates/tpl-1")
+        .match_body(Matcher::AllOf(vec![
+            Matcher::PartialJson(json!({
+                "id": "tpl-1",
+                "name": "Power Tool",
+                "defaultName": "Cordless Drill",
+                "defaultModelNumber": "DCD791",
+                "defaultLocationId": "loc-garage",
+                "defaultTagIds": ["tag-tools"]
+            })),
+            Matcher::Regex("\"Voltage\"".to_string()),
+        ]))
+        .with_status(200)
+        .with_body(
+            json!({
+                "id": "tpl-1",
+                "name": "Power Tool",
+                "defaultModelNumber": "DCD791"
+            })
+            .to_string(),
+        )
+        .expect(1)
+        .create();
+
+    hbctl(&server.url())
+        .args(["template", "update", "tpl-1", "--default-model", "DCD791"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("DCD791"));
+    m_upd_get.assert();
+    m_upd_put.assert();
+
+    // 5. template apply (falls back to template defaults + explicit override)
+    let m_apply_get = server
+        .mock("GET", "/api/v1/templates/tpl-1")
+        .with_status(200)
+        .with_body(
+            json!({
+                "id": "tpl-1",
+                "name": "Power Tool",
+                "defaultName": "Cordless Drill",
+                "defaultDescription": "20V Max tool",
+                "defaultLocation": { "id": "loc-garage", "name": "Garage" },
+                "defaultTags": [{ "id": "tag-tools", "name": "Tools" }]
+            })
+            .to_string(),
+        )
+        .expect(1)
+        .create();
+
+    let m_apply_post = server
+        .mock("POST", "/api/v1/templates/tpl-1/create-item")
+        .match_body(Matcher::PartialJson(json!({
+            "name": "Hammer Drill",
+            "description": "20V Max tool",
+            "locationId": "loc-garage",
+            "tagIds": ["tag-tools"],
+            "quantity": 2.0
+        })))
+        .with_status(201)
+        .with_body(
+            json!({
+                "id": "ent-tpl-1",
+                "name": "Hammer Drill",
+                "description": "20V Max tool",
+                "quantity": 2
+            })
+            .to_string(),
+        )
+        .expect(1)
+        .create();
+
+    hbctl(&server.url())
+        .args([
+            "--json",
+            "template",
+            "apply",
+            "tpl-1",
+            "--name",
+            "Hammer Drill",
+            "--quantity",
+            "2",
+        ])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("ent-tpl-1"))
+        .stdout(predicate::str::contains("Hammer Drill"));
+    m_apply_get.assert();
+    m_apply_post.assert();
+
+    // 6. template delete --dry-run and --yes
+    hbctl(&server.url())
+        .args(["--dry-run", "template", "delete", "tpl-1"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("DELETE"))
+        .stdout(predicate::str::contains("/api/v1/templates/tpl-1"));
+
+    let m_del = server
+        .mock("DELETE", "/api/v1/templates/tpl-1")
+        .with_status(204)
+        .expect(1)
+        .create();
+
+    hbctl(&server.url())
+        .args(["--json", "template", "delete", "tpl-1", "--yes"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(r#""deleted":true"#));
+    m_del.assert();
+}
+
+#[test]
+fn test_barcode_lookup_and_item_create_from_barcode() {
+    if !can_execute_binary() {
+        return;
+    }
+    let mut server = Server::new();
+
+    // 1. barcode --dry-run
+    hbctl(&server.url())
+        .args(["--dry-run", "barcode", "5035048748428"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("GET"))
+        .stdout(predicate::str::contains(
+            "/api/v1/products/search-from-barcode?productEAN=5035048748428",
+        ));
+
+    // 2. barcode lookup table + --json
+    let m_lookup = server
+        .mock("GET", "/api/v1/products/search-from-barcode")
+        .match_query(Matcher::UrlEncoded(
+            "productEAN".into(),
+            "5035048748428".into(),
+        ))
+        .with_status(200)
+        .with_header("content-type", "application/json")
+        .with_body(
+            json!([{
+                "search_engine_name": "upcitemdb.com",
+                "barcode": "5035048748428",
+                "manufacturer": "DeWalt",
+                "modelNumber": "DCD771C2",
+                "item": {
+                    "name": "DeWalt 20V MAX Cordless Drill",
+                    "description": "Compact drill/driver kit",
+                    "manufacturer": "DeWalt",
+                    "modelNumber": "DCD771C2",
+                    "quantity": 1
+                }
+            }])
+            .to_string(),
+        )
+        .expect(2)
+        .create();
+
+    hbctl(&server.url())
+        .args(["barcode", "5035048748428"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("DeWalt 20V MAX Cordless Drill"))
+        .stdout(predicate::str::contains("DCD771C2"))
+        .stdout(predicate::str::contains("upcitemdb.com"));
+
+    let bar_json: Value = serde_json::from_slice(
+        &hbctl(&server.url())
+            .args(["--json", "barcode", "5035048748428"])
+            .assert()
+            .success()
+            .get_output()
+            .stdout,
+    )
+    .unwrap();
+    assert_eq!(bar_json[0]["barcode"], "5035048748428");
+    assert_eq!(bar_json[0]["item"]["name"], "DeWalt 20V MAX Cordless Drill");
+    m_lookup.assert();
+
+    // 3. barcode 204 no match -> non-zero exit with clean error
+    let m_not_found = server
+        .mock("GET", "/api/v1/products/search-from-barcode")
+        .match_query(Matcher::UrlEncoded("productEAN".into(), "0000000".into()))
+        .with_status(204)
+        .expect(1)
+        .create();
+
+    hbctl(&server.url())
+        .args(["barcode", "0000000"])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains(
+            "barcode product not found: '0000000'",
+        ));
+    m_not_found.assert();
+
+    // 4. item create --from-barcode prefills missing fields, explicit flags override
+    let m_item_barcode = server
+        .mock("GET", "/api/v1/products/search-from-barcode")
+        .match_query(Matcher::UrlEncoded(
+            "productEAN".into(),
+            "5035048748428".into(),
+        ))
+        .with_status(200)
+        .with_body(
+            json!([{
+                "barcode": "5035048748428",
+                "manufacturer": "DeWalt",
+                "modelNumber": "DCD771C2",
+                "item": {
+                    "name": "DeWalt 20V MAX Cordless Drill",
+                    "description": "Compact drill/driver kit"
+                }
+            }])
+            .to_string(),
+        )
+        .expect(2)
+        .create();
+
+    let m_post_prefill = server
+        .mock("POST", "/api/v1/entities")
+        .match_body(Matcher::PartialJson(json!({
+            "name": "DeWalt 20V MAX Cordless Drill",
+            "description": "Compact drill/driver kit"
+        })))
+        .with_status(201)
+        .with_body(
+            json!({
+                "id": "ent-bar-1",
+                "name": "DeWalt 20V MAX Cordless Drill",
+                "description": "Compact drill/driver kit",
+                "quantity": 1,
+                "fields": []
+            })
+            .to_string(),
+        )
+        .expect(1)
+        .create();
+
+    let m_put_prefill = server
+        .mock("PUT", "/api/v1/entities/ent-bar-1")
+        .match_body(Matcher::AllOf(vec![
+            Matcher::Regex("\"DeWalt\"".to_string()),
+            Matcher::Regex("\"DCD771C2\"".to_string()),
+        ]))
+        .with_status(200)
+        .with_body(
+            json!({
+                "id": "ent-bar-1",
+                "name": "DeWalt 20V MAX Cordless Drill",
+                "description": "Compact drill/driver kit",
+                "quantity": 1,
+                "fields": [
+                    { "name": "Manufacturer", "type": "text", "textValue": "DeWalt" },
+                    { "name": "Model Number", "type": "text", "textValue": "DCD771C2" }
+                ]
+            })
+            .to_string(),
+        )
+        .expect(1)
+        .create();
+
+    hbctl(&server.url())
+        .args([
+            "--json",
+            "item",
+            "create",
+            "--from-barcode",
+            "5035048748428",
+        ])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("ent-bar-1"))
+        .stdout(predicate::str::contains("DeWalt 20V MAX Cordless Drill"));
+    m_post_prefill.assert();
+    m_put_prefill.assert();
+
+    // Explicit overrides beat barcode values
+    let m_post_override = server
+        .mock("POST", "/api/v1/entities")
+        .match_body(Matcher::PartialJson(json!({
+            "name": "Garage Drill",
+            "description": "Primary workbench drill"
+        })))
+        .with_status(201)
+        .with_body(
+            json!({
+                "id": "ent-bar-2",
+                "name": "Garage Drill",
+                "description": "Primary workbench drill",
+                "quantity": 1,
+                "fields": []
+            })
+            .to_string(),
+        )
+        .expect(1)
+        .create();
+
+    let m_put_override = server
+        .mock("PUT", "/api/v1/entities/ent-bar-2")
+        .match_body(Matcher::AllOf(vec![
+            Matcher::Regex("\"Stanley\"".to_string()),
+            Matcher::Regex("\"DCD771C2\"".to_string()),
+        ]))
+        .with_status(200)
+        .with_body(
+            json!({
+                "id": "ent-bar-2",
+                "name": "Garage Drill",
+                "description": "Primary workbench drill",
+                "quantity": 1,
+                "fields": [
+                    { "name": "Manufacturer", "type": "text", "textValue": "Stanley" },
+                    { "name": "Model Number", "type": "text", "textValue": "DCD771C2" }
+                ]
+            })
+            .to_string(),
+        )
+        .expect(1)
+        .create();
+
+    hbctl(&server.url())
+        .args([
+            "--json",
+            "item",
+            "create",
+            "--from-barcode",
+            "5035048748428",
+            "--name",
+            "Garage Drill",
+            "--description",
+            "Primary workbench drill",
+            "--manufacturer",
+            "Stanley",
+        ])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Garage Drill"))
+        .stdout(predicate::str::contains("Stanley"))
+        .stdout(predicate::str::contains("DCD771C2"));
+    m_item_barcode.assert();
+    m_post_override.assert();
+    m_put_override.assert();
+}
+
+#[test]
+fn test_notifier_crud_test_and_redaction() {
+    if !can_execute_binary() {
+        return;
+    }
+    let mut server = Server::new();
+
+    // 1. notifier list (redacted by default, raw with --reveal)
+    let m_list = server
+        .mock("GET", "/api/v1/notifiers")
+        .match_header("authorization", "Bearer hb_test_secret_token_999")
+        .with_status(200)
+        .with_header("content-type", "application/json")
+        .with_body(
+            json!([{
+                "id": "not-1",
+                "name": "Discord",
+                "isActive": true,
+                "url": "discord://top_secret_tok@998877"
+            }])
+            .to_string(),
+        )
+        .expect(2)
+        .create();
+
+    hbctl(&server.url())
+        .args(["notifier", "list"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("discord://***@998877"))
+        .stdout(predicate::str::contains("top_secret_tok").not());
+
+    hbctl(&server.url())
+        .args(["notifier", "list", "--reveal"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("discord://top_secret_tok@998877"));
+    m_list.assert();
+
+    // 2. notifier create --dry-run (redacts URL) + live create
+    hbctl(&server.url())
+        .args([
+            "--dry-run",
+            "notifier",
+            "create",
+            "--name",
+            "Ntfy",
+            "--notifier-url",
+            "ntfy://alice:my_secret_pw@ntfy.sh/homebox",
+        ])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("POST"))
+        .stdout(predicate::str::contains("ntfy://alice:***@ntfy.sh/homebox"))
+        .stdout(predicate::str::contains("my_secret_pw").not());
+
+    let m_create = server
+        .mock("POST", "/api/v1/notifiers")
+        .match_body(Matcher::PartialJson(json!({
+            "name": "Ntfy",
+            "url": "ntfy://alice:my_secret_pw@ntfy.sh/homebox",
+            "isActive": true
+        })))
+        .with_status(201)
+        .with_body(
+            json!({
+                "id": "not-2",
+                "name": "Ntfy",
+                "isActive": true,
+                "url": "ntfy://alice:my_secret_pw@ntfy.sh/homebox"
+            })
+            .to_string(),
+        )
+        .expect(1)
+        .create();
+
+    hbctl(&server.url())
+        .args([
+            "--json",
+            "notifier",
+            "create",
+            "--name",
+            "Ntfy",
+            "--notifier-url",
+            "ntfy://alice:my_secret_pw@ntfy.sh/homebox",
+        ])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("ntfy://alice:***@ntfy.sh/homebox"))
+        .stdout(predicate::str::contains("my_secret_pw").not());
+    m_create.assert();
+
+    // 3. notifier update (partial update fetches GET /api/v1/notifiers and merges)
+    let m_upd_list = server
+        .mock("GET", "/api/v1/notifiers")
+        .with_status(200)
+        .with_body(
+            json!([{
+                "id": "not-2",
+                "name": "Ntfy",
+                "isActive": true,
+                "url": "ntfy://alice:my_secret_pw@ntfy.sh/homebox"
+            }])
+            .to_string(),
+        )
+        .expect(1)
+        .create();
+
+    let m_upd_put = server
+        .mock("PUT", "/api/v1/notifiers/not-2")
+        .match_body(Matcher::PartialJson(json!({
+            "name": "Ntfy",
+            "isActive": false
+        })))
+        .with_status(200)
+        .with_body(
+            json!({
+                "id": "not-2",
+                "name": "Ntfy",
+                "isActive": false,
+                "url": "ntfy://alice:my_secret_pw@ntfy.sh/homebox"
+            })
+            .to_string(),
+        )
+        .expect(1)
+        .create();
+
+    hbctl(&server.url())
+        .args(["--json", "notifier", "update", "not-2", "--active=false"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(r#""isActive":false"#))
+        .stdout(predicate::str::contains("my_secret_pw").not());
+    m_upd_list.assert();
+    m_upd_put.assert();
+
+    // 4. notifier test <url> and notifier test <id>
+    let m_test_url = server
+        .mock("POST", "/api/v1/notifiers/test")
+        .match_body(Matcher::PartialJson(json!({
+            "url": "generic+https://example.com/hook?token=super_secret&channel=ops"
+        })))
+        .with_status(204)
+        .expect(1)
+        .create();
+
+    hbctl(&server.url())
+        .args([
+            "--json",
+            "notifier",
+            "test",
+            "generic+https://example.com/hook?token=super_secret&channel=ops",
+        ])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("token=***&channel=ops"))
+        .stdout(predicate::str::contains("super_secret").not());
+    m_test_url.assert();
+
+    let m_test_lookup = server
+        .mock("GET", "/api/v1/notifiers")
+        .with_status(200)
+        .with_body(
+            json!([{
+                "id": "not-1",
+                "name": "Discord",
+                "isActive": true,
+                "url": "discord://top_secret_tok@998877"
+            }])
+            .to_string(),
+        )
+        .expect(1)
+        .create();
+
+    let m_test_id = server
+        .mock("POST", "/api/v1/notifiers/test")
+        .match_body(Matcher::PartialJson(json!({
+            "url": "discord://top_secret_tok@998877"
+        })))
+        .with_status(200)
+        .expect(1)
+        .create();
+
+    hbctl(&server.url())
+        .args(["notifier", "test", "not-1"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("not-1"))
+        .stdout(predicate::str::contains("discord://***@998877"))
+        .stdout(predicate::str::contains("top_secret_tok").not());
+    m_test_lookup.assert();
+    m_test_id.assert();
+
+    // 5. notifier delete --dry-run and --yes
+    hbctl(&server.url())
+        .args(["--dry-run", "notifier", "delete", "not-2"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("DELETE"))
+        .stdout(predicate::str::contains("/api/v1/notifiers/not-2"));
+
+    let m_del = server
+        .mock("DELETE", "/api/v1/notifiers/not-2")
+        .with_status(204)
+        .expect(1)
+        .create();
+
+    hbctl(&server.url())
+        .args(["--json", "notifier", "delete", "not-2", "--yes"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(r#""deleted":true"#));
+    m_del.assert();
+}
+
+#[test]
+fn test_wave6_backup_directory_archive_and_dry_run() {
+    if !can_execute_binary() {
+        return;
+    }
+
+    use std::collections::HashMap;
+    use std::io::Read;
+
+    let tmp = tempdir().unwrap();
+
+    // Phases 1-3: dry-run, directory backup (+overwrite), archive backup (+overwrite) = 5 runs
+    // Note: dry-run does NOT download attachments, directory x2 + archive x2 = 4 download passes.
+    let mut server = Server::new();
+
+    let m_list = server
+        .mock("GET", "/api/v1/entities")
+        .match_query(Matcher::AllOf(vec![
+            Matcher::UrlEncoded("includeArchived".into(), "true".into()),
+            Matcher::UrlEncoded("page".into(), "1".into()),
+        ]))
+        .with_status(200)
+        .with_body(
+            json!({
+                "items": [
+                    { "id": "ent-2", "name": "Backup NAS", "quantity": 1 },
+                    { "id": "ent-1", "name": "Core Switch", "quantity": 2 }
+                ],
+                "total": 2
+            })
+            .to_string(),
+        )
+        .expect(5)
+        .create();
+
+    let ent1_full = json!({
+        "id": "ent-1",
+        "name": "Core Switch",
+        "quantity": 2,
+        "fields": [{ "name": "Location", "type": "text", "textValue": "Rack A" }],
+        "attachments": [
+            { "id": "att-a", "title": "photo.jpg", "mimeType": "image/jpeg", "type": "attachment", "primary": true },
+            { "id": "att-b", "name": "photo.jpg", "mimeType": "image/jpeg", "type": "attachment" },
+            { "id": "att-link", "title": "https://example.com/manual", "mimeType": "text/uri-list", "type": "link", "sourceType": "link" }
+        ]
+    });
+    let ent2_full = json!({
+        "id": "ent-2",
+        "name": "Backup NAS",
+        "quantity": 1,
+        "archived": true,
+        "fields": [{ "name": "CapacityTB", "type": "number", "numberValue": 32 }],
+        "attachments": []
+    });
+
+    let m_get1 = server
+        .mock("GET", "/api/v1/entities/ent-1")
+        .with_status(200)
+        .with_body(ent1_full.to_string())
+        .expect(5)
+        .create();
+    let m_get2 = server
+        .mock("GET", "/api/v1/entities/ent-2")
+        .with_status(200)
+        .with_body(ent2_full.to_string())
+        .expect(5)
+        .create();
+
+    let m_tags = server
+        .mock("GET", "/api/v1/tags")
+        .with_status(200)
+        .with_body(json!([{ "id": "tag-1", "name": "network" }]).to_string())
+        .expect(5)
+        .create();
+    let m_types = server
+        .mock("GET", "/api/v1/entity-types")
+        .with_status(200)
+        .with_body(json!([{ "id": "et-1", "name": "Hardware", "isLocation": false }]).to_string())
+        .expect(5)
+        .create();
+    let m_maint = server
+        .mock("GET", "/api/v1/maintenance")
+        .match_query(Matcher::UrlEncoded("status".into(), "both".into()))
+        .with_status(200)
+        .with_body(
+            json!([
+                { "id": "mnt-1", "entityId": "ent-1", "name": "Firmware Update", "completedDate": "2026-01-15T00:00:00Z" }
+            ])
+            .to_string(),
+        )
+        .expect(5)
+        .create();
+
+    let bytes_a = b"\xff\xd8\xff\xe0photo-a-payload";
+    let bytes_b = b"\xff\xd8\xff\xe0photo-b-longer-payload";
+
+    let m_dl_a = server
+        .mock("GET", "/api/v1/entities/ent-1/attachments/att-a")
+        .with_status(200)
+        .with_body(bytes_a)
+        .expect(4)
+        .create();
+    let m_dl_b = server
+        .mock("GET", "/api/v1/entities/ent-1/attachments/att-b")
+        .with_status(200)
+        .with_body(bytes_b)
+        .expect(4)
+        .create();
+
+    // 1. --dry-run --json: summarizes counts, writes nothing, downloads 0 attachments
+    let dry_dir = tmp.path().join("dry-backup");
+    let dry_out = hbctl(&server.url())
+        .args([
+            "--dry-run",
+            "--json",
+            "backup",
+            "--out",
+            dry_dir.to_str().unwrap(),
+        ])
+        .output()
+        .unwrap();
+    assert!(
+        dry_out.status.success(),
+        "dry-run failed: {}",
+        String::from_utf8_lossy(&dry_out.stderr)
+    );
+    assert!(!dry_dir.exists());
+    let dry_json: Value = serde_json::from_slice(&dry_out.stdout).unwrap();
+    assert_eq!(dry_json["dryRun"], json!(true));
+    assert_eq!(dry_json["entities"], json!(2));
+    assert_eq!(dry_json["attachments"], json!(3));
+    assert_eq!(dry_json["attachmentsDownloaded"], json!(0));
+    assert_eq!(dry_json["attachmentsSkipped"], json!(1));
+    assert_eq!(dry_json["tags"], json!(1));
+    assert_eq!(dry_json["entityTypes"], json!(1));
+    assert_eq!(dry_json["maintenance"], json!(1));
+
+    // 2. Directory backup + collision disambiguation + --overwrite guard
+    let dir_out_path = tmp.path().join("inv-dir");
+    let dir_res = hbctl(&server.url())
+        .args(["--json", "backup", "--out", dir_out_path.to_str().unwrap()])
+        .output()
+        .unwrap();
+    assert!(
+        dir_res.status.success(),
+        "dir backup failed: {}",
+        String::from_utf8_lossy(&dir_res.stderr)
+    );
+    let dir_summary: Value = serde_json::from_slice(&dir_res.stdout).unwrap();
+    assert_eq!(dir_summary["format"], json!("directory"));
+    assert_eq!(dir_summary["attachmentsDownloaded"], json!(2));
+    assert_eq!(dir_summary["attachmentsSkipped"], json!(1));
+
+    for name in [
+        "manifest.json",
+        "entities.json",
+        "tags.json",
+        "entity_types.json",
+        "maintenance.json",
+    ] {
+        assert!(dir_out_path.join(name).is_file(), "missing {name}");
+    }
+
+    let manifest: Value =
+        serde_json::from_str(&fs::read_to_string(dir_out_path.join("manifest.json")).unwrap())
+            .unwrap();
+    assert_eq!(manifest["schemaVersion"], json!(1));
+    assert_eq!(manifest["counts"]["entities"], json!(2));
+    assert_eq!(manifest["counts"]["attachments"], json!(3));
+    assert_eq!(manifest["counts"]["attachmentsDownloaded"], json!(2));
+    assert_eq!(manifest["counts"]["attachmentsSkipped"], json!(1));
+    assert_eq!(manifest["counts"]["tags"], json!(1));
+    assert_eq!(manifest["counts"]["entityTypes"], json!(1));
+    assert_eq!(manifest["counts"]["maintenance"], json!(1));
+    let manifest_str = manifest.to_string();
+    assert!(!manifest_str.contains("hb_test_secret_token_999"));
+
+    let entities_json: Value =
+        serde_json::from_str(&fs::read_to_string(dir_out_path.join("entities.json")).unwrap())
+            .unwrap();
+    assert_eq!(entities_json[0]["fields"][0]["textValue"], json!("Rack A"));
+    assert_eq!(entities_json[1]["fields"][0]["numberValue"], json!(32));
+
+    let att_records = manifest["attachments"].as_array().unwrap();
+    assert_eq!(att_records.len(), 3);
+    let rec_a = att_records
+        .iter()
+        .find(|r| r["attachmentId"] == "att-a")
+        .unwrap();
+    let rec_b = att_records
+        .iter()
+        .find(|r| r["attachmentId"] == "att-b")
+        .unwrap();
+    let rec_link = att_records
+        .iter()
+        .find(|r| r["attachmentId"] == "att-link")
+        .unwrap();
+    let path_a = rec_a["path"].as_str().unwrap();
+    let path_b = rec_b["path"].as_str().unwrap();
+    assert_ne!(path_a, path_b);
+    assert_eq!(fs::read(dir_out_path.join(path_a)).unwrap(), bytes_a);
+    assert_eq!(fs::read(dir_out_path.join(path_b)).unwrap(), bytes_b);
+    assert_eq!(rec_link["status"], json!("skipped_external_link"));
+    assert!(rec_link.get("path").is_none());
+
+    // Re-running into non-empty dir without --overwrite fails, with --overwrite succeeds
+    hbctl(&server.url())
+        .args(["backup", "--out", dir_out_path.to_str().unwrap()])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("--overwrite"));
+
+    hbctl(&server.url())
+        .args([
+            "--json",
+            "backup",
+            "--out",
+            dir_out_path.to_str().unwrap(),
+            "--overwrite",
+        ])
+        .assert()
+        .success();
+
+    // 3. .tar.gz archive backup + integrity verification + --overwrite guard
+    let archive_path = tmp.path().join("archives/inventory.tar.gz");
+    let arch_res = hbctl(&server.url())
+        .args(["--json", "backup", "--out", archive_path.to_str().unwrap()])
+        .output()
+        .unwrap();
+    assert!(
+        arch_res.status.success(),
+        "archive backup failed: {}",
+        String::from_utf8_lossy(&arch_res.stderr)
+    );
+    let arch_summary: Value = serde_json::from_slice(&arch_res.stdout).unwrap();
+    assert_eq!(arch_summary["format"], json!("archive"));
+    assert!(arch_summary["archiveBytes"].as_u64().unwrap() > 0);
+    assert!(archive_path.is_file());
+
+    let gz = flate2::read::GzDecoder::new(fs::File::open(&archive_path).unwrap());
+    let mut tar_archive = tar::Archive::new(gz);
+    let mut entries: HashMap<String, Vec<u8>> = HashMap::new();
+    for entry in tar_archive.entries().unwrap() {
+        let mut entry = entry.unwrap();
+        let path = entry.path().unwrap().to_string_lossy().into_owned();
+        let mut buf = Vec::new();
+        entry.read_to_end(&mut buf).unwrap();
+        entries.insert(path, buf);
+    }
+    for required in [
+        "manifest.json",
+        "entities.json",
+        "tags.json",
+        "entity_types.json",
+        "maintenance.json",
+    ] {
+        assert!(entries.contains_key(required), "missing {required} in tar");
+    }
+    let arch_manifest: Value = serde_json::from_slice(&entries["manifest.json"]).unwrap();
+    for rec in arch_manifest["attachments"].as_array().unwrap() {
+        if rec["status"] == "downloaded" {
+            let rel = rec["path"].as_str().unwrap();
+            let expected_len = rec["bytes"].as_u64().unwrap() as usize;
+            assert_eq!(entries.get(rel).map(Vec::len), Some(expected_len));
+        }
+    }
+    assert_eq!(entries[path_a], bytes_a);
+    assert_eq!(entries[path_b], bytes_b);
+
+    hbctl(&server.url())
+        .args(["backup", "--out", archive_path.to_str().unwrap()])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("--overwrite"));
+
+    hbctl(&server.url())
+        .args([
+            "--json",
+            "backup",
+            "--out",
+            archive_path.to_str().unwrap(),
+            "--overwrite",
+        ])
+        .assert()
+        .success();
+
+    m_list.assert();
+    m_get1.assert();
+    m_get2.assert();
+    m_tags.assert();
+    m_types.assert();
+    m_maint.assert();
+    m_dl_a.assert();
+    m_dl_b.assert();
+
+    // 4. --no-attachments --exclude-archived -q omits includeArchived & skips all attachment downloads
+    let mut server_no_arch = Server::new();
+    let m_list_excl = server_no_arch
+        .mock("GET", "/api/v1/entities")
+        .match_query(Matcher::Regex("^page=1&pageSize=50$".into()))
+        .with_status(200)
+        .with_body(
+            json!({ "items": [{ "id": "ent-1", "name": "Core Switch" }], "total": 1 }).to_string(),
+        )
+        .expect(1)
+        .create();
+    let m_get1_excl = server_no_arch
+        .mock("GET", "/api/v1/entities/ent-1")
+        .with_status(200)
+        .with_body(ent1_full.to_string())
+        .expect(1)
+        .create();
+    let m_tags_excl = server_no_arch
+        .mock("GET", "/api/v1/tags")
+        .with_status(200)
+        .with_body("[]")
+        .expect(1)
+        .create();
+    let m_types_excl = server_no_arch
+        .mock("GET", "/api/v1/entity-types")
+        .with_status(200)
+        .with_body("[]")
+        .expect(1)
+        .create();
+    let m_maint_excl = server_no_arch
+        .mock("GET", "/api/v1/maintenance")
+        .match_query(Matcher::UrlEncoded("status".into(), "both".into()))
+        .with_status(200)
+        .with_body("[]")
+        .expect(1)
+        .create();
+
+    let no_att_dir = tmp.path().join("no-att-dir");
+    let no_att_out = hbctl(&server_no_arch.url())
+        .args([
+            "-q",
+            "backup",
+            "--out",
+            no_att_dir.to_str().unwrap(),
+            "--no-attachments",
+            "--exclude-archived",
+        ])
+        .output()
+        .unwrap();
+    assert!(
+        no_att_out.status.success(),
+        "no-attachments backup failed: {}",
+        String::from_utf8_lossy(&no_att_out.stderr)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&no_att_out.stdout).trim(),
+        no_att_dir.to_str().unwrap()
+    );
+    let no_att_manifest: Value =
+        serde_json::from_str(&fs::read_to_string(no_att_dir.join("manifest.json")).unwrap())
+            .unwrap();
+    assert_eq!(no_att_manifest["includeAttachments"], json!(false));
+    assert_eq!(no_att_manifest["includeArchived"], json!(false));
+    assert_eq!(no_att_manifest["counts"]["attachmentsDownloaded"], json!(0));
+    assert_eq!(no_att_manifest["counts"]["attachmentsSkipped"], json!(3));
+
+    m_list_excl.assert();
+    m_get1_excl.assert();
+    m_tags_excl.assert();
+    m_types_excl.assert();
+    m_maint_excl.assert();
+}

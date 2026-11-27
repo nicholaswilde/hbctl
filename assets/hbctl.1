@@ -4,7 +4,7 @@
 .SH NAME
 hbctl \- Fast, agent\-friendly Rust CLI for remote Homebox v0.26+ instances
 .SH SYNOPSIS
-\fBhbctl\fR [\fB\-\-url\fR] [\fB\-\-api\-key\fR] [\fB\-\-output\fR] [\fB\-\-json\fR] [\fB\-\-select\fR] [\fB\-\-dry\-run\fR] [\fB\-q\fR|\fB\-\-quiet\fR] [\fB\-C\fR|\fB\-\-config\fR] [\fB\-P\fR|\fB\-\-profile\fR] [\fB\-h\fR|\fB\-\-help\fR] [\fB\-V\fR|\fB\-\-version\fR] <\fIsubcommands\fR>
+\fBhbctl\fR [\fB\-\-url\fR] [\fB\-\-api\-key\fR] [\fB\-\-output\fR] [\fB\-\-json\fR] [\fB\-\-select\fR] [\fB\-\-dry\-run\fR] [\fB\-q\fR|\fB\-\-quiet\fR] [\fB\-C\fR|\fB\-\-config\fR] [\fB\-P\fR|\fB\-\-profile\fR] [\fB\-\-asset\-id\fR] [\fB\-h\fR|\fB\-\-help\fR] [\fB\-V\fR|\fB\-\-version\fR] <\fIsubcommands\fR>
 .SH DESCRIPTION
 Fast, agent\-friendly Rust CLI for remote Homebox v0.26+ instances
 .SH OPTIONS
@@ -16,7 +16,7 @@ Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)
 Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)
 .TP
 \fB\-\-output\fR \fI<OUTPUT>\fR
-Output format (table, json, plain) [env: HBCTL_OUTPUT]
+Output format (table, json, plain, csv, markdown) [env: HBCTL_OUTPUT]
 .br
 
 .br
@@ -28,6 +28,10 @@ table
 json
 .IP \(bu 2
 plain
+.IP \(bu 2
+csv
+.IP \(bu 2
+markdown
 .RE
 .TP
 \fB\-\-json\fR
@@ -47,6 +51,9 @@ Path to explicit TOML configuration file
 .TP
 \fB\-P\fR, \fB\-\-profile\fR \fI<NAME>\fR
 Named configuration profile (env: HBCTL_PROFILE)
+.TP
+\fB\-\-asset\-id\fR
+Treat item ID arguments as Homebox asset IDs (auto\-detected for numeric/dashed IDs like 000\-001)
 .TP
 \fB\-h\fR, \fB\-\-help\fR
 Print help
@@ -87,6 +94,33 @@ Manage maintenance log entries (/api/v1/maintenance)
 .TP
 hbctl\-export(1)
 Export filtered items to JSON, CSV, or Markdown
+.TP
+hbctl\-backup(1)
+Create a portable full\-inventory backup (directory or .tar.gz archive)
+.TP
+hbctl\-label(1)
+Generate or print a Homebox item, asset, or location label (/api/v1/labelmaker)
+.TP
+hbctl\-qr(1)
+Generate a QR code image (/api/v1/qrcode)
+.TP
+hbctl\-actions(1)
+Run Homebox server maintenance actions (/api/v1/actions/*)
+.TP
+hbctl\-stats(1)
+Display inventory statistics and breakdowns (/api/v1/groups/statistics*)
+.TP
+hbctl\-config(1)
+Inspect effective configuration and manage named profiles
+.TP
+hbctl\-template(1)
+Manage item templates and create items from templates (/api/v1/templates)
+.TP
+hbctl\-barcode(1)
+Look up product metadata by barcode (/api/v1/products/search\-from\-barcode)
+.TP
+hbctl\-notifier(1)
+Manage Shoutrrr notification channels (/api/v1/notifiers)
 .TP
 hbctl\-completions(1)
 Generate shell completion scripts

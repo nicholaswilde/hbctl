@@ -15,6 +15,7 @@ use crate::output::{
 pub fn handle(
     args: &FieldArgs,
     dry_run: bool,
+    force_asset_id: bool,
     config: &AppConfig,
     ctx: &OutputContext,
     out: &mut dyn Write,
@@ -23,7 +24,8 @@ pub fn handle(
     match &args.command {
         FieldCommands::List { item_id } => {
             let client = HomeboxClient::from_config(config)?;
-            let entity = client.get_entity(item_id)?;
+            let resolved_id = client.resolve_entity_id(item_id, force_asset_id)?;
+            let entity = client.get_entity(&resolved_id)?;
             let fields = entity.fields_slice();
 
             if ctx.quiet {
@@ -47,7 +49,8 @@ pub fn handle(
 
         FieldCommands::Get { item_id, key } => {
             let client = HomeboxClient::from_config(config)?;
-            let entity = client.get_entity(item_id)?;
+            let resolved_id = client.resolve_entity_id(item_id, force_asset_id)?;
+            let entity = client.get_entity(&resolved_id)?;
 
             if let Some(field) = entity.find_field(key) {
                 if ctx.quiet || ctx.format == OutputFormat::Plain {
@@ -115,11 +118,12 @@ pub fn handle(
             }
 
             let client = HomeboxClient::from_config(config)?;
+            let resolved_id = client.resolve_entity_id(item_id, force_asset_id)?;
             let patch = EntityPatch {
                 fields: vec![cf.clone()],
                 ..Default::default()
             };
-            let updated = client.update_entity(item_id, &patch)?;
+            let updated = client.update_entity(&resolved_id, &patch)?;
 
             if ctx.quiet {
                 return write_quiet_ids(std::slice::from_ref(&updated.id), out);
@@ -160,7 +164,8 @@ pub fn handle(
             }
 
             let client = HomeboxClient::from_config(config)?;
-            let existing = client.get_entity(item_id)?;
+            let resolved_id = client.resolve_entity_id(item_id, force_asset_id)?;
+            let existing = client.get_entity(&resolved_id)?;
             if existing.find_field(key).is_none() {
                 return Err(HbctlError::NotFound {
                     kind: "field".to_string(),
@@ -173,7 +178,7 @@ pub fn handle(
                 ..Default::default()
             };
             let merged = merge_entity_patch(&existing, &patch);
-            let updated = client.put_entity(item_id, &merged)?;
+            let updated = client.put_entity(&resolved_id, &merged)?;
 
             if ctx.quiet {
                 return write_quiet_ids(std::slice::from_ref(&updated.id), out);

@@ -27,7 +27,7 @@ pub struct Cli {
     #[arg(long, global = true)]
     pub api_key: Option<String>,
 
-    /// Output format (table, json, plain) [env: HBCTL_OUTPUT]
+    /// Output format (table, json, plain, csv, markdown) [env: HBCTL_OUTPUT]
     #[arg(long, global = true, value_enum)]
     pub output: Option<OutputFormat>,
 
@@ -54,6 +54,10 @@ pub struct Cli {
     /// Named configuration profile (env: HBCTL_PROFILE)
     #[arg(short = 'P', long, global = true, value_name = "NAME")]
     pub profile: Option<String>,
+
+    /// Treat item ID arguments as Homebox asset IDs (auto-detected for numeric/dashed IDs like 000-001)
+    #[arg(long = "asset-id", global = true)]
+    pub asset_id: bool,
 
     #[command(subcommand)]
     pub command: Commands,
@@ -108,6 +112,36 @@ pub enum Commands {
 
     /// Export filtered items to JSON, CSV, or Markdown
     Export(ExportArgs),
+
+    /// Create a portable full-inventory backup (directory or .tar.gz archive)
+    Backup(BackupArgs),
+
+    /// Generate or print a Homebox item, asset, or location label (/api/v1/labelmaker)
+    Label(LabelArgs),
+
+    /// Generate a QR code image (/api/v1/qrcode)
+    Qr(QrArgs),
+
+    /// Run Homebox server maintenance actions (/api/v1/actions/*)
+    #[command(visible_alias = "action")]
+    Actions(ActionsArgs),
+
+    /// Display inventory statistics and breakdowns (/api/v1/groups/statistics*)
+    Stats(StatsArgs),
+
+    /// Inspect effective configuration and manage named profiles
+    Config(ConfigArgs),
+
+    /// Manage item templates and create items from templates (/api/v1/templates)
+    #[command(visible_alias = "templates")]
+    Template(TemplateArgs),
+
+    /// Look up product metadata by barcode (/api/v1/products/search-from-barcode)
+    Barcode(BarcodeArgs),
+
+    /// Manage Shoutrrr notification channels (/api/v1/notifiers)
+    #[command(visible_alias = "notifiers")]
+    Notifier(NotifierArgs),
 
     /// Generate shell completion scripts
     Completions {
@@ -278,7 +312,7 @@ pub struct ItemGetArgs {
 
 #[derive(Args, Debug, Clone)]
 pub struct ItemCreateArgs {
-    /// Item name (required unless supplied via --from-json)
+    /// Item name (required unless supplied via --from-json or --from-barcode)
     #[arg(long)]
     pub name: Option<String>,
 
@@ -377,6 +411,10 @@ pub struct ItemCreateArgs {
     /// Load initial item JSON from file path or '-' for stdin
     #[arg(long)]
     pub from_json: Option<String>,
+
+    /// Prefill name, description, manufacturer, and model from a barcode lookup
+    #[arg(long, value_name = "CODE")]
+    pub from_barcode: Option<String>,
 
     /// Local file path(s) to attach after creating the item (`FILE` or `FILE=REMOTE_NAME`, repeatable)
     #[arg(long = "attach", value_name = "FILE[=NAME]")]
@@ -991,11 +1029,17 @@ pub enum AttachmentCommands {
     Download(AttachmentDownloadArgs),
     /// Delete an attachment from an item
     Delete(AttachmentDeleteArgs),
+    /// Mark an existing attachment as the item's primary photo
+    SetPrimary(AttachmentSetPrimaryArgs),
+    /// Update attachment metadata (title, type, primary)
+    Update(AttachmentUpdateArgs),
+    /// Attach an external HTTP(S) URL link to an item
+    AddLink(AttachmentAddLinkArgs),
 }
 
 #[derive(Args, Debug, Clone)]
 pub struct AttachmentUploadArgs {
-    /// Target entity ID
+    /// Target entity ID or asset ID
     pub item_id: String,
 
     /// Local file path(s) to upload (or '-' for stdin when combined with --name)
@@ -1009,6 +1053,10 @@ pub struct AttachmentUploadArgs {
     /// Override remote filename/title (for single-file or stdin '-' uploads)
     #[arg(long)]
     pub name: Option<String>,
+
+    /// Mark the uploaded attachment as the item's primary photo
+    #[arg(long)]
+    pub primary: bool,
 
     /// Skip files that already exist on the item (default behavior)
     #[arg(long, conflicts_with = "overwrite")]
@@ -1076,11 +1124,59 @@ pub struct AttachmentDownloadArgs {
 
 #[derive(Args, Debug, Clone)]
 pub struct AttachmentDeleteArgs {
-    /// Target entity ID
+    /// Target entity ID or asset ID
     pub item_id: String,
 
     /// Attachment ID to delete
     pub attachment_id: String,
+}
+
+#[derive(Args, Debug, Clone)]
+pub struct AttachmentSetPrimaryArgs {
+    /// Target entity ID or asset ID
+    pub item_id: String,
+
+    /// Attachment ID to mark as primary
+    pub attachment_id: String,
+}
+
+#[derive(Args, Debug, Clone)]
+pub struct AttachmentUpdateArgs {
+    /// Target entity ID or asset ID
+    pub item_id: String,
+
+    /// Attachment ID to update
+    pub attachment_id: String,
+
+    /// Updated attachment title
+    #[arg(long)]
+    pub title: Option<String>,
+
+    /// Updated attachment type (e.g. photo, manual, warranty, receipt, attachment)
+    #[arg(long = "type", value_name = "TYPE")]
+    pub attachment_type: Option<String>,
+
+    /// Mark or unmark as the primary attachment (true/false; bare flag means true)
+    #[arg(long, num_args = 0..=1, default_missing_value = "true")]
+    pub primary: Option<bool>,
+}
+
+#[derive(Args, Debug, Clone)]
+pub struct AttachmentAddLinkArgs {
+    /// Target entity ID or asset ID
+    pub item_id: String,
+
+    /// External HTTP(S) URL to attach
+    #[arg(value_name = "URL")]
+    pub link: String,
+
+    /// Display title for the external link (defaults to sanitized URL)
+    #[arg(long)]
+    pub title: Option<String>,
+
+    /// Attachment type (photo, manual, warranty, receipt, attachment)
+    #[arg(long = "type", value_name = "TYPE")]
+    pub attachment_type: Option<String>,
 }
 
 // -----------------------------------------------------------------------------
@@ -1459,6 +1555,462 @@ pub struct ExportArgs {
     /// Placeholder string for empty/missing cells
     #[arg(long, value_name = "STR", default_value = "")]
     pub empty: String,
+}
+
+// -----------------------------------------------------------------------------
+// Backup
+// -----------------------------------------------------------------------------
+
+#[derive(Args, Debug, Clone)]
+pub struct BackupArgs {
+    /// Destination directory or .tar.gz / .tgz archive path
+    #[arg(short = 'o', long = "out", value_name = "PATH")]
+    pub out: PathBuf,
+
+    /// Skip downloading attachment binary files (attachment metadata stays in entities.json)
+    #[arg(long)]
+    pub no_attachments: bool,
+
+    /// Exclude archived items from the backup (archived items are included by default)
+    #[arg(long)]
+    pub exclude_archived: bool,
+
+    /// Overwrite an existing archive file or write into a non-empty directory
+    #[arg(long)]
+    pub overwrite: bool,
+}
+
+// -----------------------------------------------------------------------------
+// Label, QR & Server Actions
+// -----------------------------------------------------------------------------
+
+#[derive(ValueEnum, Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum LabelTargetKind {
+    #[default]
+    Auto,
+    Item,
+    Asset,
+    Location,
+}
+
+#[derive(Args, Debug, Clone)]
+pub struct LabelArgs {
+    /// Item UUID, location UUID, or asset ID (e.g. 000-001)
+    pub id: String,
+
+    /// Output file path, or '-' to write raw label bytes to stdout
+    #[arg(short = 'o', long, value_name = "FILE|-", conflicts_with = "print")]
+    pub out: Option<PathBuf>,
+
+    /// Target label endpoint kind (auto detects numeric/dashed asset IDs)
+    #[arg(long = "kind", value_enum, default_value_t = LabelTargetKind::Auto)]
+    pub kind: LabelTargetKind,
+
+    /// Send the label directly to the server's configured printer (?print=true)
+    #[arg(long)]
+    pub print: bool,
+
+    /// Overwrite output file if it already exists
+    #[arg(long)]
+    pub overwrite: bool,
+}
+
+#[derive(Args, Debug, Clone)]
+pub struct QrArgs {
+    /// Item UUID, asset ID, URL, or raw data (with --raw)
+    pub id: String,
+
+    /// Output file path, or '-' to write raw QR image bytes to stdout
+    #[arg(short = 'o', long, value_name = "FILE|-")]
+    pub out: Option<PathBuf>,
+
+    /// Encode <ID> verbatim as QR `data` instead of building a Homebox item/asset URL
+    #[arg(long)]
+    pub raw: bool,
+
+    /// Overwrite output file if it already exists
+    #[arg(long)]
+    pub overwrite: bool,
+}
+
+#[derive(Args, Debug, Clone)]
+pub struct ActionsArgs {
+    #[command(subcommand)]
+    pub command: ActionsCommands,
+}
+
+#[derive(Subcommand, Debug, Clone)]
+pub enum ActionsCommands {
+    /// Ensure all items in Homebox have an asset ID assigned (/api/v1/actions/ensure-asset-ids)
+    EnsureAssetIds,
+    /// Create thumbnails for attachments missing them (/api/v1/actions/create-missing-thumbnails)
+    CreateMissingThumbnails,
+}
+
+// -----------------------------------------------------------------------------
+// Stats & Config
+// -----------------------------------------------------------------------------
+
+#[derive(Args, Debug, Clone)]
+pub struct StatsArgs {
+    /// Also count non-lifetime warranties expiring within DAYS days
+    #[arg(long, value_name = "DAYS")]
+    pub warranty_days: Option<u32>,
+
+    #[command(subcommand)]
+    pub command: Option<StatsCommands>,
+}
+
+#[derive(Subcommand, Debug, Clone)]
+pub enum StatsCommands {
+    /// Group-wide overview statistics (/api/v1/groups/statistics + upcoming maintenance)
+    Overview,
+    /// Tag purchase-value breakdown (/api/v1/groups/statistics/tags)
+    Tags,
+    /// Location purchase-value breakdown (/api/v1/groups/statistics/locations)
+    Locations,
+    /// Entity-type count and purchase-value breakdown
+    #[command(name = "entity-types", visible_alias = "types")]
+    EntityTypes,
+    /// Purchase value over time (/api/v1/groups/statistics/purchase-price)
+    #[command(name = "purchase-price", visible_alias = "price")]
+    PurchasePrice {
+        /// Start date (YYYY-MM-DD)
+        #[arg(long, value_name = "YYYY-MM-DD")]
+        start: Option<String>,
+        /// End date (YYYY-MM-DD)
+        #[arg(long, value_name = "YYYY-MM-DD")]
+        end: Option<String>,
+    },
+}
+
+#[derive(Args, Debug, Clone)]
+pub struct ConfigArgs {
+    #[command(subcommand)]
+    pub command: ConfigCommands,
+}
+
+#[derive(Subcommand, Debug, Clone)]
+pub enum ConfigCommands {
+    /// Display effective resolved configuration (secrets redacted as Bearer ***)
+    Show,
+    /// List configured profiles and indicate active/default selection
+    Profiles,
+    /// Switch the active default profile in user config
+    Use {
+        /// Profile name to set as default_profile
+        profile: String,
+    },
+}
+
+// -----------------------------------------------------------------------------
+// Templates, Barcode & Notifiers
+// -----------------------------------------------------------------------------
+
+#[derive(Args, Debug, Clone)]
+pub struct TemplateArgs {
+    #[command(subcommand)]
+    pub command: TemplateCommands,
+}
+
+#[derive(Subcommand, Debug, Clone)]
+pub enum TemplateCommands {
+    /// List all entity templates
+    List,
+    /// Fetch a single entity template by ID
+    Get {
+        /// Template UUID
+        id: String,
+    },
+    /// Create a new entity template
+    Create(TemplateCreateArgs),
+    /// Update an existing entity template (GET -> Merge -> PUT)
+    Update(TemplateUpdateArgs),
+    /// Delete an entity template
+    Delete {
+        /// Template UUID
+        id: String,
+        /// Skip interactive confirmation prompt
+        #[arg(short = 'y', long = "yes")]
+        yes: bool,
+        /// Skip interactive confirmation prompt
+        #[arg(long)]
+        force: bool,
+    },
+    /// Create a new item from a template (/api/v1/templates/{id}/create-item)
+    Apply(TemplateApplyArgs),
+}
+
+#[derive(Args, Debug, Clone)]
+pub struct TemplateCreateArgs {
+    /// Template name
+    #[arg(long)]
+    pub name: String,
+
+    /// Template description
+    #[arg(long)]
+    pub description: Option<String>,
+
+    /// Template notes
+    #[arg(long)]
+    pub notes: Option<String>,
+
+    /// Default item name
+    #[arg(long)]
+    pub default_name: Option<String>,
+
+    /// Default item description
+    #[arg(long)]
+    pub default_description: Option<String>,
+
+    /// Default item quantity
+    #[arg(long)]
+    pub default_quantity: Option<f64>,
+
+    /// Default item manufacturer
+    #[arg(long)]
+    pub default_manufacturer: Option<String>,
+
+    /// Default item model number
+    #[arg(long = "default-model")]
+    pub default_model: Option<String>,
+
+    /// Default insured flag (true/false; bare flag means true)
+    #[arg(long, num_args = 0..=1, default_missing_value = "true")]
+    pub default_insured: Option<bool>,
+
+    /// Default lifetime warranty flag (true/false; bare flag means true)
+    #[arg(long, num_args = 0..=1, default_missing_value = "true")]
+    pub default_lifetime_warranty: Option<bool>,
+
+    /// Default warranty details
+    #[arg(long)]
+    pub default_warranty_details: Option<String>,
+
+    /// Default location name or UUID
+    #[arg(long)]
+    pub default_location: Option<String>,
+
+    /// Default tag name or UUID (repeatable; missing tags auto-created)
+    #[arg(long = "default-tag")]
+    pub default_tags: Vec<String>,
+
+    /// Include warranty fields on created items (true/false; bare flag means true)
+    #[arg(long, num_args = 0..=1, default_missing_value = "true")]
+    pub include_warranty_fields: Option<bool>,
+
+    /// Include purchase fields on created items (true/false; bare flag means true)
+    #[arg(long, num_args = 0..=1, default_missing_value = "true")]
+    pub include_purchase_fields: Option<bool>,
+
+    /// Include sold fields on created items (true/false; bare flag means true)
+    #[arg(long, num_args = 0..=1, default_missing_value = "true")]
+    pub include_sold_fields: Option<bool>,
+
+    /// Default custom field KEY=VAL (repeatable)
+    #[arg(long = "field")]
+    pub fields: Vec<String>,
+
+    /// Value type for --field entries
+    #[arg(long, value_enum, default_value_t = FieldValueType::Text)]
+    pub field_type: FieldValueType,
+}
+
+#[derive(Args, Debug, Clone)]
+pub struct TemplateUpdateArgs {
+    /// Template UUID
+    pub id: String,
+
+    /// Updated template name
+    #[arg(long)]
+    pub name: Option<String>,
+
+    /// Updated template description
+    #[arg(long)]
+    pub description: Option<String>,
+
+    /// Updated template notes
+    #[arg(long)]
+    pub notes: Option<String>,
+
+    /// Updated default item name
+    #[arg(long)]
+    pub default_name: Option<String>,
+
+    /// Updated default item description
+    #[arg(long)]
+    pub default_description: Option<String>,
+
+    /// Updated default item quantity
+    #[arg(long)]
+    pub default_quantity: Option<f64>,
+
+    /// Updated default item manufacturer
+    #[arg(long)]
+    pub default_manufacturer: Option<String>,
+
+    /// Updated default item model number
+    #[arg(long = "default-model")]
+    pub default_model: Option<String>,
+
+    /// Updated default insured flag (true/false; bare flag means true)
+    #[arg(long, num_args = 0..=1, default_missing_value = "true")]
+    pub default_insured: Option<bool>,
+
+    /// Updated default lifetime warranty flag (true/false; bare flag means true)
+    #[arg(long, num_args = 0..=1, default_missing_value = "true")]
+    pub default_lifetime_warranty: Option<bool>,
+
+    /// Updated default warranty details
+    #[arg(long)]
+    pub default_warranty_details: Option<String>,
+
+    /// Updated default location name, UUID, or 'none'
+    #[arg(long)]
+    pub default_location: Option<String>,
+
+    /// Updated default tag name or UUID (repeatable; replaces tag list)
+    #[arg(long = "default-tag")]
+    pub default_tags: Vec<String>,
+
+    /// Include warranty fields on created items (true/false; bare flag means true)
+    #[arg(long, num_args = 0..=1, default_missing_value = "true")]
+    pub include_warranty_fields: Option<bool>,
+
+    /// Include purchase fields on created items (true/false; bare flag means true)
+    #[arg(long, num_args = 0..=1, default_missing_value = "true")]
+    pub include_purchase_fields: Option<bool>,
+
+    /// Include sold fields on created items (true/false; bare flag means true)
+    #[arg(long, num_args = 0..=1, default_missing_value = "true")]
+    pub include_sold_fields: Option<bool>,
+
+    /// Default custom field KEY=VAL to add/update (repeatable)
+    #[arg(long = "field")]
+    pub fields: Vec<String>,
+
+    /// Value type for --field entries
+    #[arg(long, value_enum, default_value_t = FieldValueType::Text)]
+    pub field_type: FieldValueType,
+}
+
+#[derive(Args, Debug, Clone)]
+pub struct TemplateApplyArgs {
+    /// Template UUID
+    pub id: String,
+
+    /// Item name (defaults to template's defaultName if omitted)
+    #[arg(long)]
+    pub name: Option<String>,
+
+    /// Item description (defaults to template's defaultDescription if omitted)
+    #[arg(long)]
+    pub description: Option<String>,
+
+    /// Parent item/location name, ID, or 'none'
+    #[arg(long)]
+    pub parent: Option<String>,
+
+    /// Location name or ID (falls back to template's defaultLocation if omitted)
+    #[arg(long)]
+    pub location: Option<String>,
+
+    /// Entity type name or UUID
+    #[arg(long = "type")]
+    pub entity_type: Option<String>,
+
+    /// Tag name or UUID (repeatable; defaults to template's defaultTags if omitted)
+    #[arg(long = "tag")]
+    pub tags: Vec<String>,
+
+    /// Item quantity override
+    #[arg(long)]
+    pub quantity: Option<f64>,
+}
+
+#[derive(Args, Debug, Clone)]
+pub struct BarcodeArgs {
+    /// Barcode / EAN / UPC string to look up
+    #[arg(value_name = "CODE")]
+    pub code: String,
+}
+
+#[derive(Args, Debug, Clone)]
+pub struct NotifierArgs {
+    #[command(subcommand)]
+    pub command: NotifierCommands,
+}
+
+#[derive(Subcommand, Debug, Clone)]
+pub enum NotifierCommands {
+    /// List configured notifiers (URLs redacted unless --reveal is passed)
+    List {
+        /// Display unredacted notifier URLs
+        #[arg(long)]
+        reveal: bool,
+    },
+    /// Create a new notifier
+    Create(NotifierCreateArgs),
+    /// Update an existing notifier
+    Update(NotifierUpdateArgs),
+    /// Delete a notifier
+    Delete {
+        /// Notifier UUID
+        id: String,
+        /// Skip interactive confirmation prompt
+        #[arg(short = 'y', long = "yes")]
+        yes: bool,
+        /// Skip interactive confirmation prompt
+        #[arg(long)]
+        force: bool,
+    },
+    /// Send a test notification to a notifier ID/name or Shoutrrr URL
+    Test {
+        /// Notifier ID, name, or Shoutrrr URL
+        #[arg(value_name = "ID|URL")]
+        target: String,
+    },
+}
+
+#[derive(Args, Debug, Clone)]
+pub struct NotifierCreateArgs {
+    /// Notifier display name
+    #[arg(long)]
+    pub name: String,
+
+    /// Shoutrrr destination URL
+    #[arg(
+        long = "notifier-url",
+        visible_alias = "target",
+        value_name = "SHOUTRRR_URL"
+    )]
+    pub notifier_url: String,
+
+    /// Whether the notifier is active (true/false; bare flag means true, defaults to true)
+    #[arg(long, num_args = 0..=1, default_missing_value = "true")]
+    pub active: Option<bool>,
+}
+
+#[derive(Args, Debug, Clone)]
+pub struct NotifierUpdateArgs {
+    /// Notifier UUID
+    pub id: String,
+
+    /// Updated notifier name
+    #[arg(long)]
+    pub name: Option<String>,
+
+    /// Updated Shoutrrr destination URL
+    #[arg(
+        long = "notifier-url",
+        visible_alias = "target",
+        value_name = "SHOUTRRR_URL"
+    )]
+    pub notifier_url: Option<String>,
+
+    /// Updated active state (true/false; bare flag means true)
+    #[arg(long, num_args = 0..=1, default_missing_value = "true")]
+    pub active: Option<bool>,
 }
 
 // -----------------------------------------------------------------------------
@@ -2848,5 +3400,497 @@ mod tests {
             Commands::Search(a) => assert!(a.with_path),
             other => panic!("unexpected command: {other:?}"),
         }
+    }
+
+    #[test]
+    fn test_cli_parse_wave3_asset_label_qr_actions_and_attachments() {
+        let with_asset =
+            Cli::try_parse_from(["hbctl", "--asset-id", "item", "get", "000-001"]).unwrap();
+        assert!(with_asset.asset_id);
+
+        let label = Cli::try_parse_from([
+            "hbctl",
+            "label",
+            "000-001",
+            "--kind",
+            "asset",
+            "--out",
+            "label.png",
+            "--overwrite",
+        ])
+        .unwrap();
+        match label.command {
+            Commands::Label(a) => {
+                assert_eq!(a.id, "000-001");
+                assert_eq!(a.kind, LabelTargetKind::Asset);
+                assert_eq!(a.out, Some(PathBuf::from("label.png")));
+                assert!(a.overwrite);
+                assert!(!a.print);
+            }
+            other => panic!("unexpected command: {other:?}"),
+        }
+
+        let label_print = Cli::try_parse_from(["hbctl", "label", "ent-1", "--print"]).unwrap();
+        match label_print.command {
+            Commands::Label(a) => assert!(a.print),
+            other => panic!("unexpected command: {other:?}"),
+        }
+
+        assert!(
+            Cli::try_parse_from(["hbctl", "label", "ent-1", "--print", "--out", "a.png"]).is_err()
+        );
+
+        let qr = Cli::try_parse_from(["hbctl", "qr", "000-001", "--raw", "-o", "qr.jpg"]).unwrap();
+        match qr.command {
+            Commands::Qr(a) => {
+                assert_eq!(a.id, "000-001");
+                assert!(a.raw);
+                assert_eq!(a.out, Some(PathBuf::from("qr.jpg")));
+            }
+            other => panic!("unexpected command: {other:?}"),
+        }
+
+        let act1 = Cli::try_parse_from(["hbctl", "actions", "ensure-asset-ids"]).unwrap();
+        assert!(matches!(
+            act1.command,
+            Commands::Actions(ActionsArgs {
+                command: ActionsCommands::EnsureAssetIds
+            })
+        ));
+
+        let act2 = Cli::try_parse_from(["hbctl", "action", "create-missing-thumbnails"]).unwrap();
+        assert!(matches!(
+            act2.command,
+            Commands::Actions(ActionsArgs {
+                command: ActionsCommands::CreateMissingThumbnails
+            })
+        ));
+
+        let up = Cli::try_parse_from([
+            "hbctl",
+            "attachment",
+            "upload",
+            "ent-1",
+            "photo.jpg",
+            "--primary",
+        ])
+        .unwrap();
+        match up.command {
+            Commands::Attachment(AttachmentArgs {
+                command: AttachmentCommands::Upload(a),
+            }) => assert!(a.primary),
+            other => panic!("unexpected command: {other:?}"),
+        }
+
+        let sp =
+            Cli::try_parse_from(["hbctl", "attachment", "set-primary", "ent-1", "att-2"]).unwrap();
+        match sp.command {
+            Commands::Attachment(AttachmentArgs {
+                command: AttachmentCommands::SetPrimary(a),
+            }) => {
+                assert_eq!(a.item_id, "ent-1");
+                assert_eq!(a.attachment_id, "att-2");
+            }
+            other => panic!("unexpected command: {other:?}"),
+        }
+
+        let upd = Cli::try_parse_from([
+            "hbctl",
+            "attachment",
+            "update",
+            "ent-1",
+            "att-2",
+            "--title",
+            "Front View",
+            "--type",
+            "photo",
+            "--primary",
+        ])
+        .unwrap();
+        match upd.command {
+            Commands::Attachment(AttachmentArgs {
+                command: AttachmentCommands::Update(a),
+            }) => {
+                assert_eq!(a.title.as_deref(), Some("Front View"));
+                assert_eq!(a.attachment_type.as_deref(), Some("photo"));
+                assert_eq!(a.primary, Some(true));
+            }
+            other => panic!("unexpected command: {other:?}"),
+        }
+
+        let link = Cli::try_parse_from([
+            "hbctl",
+            "attachment",
+            "add-link",
+            "ent-1",
+            "https://example.com/manual.pdf",
+            "--title",
+            "Manual",
+            "--type",
+            "manual",
+        ])
+        .unwrap();
+        match link.command {
+            Commands::Attachment(AttachmentArgs {
+                command: AttachmentCommands::AddLink(a),
+            }) => {
+                assert_eq!(a.link, "https://example.com/manual.pdf");
+                assert_eq!(a.title.as_deref(), Some("Manual"));
+                assert_eq!(a.attachment_type.as_deref(), Some("manual"));
+            }
+            other => panic!("unexpected command: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_cli_parse_wave4_stats_config_and_output_formats() {
+        let csv_out = Cli::try_parse_from(["hbctl", "--output", "csv", "stats"]).unwrap();
+        assert_eq!(csv_out.output, Some(OutputFormat::Csv));
+        assert!(matches!(
+            csv_out.command,
+            Commands::Stats(StatsArgs {
+                warranty_days: None,
+                command: None
+            })
+        ));
+
+        let md_alias =
+            Cli::try_parse_from(["hbctl", "--output", "md", "stats", "--warranty-days", "30"])
+                .unwrap();
+        assert_eq!(md_alias.output, Some(OutputFormat::Markdown));
+        assert!(matches!(
+            md_alias.command,
+            Commands::Stats(StatsArgs {
+                warranty_days: Some(30),
+                command: None
+            })
+        ));
+
+        let stats_ov = Cli::try_parse_from(["hbctl", "stats", "overview"]).unwrap();
+        assert!(matches!(
+            stats_ov.command,
+            Commands::Stats(StatsArgs {
+                command: Some(StatsCommands::Overview),
+                ..
+            })
+        ));
+
+        let stats_tags = Cli::try_parse_from(["hbctl", "stats", "tags"]).unwrap();
+        assert!(matches!(
+            stats_tags.command,
+            Commands::Stats(StatsArgs {
+                command: Some(StatsCommands::Tags),
+                ..
+            })
+        ));
+
+        let stats_locs = Cli::try_parse_from(["hbctl", "stats", "locations"]).unwrap();
+        assert!(matches!(
+            stats_locs.command,
+            Commands::Stats(StatsArgs {
+                command: Some(StatsCommands::Locations),
+                ..
+            })
+        ));
+
+        let stats_types = Cli::try_parse_from(["hbctl", "stats", "types"]).unwrap();
+        assert!(matches!(
+            stats_types.command,
+            Commands::Stats(StatsArgs {
+                command: Some(StatsCommands::EntityTypes),
+                ..
+            })
+        ));
+
+        let stats_pp = Cli::try_parse_from([
+            "hbctl",
+            "stats",
+            "price",
+            "--start",
+            "2026-01-01",
+            "--end",
+            "2026-11-27",
+        ])
+        .unwrap();
+        match stats_pp.command {
+            Commands::Stats(StatsArgs {
+                command: Some(StatsCommands::PurchasePrice { start, end }),
+                ..
+            }) => {
+                assert_eq!(start.as_deref(), Some("2026-01-01"));
+                assert_eq!(end.as_deref(), Some("2026-11-27"));
+            }
+            other => panic!("unexpected command: {other:?}"),
+        }
+
+        let cfg_show = Cli::try_parse_from(["hbctl", "config", "show"]).unwrap();
+        assert!(matches!(
+            cfg_show.command,
+            Commands::Config(ConfigArgs {
+                command: ConfigCommands::Show
+            })
+        ));
+
+        let cfg_profiles = Cli::try_parse_from(["hbctl", "config", "profiles"]).unwrap();
+        assert!(matches!(
+            cfg_profiles.command,
+            Commands::Config(ConfigArgs {
+                command: ConfigCommands::Profiles
+            })
+        ));
+
+        let cfg_use = Cli::try_parse_from(["hbctl", "config", "use", "staging"]).unwrap();
+        match cfg_use.command {
+            Commands::Config(ConfigArgs {
+                command: ConfigCommands::Use { profile },
+            }) => assert_eq!(profile, "staging"),
+            other => panic!("unexpected command: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_cli_parse_wave5_template_barcode_and_notifier() {
+        let tpl_list = Cli::try_parse_from(["hbctl", "template", "list"]).unwrap();
+        assert!(matches!(
+            tpl_list.command,
+            Commands::Template(TemplateArgs {
+                command: TemplateCommands::List
+            })
+        ));
+
+        let tpl_get = Cli::try_parse_from(["hbctl", "templates", "get", "tpl-1"]).unwrap();
+        assert!(matches!(
+            tpl_get.command,
+            Commands::Template(TemplateArgs {
+                command: TemplateCommands::Get { .. }
+            })
+        ));
+
+        let tpl_create = Cli::try_parse_from([
+            "hbctl",
+            "template",
+            "create",
+            "--name",
+            "Power Tool",
+            "--default-name",
+            "Drill",
+            "--default-quantity",
+            "2",
+            "--default-insured",
+            "--default-tag",
+            "tools",
+            "--field",
+            "Voltage=20V",
+        ])
+        .unwrap();
+        match tpl_create.command {
+            Commands::Template(TemplateArgs {
+                command: TemplateCommands::Create(a),
+            }) => {
+                assert_eq!(a.name, "Power Tool");
+                assert_eq!(a.default_name.as_deref(), Some("Drill"));
+                assert_eq!(a.default_quantity, Some(2.0));
+                assert_eq!(a.default_insured, Some(true));
+                assert_eq!(a.default_tags, vec!["tools"]);
+                assert_eq!(a.fields, vec!["Voltage=20V"]);
+            }
+            other => panic!("unexpected command: {other:?}"),
+        }
+
+        let tpl_update = Cli::try_parse_from([
+            "hbctl",
+            "template",
+            "update",
+            "tpl-1",
+            "--default-model",
+            "DCD771",
+            "--include-warranty-fields",
+            "false",
+        ])
+        .unwrap();
+        match tpl_update.command {
+            Commands::Template(TemplateArgs {
+                command: TemplateCommands::Update(a),
+            }) => {
+                assert_eq!(a.id, "tpl-1");
+                assert_eq!(a.default_model.as_deref(), Some("DCD771"));
+                assert_eq!(a.include_warranty_fields, Some(false));
+            }
+            other => panic!("unexpected command: {other:?}"),
+        }
+
+        let tpl_del =
+            Cli::try_parse_from(["hbctl", "template", "delete", "tpl-1", "--yes"]).unwrap();
+        assert!(matches!(
+            tpl_del.command,
+            Commands::Template(TemplateArgs {
+                command: TemplateCommands::Delete { yes: true, .. }
+            })
+        ));
+
+        let tpl_apply = Cli::try_parse_from([
+            "hbctl",
+            "template",
+            "apply",
+            "tpl-1",
+            "--name",
+            "Router",
+            "--location",
+            "Office",
+            "--quantity",
+            "3",
+        ])
+        .unwrap();
+        match tpl_apply.command {
+            Commands::Template(TemplateArgs {
+                command: TemplateCommands::Apply(a),
+            }) => {
+                assert_eq!(a.id, "tpl-1");
+                assert_eq!(a.name.as_deref(), Some("Router"));
+                assert_eq!(a.location.as_deref(), Some("Office"));
+                assert_eq!(a.quantity, Some(3.0));
+            }
+            other => panic!("unexpected command: {other:?}"),
+        }
+
+        let barcode = Cli::try_parse_from(["hbctl", "barcode", "5035048748428"]).unwrap();
+        match barcode.command {
+            Commands::Barcode(a) => assert_eq!(a.code, "5035048748428"),
+            other => panic!("unexpected command: {other:?}"),
+        }
+
+        let item_bar = Cli::try_parse_from([
+            "hbctl",
+            "item",
+            "create",
+            "--from-barcode",
+            "5035048748428",
+            "--name",
+            "Override Name",
+        ])
+        .unwrap();
+        match item_bar.command {
+            Commands::Item(ItemArgs {
+                command: ItemCommands::Create(a),
+            }) => {
+                assert_eq!(a.from_barcode.as_deref(), Some("5035048748428"));
+                assert_eq!(a.name.as_deref(), Some("Override Name"));
+            }
+            other => panic!("unexpected command: {other:?}"),
+        }
+
+        let not_list = Cli::try_parse_from(["hbctl", "notifier", "list", "--reveal"]).unwrap();
+        assert!(matches!(
+            not_list.command,
+            Commands::Notifier(NotifierArgs {
+                command: NotifierCommands::List { reveal: true }
+            })
+        ));
+
+        let not_create = Cli::try_parse_from([
+            "hbctl",
+            "--url",
+            "http://127.0.0.1:7745",
+            "notifiers",
+            "create",
+            "--name",
+            "Discord",
+            "--notifier-url",
+            "discord://tok@123",
+            "--active=false",
+        ])
+        .unwrap();
+        assert_eq!(not_create.url.as_deref(), Some("http://127.0.0.1:7745"));
+        match not_create.command {
+            Commands::Notifier(NotifierArgs {
+                command: NotifierCommands::Create(a),
+            }) => {
+                assert_eq!(a.name, "Discord");
+                assert_eq!(a.notifier_url, "discord://tok@123");
+                assert_eq!(a.active, Some(false));
+            }
+            other => panic!("unexpected command: {other:?}"),
+        }
+
+        let not_update = Cli::try_parse_from([
+            "hbctl",
+            "notifier",
+            "update",
+            "not-1",
+            "--name",
+            "Renamed",
+            "--target",
+            "ntfy://ntfy.sh/alerts",
+            "--active",
+        ])
+        .unwrap();
+        match not_update.command {
+            Commands::Notifier(NotifierArgs {
+                command: NotifierCommands::Update(a),
+            }) => {
+                assert_eq!(a.id, "not-1");
+                assert_eq!(a.name.as_deref(), Some("Renamed"));
+                assert_eq!(a.notifier_url.as_deref(), Some("ntfy://ntfy.sh/alerts"));
+                assert_eq!(a.active, Some(true));
+            }
+            other => panic!("unexpected command: {other:?}"),
+        }
+
+        let not_del = Cli::try_parse_from(["hbctl", "notifier", "delete", "not-1", "-y"]).unwrap();
+        assert!(matches!(
+            not_del.command,
+            Commands::Notifier(NotifierArgs {
+                command: NotifierCommands::Delete { yes: true, .. }
+            })
+        ));
+
+        let not_test =
+            Cli::try_parse_from(["hbctl", "notifier", "test", "discord://tok@123"]).unwrap();
+        match not_test.command {
+            Commands::Notifier(NotifierArgs {
+                command: NotifierCommands::Test { target },
+            }) => assert_eq!(target, "discord://tok@123"),
+            other => panic!("unexpected command: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_cli_parse_wave6_backup() {
+        let basic = Cli::try_parse_from(["hbctl", "backup", "--out", "./bk"]).unwrap();
+        match basic.command {
+            Commands::Backup(args) => {
+                assert_eq!(args.out, PathBuf::from("./bk"));
+                assert!(!args.no_attachments);
+                assert!(!args.exclude_archived);
+                assert!(!args.overwrite);
+            }
+            other => panic!("unexpected command: {other:?}"),
+        }
+
+        let full = Cli::try_parse_from([
+            "hbctl",
+            "--dry-run",
+            "--json",
+            "backup",
+            "-o",
+            "/tmp/inv.tar.gz",
+            "--no-attachments",
+            "--exclude-archived",
+            "--overwrite",
+        ])
+        .unwrap();
+        assert!(full.dry_run);
+        assert!(full.json);
+        match full.command {
+            Commands::Backup(args) => {
+                assert_eq!(args.out, PathBuf::from("/tmp/inv.tar.gz"));
+                assert!(args.no_attachments);
+                assert!(args.exclude_archived);
+                assert!(args.overwrite);
+            }
+            other => panic!("unexpected command: {other:?}"),
+        }
+
+        assert!(Cli::try_parse_from(["hbctl", "backup"]).is_err());
     }
 }

@@ -1,14 +1,23 @@
+pub mod actions;
 pub mod api;
 pub mod attachment;
 pub mod auth;
+pub mod backup;
+pub mod barcode;
+pub mod config;
 pub mod entity_type;
 pub mod export;
 pub mod field;
 pub mod item;
+pub mod label;
 pub mod maintenance;
+pub mod notifier;
+pub mod qr;
 pub mod search;
+pub mod stats;
 pub mod status;
 pub mod tag;
+pub mod template;
 
 use std::collections::HashSet;
 use std::fs;
@@ -42,15 +51,32 @@ pub fn dispatch(
             out,
             err,
         ),
-        Commands::Item(args) => item::handle(args, cli.dry_run, config, ctx, out, err),
-        Commands::Attachment(args) => attachment::handle(args, cli.dry_run, config, ctx, out, err),
+        Commands::Item(args) => {
+            item::handle(args, cli.dry_run, cli.asset_id, config, ctx, out, err)
+        }
+        Commands::Attachment(args) => {
+            attachment::handle(args, cli.dry_run, cli.asset_id, config, ctx, out, err)
+        }
         Commands::Search(args) => search::handle(args, config, ctx, out, err),
-        Commands::Field(args) => field::handle(args, cli.dry_run, config, ctx, out, err),
+        Commands::Field(args) => {
+            field::handle(args, cli.dry_run, cli.asset_id, config, ctx, out, err)
+        }
         Commands::Tag(args) => tag::handle(args, cli.dry_run, config, ctx, out, err),
         Commands::EntityTypes(args) => {
             entity_type::handle(args, cli.dry_run, config, ctx, out, err)
         }
         Commands::Export(args) => export::handle(args, config, ctx, out, err),
+        Commands::Backup(args) => backup::handle(args, cli.dry_run, config, ctx, out, err),
+        Commands::Label(args) => label::handle(args, cli.dry_run, cli.asset_id, config, ctx, out),
+        Commands::Qr(args) => qr::handle(args, cli.dry_run, cli.asset_id, config, ctx, out),
+        Commands::Actions(args) => actions::handle(args, cli.dry_run, config, ctx, out),
+        Commands::Stats(args) => stats::handle(args, cli.dry_run, config, ctx, out),
+        Commands::Config(args) => {
+            config::handle(args, cli.dry_run, cli.config.as_ref(), config, ctx, out)
+        }
+        Commands::Template(args) => template::handle(args, cli.dry_run, config, ctx, out, err),
+        Commands::Barcode(args) => barcode::handle(args, cli.dry_run, config, ctx, out),
+        Commands::Notifier(args) => notifier::handle(args, cli.dry_run, config, ctx, out, err),
         Commands::Status => status::handle(cli.dry_run, config, ctx, out),
         Commands::Api(args) => api::handle(args, cli.dry_run, config, ctx, out),
         Commands::Maintenance(args) => {

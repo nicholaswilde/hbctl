@@ -39,6 +39,11 @@ echo "$STAGING_KEY" | hbctl --profile staging auth login --url https://homebox-s
 # Target an instance via flag or environment variable
 hbctl -P staging item list
 HBCTL_PROFILE=staging hbctl item list
+
+# Inspect effective configuration and manage profiles
+hbctl config show
+hbctl config profiles
+hbctl config use homelab
 ```
 
 Profile names allow ASCII letters, digits, `-`, `_`, and `.`. Stored credentials use `profile:<name>:<base_url>` as the keyring/file account key so switching profiles never leaks tokens across instances.
@@ -96,6 +101,6 @@ By default, `hbctl` rejects image uploads exceeding `500` KB (`max_image_kb = 50
 | `HBCTL_API_KEY` | `api_key` | `--api-key` | Homebox API key (`hb_...`) or Bearer token (highest env precedence) |
 | `HOMEBOX_API_KEY` | `api_key` | `--api-key` | Fallback Homebox API key or Bearer token |
 | `HBCTL_PROFILE` | `default_profile` | `-P`, `--profile` | Active named profile from `config.toml` |
-| `HBCTL_OUTPUT` | `output` | `--output`, `--json` | Output format (`table`, `json`, or `plain`) |
+| `HBCTL_OUTPUT` | `output` | `--output`, `--json` | Output format (`table`, `json`, `plain`, `csv`, or `markdown`) |
 | `HBCTL_INSECURE_STORAGE` | N/A | `--insecure-storage` | Set to `1`, `true`, or `yes` to bypass OS keyring and use `0600` file store |
 | `XDG_CONFIG_HOME` | N/A | `-C`, `--config` | Base directory for `~/.config/hbctl/config.toml` and `credentials.json` |

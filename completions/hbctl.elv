@@ -20,7 +20,7 @@ set edit:completion:arg-completer[hbctl] = {|@words|
         &'hbctl'= {
             cand --url 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
             cand --api-key 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)'
-            cand --output 'Output format (table, json, plain) [env: HBCTL_OUTPUT]'
+            cand --output 'Output format (table, json, plain, csv, markdown) [env: HBCTL_OUTPUT]'
             cand --select 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)'
             cand -C 'Path to explicit TOML configuration file'
             cand --config 'Path to explicit TOML configuration file'
@@ -30,6 +30,7 @@ set edit:completion:arg-completer[hbctl] = {|@words|
             cand --dry-run 'Preview mutating requests without hitting the server (redacts Authorization)'
             cand -q 'Output only created/affected IDs for shell piping'
             cand --quiet 'Output only created/affected IDs for shell piping'
+            cand --asset-id 'Treat item ID arguments as Homebox asset IDs (auto-detected for numeric/dashed IDs like 000-001)'
             cand -h 'Print help'
             cand --help 'Print help'
             cand -V 'Print version'
@@ -46,6 +47,18 @@ set edit:completion:arg-completer[hbctl] = {|@words|
             cand api 'Issue a raw authenticated HTTP request against any Homebox API endpoint'
             cand maintenance 'Manage maintenance log entries (/api/v1/maintenance)'
             cand export 'Export filtered items to JSON, CSV, or Markdown'
+            cand backup 'Create a portable full-inventory backup (directory or .tar.gz archive)'
+            cand label 'Generate or print a Homebox item, asset, or location label (/api/v1/labelmaker)'
+            cand qr 'Generate a QR code image (/api/v1/qrcode)'
+            cand actions 'Run Homebox server maintenance actions (/api/v1/actions/*)'
+            cand action 'Run Homebox server maintenance actions (/api/v1/actions/*)'
+            cand stats 'Display inventory statistics and breakdowns (/api/v1/groups/statistics*)'
+            cand config 'Inspect effective configuration and manage named profiles'
+            cand template 'Manage item templates and create items from templates (/api/v1/templates)'
+            cand templates 'Manage item templates and create items from templates (/api/v1/templates)'
+            cand barcode 'Look up product metadata by barcode (/api/v1/products/search-from-barcode)'
+            cand notifier 'Manage Shoutrrr notification channels (/api/v1/notifiers)'
+            cand notifiers 'Manage Shoutrrr notification channels (/api/v1/notifiers)'
             cand completions 'Generate shell completion scripts'
             cand man 'Generate UNIX roff man page'
             cand update 'Check for and install the latest hbctl release from GitHub'
@@ -55,7 +68,7 @@ set edit:completion:arg-completer[hbctl] = {|@words|
         &'hbctl;auth'= {
             cand --url 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
             cand --api-key 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)'
-            cand --output 'Output format (table, json, plain) [env: HBCTL_OUTPUT]'
+            cand --output 'Output format (table, json, plain, csv, markdown) [env: HBCTL_OUTPUT]'
             cand --select 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)'
             cand -C 'Path to explicit TOML configuration file'
             cand --config 'Path to explicit TOML configuration file'
@@ -65,6 +78,7 @@ set edit:completion:arg-completer[hbctl] = {|@words|
             cand --dry-run 'Preview mutating requests without hitting the server (redacts Authorization)'
             cand -q 'Output only created/affected IDs for shell piping'
             cand --quiet 'Output only created/affected IDs for shell piping'
+            cand --asset-id 'Treat item ID arguments as Homebox asset IDs (auto-detected for numeric/dashed IDs like 000-001)'
             cand -h 'Print help'
             cand --help 'Print help'
             cand login 'Authenticate with Homebox via API key (--with-token) or email/password'
@@ -78,7 +92,7 @@ set edit:completion:arg-completer[hbctl] = {|@words|
             cand --username 'Email or username for password login (POST /api/v1/users/login)'
             cand --url 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
             cand --api-key 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)'
-            cand --output 'Output format (table, json, plain) [env: HBCTL_OUTPUT]'
+            cand --output 'Output format (table, json, plain, csv, markdown) [env: HBCTL_OUTPUT]'
             cand --select 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)'
             cand -C 'Path to explicit TOML configuration file'
             cand --config 'Path to explicit TOML configuration file'
@@ -91,13 +105,14 @@ set edit:completion:arg-completer[hbctl] = {|@words|
             cand --dry-run 'Preview mutating requests without hitting the server (redacts Authorization)'
             cand -q 'Output only created/affected IDs for shell piping'
             cand --quiet 'Output only created/affected IDs for shell piping'
+            cand --asset-id 'Treat item ID arguments as Homebox asset IDs (auto-detected for numeric/dashed IDs like 000-001)'
             cand -h 'Print help'
             cand --help 'Print help'
         }
         &'hbctl;auth;status'= {
             cand --url 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
             cand --api-key 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)'
-            cand --output 'Output format (table, json, plain) [env: HBCTL_OUTPUT]'
+            cand --output 'Output format (table, json, plain, csv, markdown) [env: HBCTL_OUTPUT]'
             cand --select 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)'
             cand -C 'Path to explicit TOML configuration file'
             cand --config 'Path to explicit TOML configuration file'
@@ -107,13 +122,14 @@ set edit:completion:arg-completer[hbctl] = {|@words|
             cand --dry-run 'Preview mutating requests without hitting the server (redacts Authorization)'
             cand -q 'Output only created/affected IDs for shell piping'
             cand --quiet 'Output only created/affected IDs for shell piping'
+            cand --asset-id 'Treat item ID arguments as Homebox asset IDs (auto-detected for numeric/dashed IDs like 000-001)'
             cand -h 'Print help'
             cand --help 'Print help'
         }
         &'hbctl;auth;logout'= {
             cand --url 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
             cand --api-key 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)'
-            cand --output 'Output format (table, json, plain) [env: HBCTL_OUTPUT]'
+            cand --output 'Output format (table, json, plain, csv, markdown) [env: HBCTL_OUTPUT]'
             cand --select 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)'
             cand -C 'Path to explicit TOML configuration file'
             cand --config 'Path to explicit TOML configuration file'
@@ -124,13 +140,14 @@ set edit:completion:arg-completer[hbctl] = {|@words|
             cand --dry-run 'Preview mutating requests without hitting the server (redacts Authorization)'
             cand -q 'Output only created/affected IDs for shell piping'
             cand --quiet 'Output only created/affected IDs for shell piping'
+            cand --asset-id 'Treat item ID arguments as Homebox asset IDs (auto-detected for numeric/dashed IDs like 000-001)'
             cand -h 'Print help'
             cand --help 'Print help'
         }
         &'hbctl;auth;refresh'= {
             cand --url 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
             cand --api-key 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)'
-            cand --output 'Output format (table, json, plain) [env: HBCTL_OUTPUT]'
+            cand --output 'Output format (table, json, plain, csv, markdown) [env: HBCTL_OUTPUT]'
             cand --select 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)'
             cand -C 'Path to explicit TOML configuration file'
             cand --config 'Path to explicit TOML configuration file'
@@ -141,6 +158,7 @@ set edit:completion:arg-completer[hbctl] = {|@words|
             cand --dry-run 'Preview mutating requests without hitting the server (redacts Authorization)'
             cand -q 'Output only created/affected IDs for shell piping'
             cand --quiet 'Output only created/affected IDs for shell piping'
+            cand --asset-id 'Treat item ID arguments as Homebox asset IDs (auto-detected for numeric/dashed IDs like 000-001)'
             cand -h 'Print help'
             cand --help 'Print help'
         }
@@ -164,7 +182,7 @@ set edit:completion:arg-completer[hbctl] = {|@words|
         &'hbctl;item'= {
             cand --url 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
             cand --api-key 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)'
-            cand --output 'Output format (table, json, plain) [env: HBCTL_OUTPUT]'
+            cand --output 'Output format (table, json, plain, csv, markdown) [env: HBCTL_OUTPUT]'
             cand --select 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)'
             cand -C 'Path to explicit TOML configuration file'
             cand --config 'Path to explicit TOML configuration file'
@@ -174,6 +192,7 @@ set edit:completion:arg-completer[hbctl] = {|@words|
             cand --dry-run 'Preview mutating requests without hitting the server (redacts Authorization)'
             cand -q 'Output only created/affected IDs for shell piping'
             cand --quiet 'Output only created/affected IDs for shell piping'
+            cand --asset-id 'Treat item ID arguments as Homebox asset IDs (auto-detected for numeric/dashed IDs like 000-001)'
             cand -h 'Print help'
             cand --help 'Print help'
             cand list 'List inventory items'
@@ -199,7 +218,7 @@ set edit:completion:arg-completer[hbctl] = {|@words|
             cand --warranty-expiring 'Only show items with a warranty expiring within the next DAYS days (excludes lifetime warranties)'
             cand --url 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
             cand --api-key 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)'
-            cand --output 'Output format (table, json, plain) [env: HBCTL_OUTPUT]'
+            cand --output 'Output format (table, json, plain, csv, markdown) [env: HBCTL_OUTPUT]'
             cand --select 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)'
             cand -C 'Path to explicit TOML configuration file'
             cand --config 'Path to explicit TOML configuration file'
@@ -212,13 +231,14 @@ set edit:completion:arg-completer[hbctl] = {|@words|
             cand --dry-run 'Preview mutating requests without hitting the server (redacts Authorization)'
             cand -q 'Output only created/affected IDs for shell piping'
             cand --quiet 'Output only created/affected IDs for shell piping'
+            cand --asset-id 'Treat item ID arguments as Homebox asset IDs (auto-detected for numeric/dashed IDs like 000-001)'
             cand -h 'Print help'
             cand --help 'Print help'
         }
         &'hbctl;item;get'= {
             cand --url 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
             cand --api-key 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)'
-            cand --output 'Output format (table, json, plain) [env: HBCTL_OUTPUT]'
+            cand --output 'Output format (table, json, plain, csv, markdown) [env: HBCTL_OUTPUT]'
             cand --select 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)'
             cand -C 'Path to explicit TOML configuration file'
             cand --config 'Path to explicit TOML configuration file'
@@ -229,11 +249,12 @@ set edit:completion:arg-completer[hbctl] = {|@words|
             cand --dry-run 'Preview mutating requests without hitting the server (redacts Authorization)'
             cand -q 'Output only created/affected IDs for shell piping'
             cand --quiet 'Output only created/affected IDs for shell piping'
+            cand --asset-id 'Treat item ID arguments as Homebox asset IDs (auto-detected for numeric/dashed IDs like 000-001)'
             cand -h 'Print help'
             cand --help 'Print help'
         }
         &'hbctl;item;create'= {
-            cand --name 'Item name (required unless supplied via --from-json)'
+            cand --name 'Item name (required unless supplied via --from-json or --from-barcode)'
             cand --description 'Item description'
             cand --type 'Entity type name or UUID'
             cand --parent 'Parent item/location name, ID, or ''none'''
@@ -258,11 +279,12 @@ set edit:completion:arg-completer[hbctl] = {|@words|
             cand --field 'Custom field KEY=VAL (repeatable)'
             cand --field-type 'Value type for --field entries'
             cand --from-json 'Load initial item JSON from file path or ''-'' for stdin'
+            cand --from-barcode 'Prefill name, description, manufacturer, and model from a barcode lookup'
             cand --attach 'Local file path(s) to attach after creating the item (`FILE` or `FILE=REMOTE_NAME`, repeatable)'
             cand --attach-url 'Remote HTTP(S) URL(s) to download and attach (`URL` or `URL=REMOTE_NAME`, repeatable)'
             cand --url 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
             cand --api-key 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)'
-            cand --output 'Output format (table, json, plain) [env: HBCTL_OUTPUT]'
+            cand --output 'Output format (table, json, plain, csv, markdown) [env: HBCTL_OUTPUT]'
             cand --select 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)'
             cand -C 'Path to explicit TOML configuration file'
             cand --config 'Path to explicit TOML configuration file'
@@ -275,6 +297,7 @@ set edit:completion:arg-completer[hbctl] = {|@words|
             cand --dry-run 'Preview mutating requests without hitting the server (redacts Authorization)'
             cand -q 'Output only created/affected IDs for shell piping'
             cand --quiet 'Output only created/affected IDs for shell piping'
+            cand --asset-id 'Treat item ID arguments as Homebox asset IDs (auto-detected for numeric/dashed IDs like 000-001)'
             cand -h 'Print help'
             cand --help 'Print help'
         }
@@ -312,7 +335,7 @@ set edit:completion:arg-completer[hbctl] = {|@words|
             cand --from-json 'Load patch JSON from file path or ''-'' for stdin'
             cand --url 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
             cand --api-key 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)'
-            cand --output 'Output format (table, json, plain) [env: HBCTL_OUTPUT]'
+            cand --output 'Output format (table, json, plain, csv, markdown) [env: HBCTL_OUTPUT]'
             cand --select 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)'
             cand -C 'Path to explicit TOML configuration file'
             cand --config 'Path to explicit TOML configuration file'
@@ -323,6 +346,7 @@ set edit:completion:arg-completer[hbctl] = {|@words|
             cand --dry-run 'Preview mutating requests without hitting the server (redacts Authorization)'
             cand -q 'Output only created/affected IDs for shell piping'
             cand --quiet 'Output only created/affected IDs for shell piping'
+            cand --asset-id 'Treat item ID arguments as Homebox asset IDs (auto-detected for numeric/dashed IDs like 000-001)'
             cand -h 'Print help'
             cand --help 'Print help'
         }
@@ -359,7 +383,7 @@ set edit:completion:arg-completer[hbctl] = {|@words|
             cand --attach-url 'Remote HTTP(S) URL(s) to download and attach (`URL` or `URL=REMOTE_NAME`, repeatable)'
             cand --url 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
             cand --api-key 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)'
-            cand --output 'Output format (table, json, plain) [env: HBCTL_OUTPUT]'
+            cand --output 'Output format (table, json, plain, csv, markdown) [env: HBCTL_OUTPUT]'
             cand --select 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)'
             cand -C 'Path to explicit TOML configuration file'
             cand --config 'Path to explicit TOML configuration file'
@@ -373,6 +397,7 @@ set edit:completion:arg-completer[hbctl] = {|@words|
             cand --dry-run 'Preview mutating requests without hitting the server (redacts Authorization)'
             cand -q 'Output only created/affected IDs for shell piping'
             cand --quiet 'Output only created/affected IDs for shell piping'
+            cand --asset-id 'Treat item ID arguments as Homebox asset IDs (auto-detected for numeric/dashed IDs like 000-001)'
             cand -h 'Print help'
             cand --help 'Print help'
         }
@@ -386,7 +411,7 @@ set edit:completion:arg-completer[hbctl] = {|@words|
             cand --filter-type 'Select items to delete matching this entity type name or UUID'
             cand --url 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
             cand --api-key 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)'
-            cand --output 'Output format (table, json, plain) [env: HBCTL_OUTPUT]'
+            cand --output 'Output format (table, json, plain, csv, markdown) [env: HBCTL_OUTPUT]'
             cand --select 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)'
             cand -C 'Path to explicit TOML configuration file'
             cand --config 'Path to explicit TOML configuration file'
@@ -399,6 +424,7 @@ set edit:completion:arg-completer[hbctl] = {|@words|
             cand --dry-run 'Preview mutating requests without hitting the server (redacts Authorization)'
             cand -q 'Output only created/affected IDs for shell piping'
             cand --quiet 'Output only created/affected IDs for shell piping'
+            cand --asset-id 'Treat item ID arguments as Homebox asset IDs (auto-detected for numeric/dashed IDs like 000-001)'
             cand -h 'Print help'
             cand --help 'Print help'
         }
@@ -410,7 +436,7 @@ set edit:completion:arg-completer[hbctl] = {|@words|
             cand --attach 'Local file path(s) to attach to each imported item (`FILE` or `FILE=REMOTE_NAME`, repeatable)'
             cand --url 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
             cand --api-key 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)'
-            cand --output 'Output format (table, json, plain) [env: HBCTL_OUTPUT]'
+            cand --output 'Output format (table, json, plain, csv, markdown) [env: HBCTL_OUTPUT]'
             cand --select 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)'
             cand -C 'Path to explicit TOML configuration file'
             cand --config 'Path to explicit TOML configuration file'
@@ -425,6 +451,7 @@ set edit:completion:arg-completer[hbctl] = {|@words|
             cand --dry-run 'Preview mutating requests without hitting the server (redacts Authorization)'
             cand -q 'Output only created/affected IDs for shell piping'
             cand --quiet 'Output only created/affected IDs for shell piping'
+            cand --asset-id 'Treat item ID arguments as Homebox asset IDs (auto-detected for numeric/dashed IDs like 000-001)'
             cand -h 'Print help'
             cand --help 'Print help'
         }
@@ -432,7 +459,7 @@ set edit:completion:arg-completer[hbctl] = {|@words|
             cand --threshold 'Jaccard similarity threshold for near-duplicate detection (0.0..=1.0)'
             cand --url 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
             cand --api-key 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)'
-            cand --output 'Output format (table, json, plain) [env: HBCTL_OUTPUT]'
+            cand --output 'Output format (table, json, plain, csv, markdown) [env: HBCTL_OUTPUT]'
             cand --select 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)'
             cand -C 'Path to explicit TOML configuration file'
             cand --config 'Path to explicit TOML configuration file'
@@ -444,6 +471,7 @@ set edit:completion:arg-completer[hbctl] = {|@words|
             cand --dry-run 'Preview mutating requests without hitting the server (redacts Authorization)'
             cand -q 'Output only created/affected IDs for shell piping'
             cand --quiet 'Output only created/affected IDs for shell piping'
+            cand --asset-id 'Treat item ID arguments as Homebox asset IDs (auto-detected for numeric/dashed IDs like 000-001)'
             cand -h 'Print help'
             cand --help 'Print help'
         }
@@ -458,7 +486,7 @@ set edit:completion:arg-completer[hbctl] = {|@words|
             cand --filter-type 'Select items to move matching this entity type name or UUID'
             cand --url 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
             cand --api-key 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)'
-            cand --output 'Output format (table, json, plain) [env: HBCTL_OUTPUT]'
+            cand --output 'Output format (table, json, plain, csv, markdown) [env: HBCTL_OUTPUT]'
             cand --select 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)'
             cand -C 'Path to explicit TOML configuration file'
             cand --config 'Path to explicit TOML configuration file'
@@ -468,6 +496,7 @@ set edit:completion:arg-completer[hbctl] = {|@words|
             cand --dry-run 'Preview mutating requests without hitting the server (redacts Authorization)'
             cand -q 'Output only created/affected IDs for shell piping'
             cand --quiet 'Output only created/affected IDs for shell piping'
+            cand --asset-id 'Treat item ID arguments as Homebox asset IDs (auto-detected for numeric/dashed IDs like 000-001)'
             cand -h 'Print help'
             cand --help 'Print help'
         }
@@ -475,7 +504,7 @@ set edit:completion:arg-completer[hbctl] = {|@words|
             cand --count 'Number of duplicates to create'
             cand --url 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
             cand --api-key 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)'
-            cand --output 'Output format (table, json, plain) [env: HBCTL_OUTPUT]'
+            cand --output 'Output format (table, json, plain, csv, markdown) [env: HBCTL_OUTPUT]'
             cand --select 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)'
             cand -C 'Path to explicit TOML configuration file'
             cand --config 'Path to explicit TOML configuration file'
@@ -485,13 +514,14 @@ set edit:completion:arg-completer[hbctl] = {|@words|
             cand --dry-run 'Preview mutating requests without hitting the server (redacts Authorization)'
             cand -q 'Output only created/affected IDs for shell piping'
             cand --quiet 'Output only created/affected IDs for shell piping'
+            cand --asset-id 'Treat item ID arguments as Homebox asset IDs (auto-detected for numeric/dashed IDs like 000-001)'
             cand -h 'Print help'
             cand --help 'Print help'
         }
         &'hbctl;item;path'= {
             cand --url 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
             cand --api-key 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)'
-            cand --output 'Output format (table, json, plain) [env: HBCTL_OUTPUT]'
+            cand --output 'Output format (table, json, plain, csv, markdown) [env: HBCTL_OUTPUT]'
             cand --select 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)'
             cand -C 'Path to explicit TOML configuration file'
             cand --config 'Path to explicit TOML configuration file'
@@ -501,6 +531,7 @@ set edit:completion:arg-completer[hbctl] = {|@words|
             cand --dry-run 'Preview mutating requests without hitting the server (redacts Authorization)'
             cand -q 'Output only created/affected IDs for shell piping'
             cand --quiet 'Output only created/affected IDs for shell piping'
+            cand --asset-id 'Treat item ID arguments as Homebox asset IDs (auto-detected for numeric/dashed IDs like 000-001)'
             cand -h 'Print help'
             cand --help 'Print help'
         }
@@ -509,7 +540,7 @@ set edit:completion:arg-completer[hbctl] = {|@words|
             cand --max-depth 'Optional maximum depth to display (0 = roots only)'
             cand --url 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
             cand --api-key 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)'
-            cand --output 'Output format (table, json, plain) [env: HBCTL_OUTPUT]'
+            cand --output 'Output format (table, json, plain, csv, markdown) [env: HBCTL_OUTPUT]'
             cand --select 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)'
             cand -C 'Path to explicit TOML configuration file'
             cand --config 'Path to explicit TOML configuration file'
@@ -519,6 +550,7 @@ set edit:completion:arg-completer[hbctl] = {|@words|
             cand --dry-run 'Preview mutating requests without hitting the server (redacts Authorization)'
             cand -q 'Output only created/affected IDs for shell piping'
             cand --quiet 'Output only created/affected IDs for shell piping'
+            cand --asset-id 'Treat item ID arguments as Homebox asset IDs (auto-detected for numeric/dashed IDs like 000-001)'
             cand -h 'Print help'
             cand --help 'Print help'
         }
@@ -566,7 +598,7 @@ set edit:completion:arg-completer[hbctl] = {|@words|
         &'hbctl;attachment'= {
             cand --url 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
             cand --api-key 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)'
-            cand --output 'Output format (table, json, plain) [env: HBCTL_OUTPUT]'
+            cand --output 'Output format (table, json, plain, csv, markdown) [env: HBCTL_OUTPUT]'
             cand --select 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)'
             cand -C 'Path to explicit TOML configuration file'
             cand --config 'Path to explicit TOML configuration file'
@@ -576,12 +608,16 @@ set edit:completion:arg-completer[hbctl] = {|@words|
             cand --dry-run 'Preview mutating requests without hitting the server (redacts Authorization)'
             cand -q 'Output only created/affected IDs for shell piping'
             cand --quiet 'Output only created/affected IDs for shell piping'
+            cand --asset-id 'Treat item ID arguments as Homebox asset IDs (auto-detected for numeric/dashed IDs like 000-001)'
             cand -h 'Print help'
             cand --help 'Print help'
             cand upload 'Upload one or more files as item attachments'
             cand list 'List attachments on an item'
             cand download 'Stream-download attachments from one or multiple items'
             cand delete 'Delete an attachment from an item'
+            cand set-primary 'Mark an existing attachment as the item''s primary photo'
+            cand update 'Update attachment metadata (title, type, primary)'
+            cand add-link 'Attach an external HTTP(S) URL link to an item'
             cand help 'Print this message or the help of the given subcommand(s)'
         }
         &'hbctl;attachment;upload'= {
@@ -589,12 +625,13 @@ set edit:completion:arg-completer[hbctl] = {|@words|
             cand --name 'Override remote filename/title (for single-file or stdin ''-'' uploads)'
             cand --url 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
             cand --api-key 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)'
-            cand --output 'Output format (table, json, plain) [env: HBCTL_OUTPUT]'
+            cand --output 'Output format (table, json, plain, csv, markdown) [env: HBCTL_OUTPUT]'
             cand --select 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)'
             cand -C 'Path to explicit TOML configuration file'
             cand --config 'Path to explicit TOML configuration file'
             cand -P 'Named configuration profile (env: HBCTL_PROFILE)'
             cand --profile 'Named configuration profile (env: HBCTL_PROFILE)'
+            cand --primary 'Mark the uploaded attachment as the item''s primary photo'
             cand --skip-existing 'Skip files that already exist on the item (default behavior)'
             cand --overwrite 'Delete and re-upload files that already exist on the item'
             cand --optimize 'Automatically resize/compress oversized images before upload'
@@ -603,13 +640,14 @@ set edit:completion:arg-completer[hbctl] = {|@words|
             cand --dry-run 'Preview mutating requests without hitting the server (redacts Authorization)'
             cand -q 'Output only created/affected IDs for shell piping'
             cand --quiet 'Output only created/affected IDs for shell piping'
+            cand --asset-id 'Treat item ID arguments as Homebox asset IDs (auto-detected for numeric/dashed IDs like 000-001)'
             cand -h 'Print help'
             cand --help 'Print help'
         }
         &'hbctl;attachment;list'= {
             cand --url 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
             cand --api-key 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)'
-            cand --output 'Output format (table, json, plain) [env: HBCTL_OUTPUT]'
+            cand --output 'Output format (table, json, plain, csv, markdown) [env: HBCTL_OUTPUT]'
             cand --select 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)'
             cand -C 'Path to explicit TOML configuration file'
             cand --config 'Path to explicit TOML configuration file'
@@ -619,6 +657,7 @@ set edit:completion:arg-completer[hbctl] = {|@words|
             cand --dry-run 'Preview mutating requests without hitting the server (redacts Authorization)'
             cand -q 'Output only created/affected IDs for shell piping'
             cand --quiet 'Output only created/affected IDs for shell piping'
+            cand --asset-id 'Treat item ID arguments as Homebox asset IDs (auto-detected for numeric/dashed IDs like 000-001)'
             cand -h 'Print help'
             cand --help 'Print help'
         }
@@ -630,7 +669,7 @@ set edit:completion:arg-completer[hbctl] = {|@words|
             cand --out 'Output file path (single download) or directory (multi-download / --all / bulk)'
             cand --url 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
             cand --api-key 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)'
-            cand --output 'Output format (table, json, plain) [env: HBCTL_OUTPUT]'
+            cand --output 'Output format (table, json, plain, csv, markdown) [env: HBCTL_OUTPUT]'
             cand --select 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)'
             cand -C 'Path to explicit TOML configuration file'
             cand --config 'Path to explicit TOML configuration file'
@@ -643,13 +682,14 @@ set edit:completion:arg-completer[hbctl] = {|@words|
             cand --dry-run 'Preview mutating requests without hitting the server (redacts Authorization)'
             cand -q 'Output only created/affected IDs for shell piping'
             cand --quiet 'Output only created/affected IDs for shell piping'
+            cand --asset-id 'Treat item ID arguments as Homebox asset IDs (auto-detected for numeric/dashed IDs like 000-001)'
             cand -h 'Print help'
             cand --help 'Print help'
         }
         &'hbctl;attachment;delete'= {
             cand --url 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
             cand --api-key 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)'
-            cand --output 'Output format (table, json, plain) [env: HBCTL_OUTPUT]'
+            cand --output 'Output format (table, json, plain, csv, markdown) [env: HBCTL_OUTPUT]'
             cand --select 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)'
             cand -C 'Path to explicit TOML configuration file'
             cand --config 'Path to explicit TOML configuration file'
@@ -659,6 +699,63 @@ set edit:completion:arg-completer[hbctl] = {|@words|
             cand --dry-run 'Preview mutating requests without hitting the server (redacts Authorization)'
             cand -q 'Output only created/affected IDs for shell piping'
             cand --quiet 'Output only created/affected IDs for shell piping'
+            cand --asset-id 'Treat item ID arguments as Homebox asset IDs (auto-detected for numeric/dashed IDs like 000-001)'
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'hbctl;attachment;set-primary'= {
+            cand --url 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
+            cand --api-key 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)'
+            cand --output 'Output format (table, json, plain, csv, markdown) [env: HBCTL_OUTPUT]'
+            cand --select 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)'
+            cand -C 'Path to explicit TOML configuration file'
+            cand --config 'Path to explicit TOML configuration file'
+            cand -P 'Named configuration profile (env: HBCTL_PROFILE)'
+            cand --profile 'Named configuration profile (env: HBCTL_PROFILE)'
+            cand --json 'Shorthand for --output json (emits compact JSON)'
+            cand --dry-run 'Preview mutating requests without hitting the server (redacts Authorization)'
+            cand -q 'Output only created/affected IDs for shell piping'
+            cand --quiet 'Output only created/affected IDs for shell piping'
+            cand --asset-id 'Treat item ID arguments as Homebox asset IDs (auto-detected for numeric/dashed IDs like 000-001)'
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'hbctl;attachment;update'= {
+            cand --title 'Updated attachment title'
+            cand --type 'Updated attachment type (e.g. photo, manual, warranty, receipt, attachment)'
+            cand --primary 'Mark or unmark as the primary attachment (true/false; bare flag means true)'
+            cand --url 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
+            cand --api-key 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)'
+            cand --output 'Output format (table, json, plain, csv, markdown) [env: HBCTL_OUTPUT]'
+            cand --select 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)'
+            cand -C 'Path to explicit TOML configuration file'
+            cand --config 'Path to explicit TOML configuration file'
+            cand -P 'Named configuration profile (env: HBCTL_PROFILE)'
+            cand --profile 'Named configuration profile (env: HBCTL_PROFILE)'
+            cand --json 'Shorthand for --output json (emits compact JSON)'
+            cand --dry-run 'Preview mutating requests without hitting the server (redacts Authorization)'
+            cand -q 'Output only created/affected IDs for shell piping'
+            cand --quiet 'Output only created/affected IDs for shell piping'
+            cand --asset-id 'Treat item ID arguments as Homebox asset IDs (auto-detected for numeric/dashed IDs like 000-001)'
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'hbctl;attachment;add-link'= {
+            cand --title 'Display title for the external link (defaults to sanitized URL)'
+            cand --type 'Attachment type (photo, manual, warranty, receipt, attachment)'
+            cand --url 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
+            cand --api-key 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)'
+            cand --output 'Output format (table, json, plain, csv, markdown) [env: HBCTL_OUTPUT]'
+            cand --select 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)'
+            cand -C 'Path to explicit TOML configuration file'
+            cand --config 'Path to explicit TOML configuration file'
+            cand -P 'Named configuration profile (env: HBCTL_PROFILE)'
+            cand --profile 'Named configuration profile (env: HBCTL_PROFILE)'
+            cand --json 'Shorthand for --output json (emits compact JSON)'
+            cand --dry-run 'Preview mutating requests without hitting the server (redacts Authorization)'
+            cand -q 'Output only created/affected IDs for shell piping'
+            cand --quiet 'Output only created/affected IDs for shell piping'
+            cand --asset-id 'Treat item ID arguments as Homebox asset IDs (auto-detected for numeric/dashed IDs like 000-001)'
             cand -h 'Print help'
             cand --help 'Print help'
         }
@@ -667,6 +764,9 @@ set edit:completion:arg-completer[hbctl] = {|@words|
             cand list 'List attachments on an item'
             cand download 'Stream-download attachments from one or multiple items'
             cand delete 'Delete an attachment from an item'
+            cand set-primary 'Mark an existing attachment as the item''s primary photo'
+            cand update 'Update attachment metadata (title, type, primary)'
+            cand add-link 'Attach an external HTTP(S) URL link to an item'
             cand help 'Print this message or the help of the given subcommand(s)'
         }
         &'hbctl;attachment;help;upload'= {
@@ -676,6 +776,12 @@ set edit:completion:arg-completer[hbctl] = {|@words|
         &'hbctl;attachment;help;download'= {
         }
         &'hbctl;attachment;help;delete'= {
+        }
+        &'hbctl;attachment;help;set-primary'= {
+        }
+        &'hbctl;attachment;help;update'= {
+        }
+        &'hbctl;attachment;help;add-link'= {
         }
         &'hbctl;attachment;help;help'= {
         }
@@ -691,7 +797,7 @@ set edit:completion:arg-completer[hbctl] = {|@words|
             cand --field 'Filter by custom field existence (KEY) or substring value (KEY=VAL), case-insensitive (repeatable)'
             cand --url 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
             cand --api-key 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)'
-            cand --output 'Output format (table, json, plain) [env: HBCTL_OUTPUT]'
+            cand --output 'Output format (table, json, plain, csv, markdown) [env: HBCTL_OUTPUT]'
             cand --select 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)'
             cand -C 'Path to explicit TOML configuration file'
             cand --config 'Path to explicit TOML configuration file'
@@ -705,13 +811,14 @@ set edit:completion:arg-completer[hbctl] = {|@words|
             cand --dry-run 'Preview mutating requests without hitting the server (redacts Authorization)'
             cand -q 'Output only created/affected IDs for shell piping'
             cand --quiet 'Output only created/affected IDs for shell piping'
+            cand --asset-id 'Treat item ID arguments as Homebox asset IDs (auto-detected for numeric/dashed IDs like 000-001)'
             cand -h 'Print help'
             cand --help 'Print help'
         }
         &'hbctl;field'= {
             cand --url 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
             cand --api-key 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)'
-            cand --output 'Output format (table, json, plain) [env: HBCTL_OUTPUT]'
+            cand --output 'Output format (table, json, plain, csv, markdown) [env: HBCTL_OUTPUT]'
             cand --select 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)'
             cand -C 'Path to explicit TOML configuration file'
             cand --config 'Path to explicit TOML configuration file'
@@ -721,6 +828,7 @@ set edit:completion:arg-completer[hbctl] = {|@words|
             cand --dry-run 'Preview mutating requests without hitting the server (redacts Authorization)'
             cand -q 'Output only created/affected IDs for shell piping'
             cand --quiet 'Output only created/affected IDs for shell piping'
+            cand --asset-id 'Treat item ID arguments as Homebox asset IDs (auto-detected for numeric/dashed IDs like 000-001)'
             cand -h 'Print help'
             cand --help 'Print help'
             cand list 'List all custom fields on an item'
@@ -732,7 +840,7 @@ set edit:completion:arg-completer[hbctl] = {|@words|
         &'hbctl;field;list'= {
             cand --url 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
             cand --api-key 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)'
-            cand --output 'Output format (table, json, plain) [env: HBCTL_OUTPUT]'
+            cand --output 'Output format (table, json, plain, csv, markdown) [env: HBCTL_OUTPUT]'
             cand --select 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)'
             cand -C 'Path to explicit TOML configuration file'
             cand --config 'Path to explicit TOML configuration file'
@@ -742,13 +850,14 @@ set edit:completion:arg-completer[hbctl] = {|@words|
             cand --dry-run 'Preview mutating requests without hitting the server (redacts Authorization)'
             cand -q 'Output only created/affected IDs for shell piping'
             cand --quiet 'Output only created/affected IDs for shell piping'
+            cand --asset-id 'Treat item ID arguments as Homebox asset IDs (auto-detected for numeric/dashed IDs like 000-001)'
             cand -h 'Print help'
             cand --help 'Print help'
         }
         &'hbctl;field;get'= {
             cand --url 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
             cand --api-key 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)'
-            cand --output 'Output format (table, json, plain) [env: HBCTL_OUTPUT]'
+            cand --output 'Output format (table, json, plain, csv, markdown) [env: HBCTL_OUTPUT]'
             cand --select 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)'
             cand -C 'Path to explicit TOML configuration file'
             cand --config 'Path to explicit TOML configuration file'
@@ -758,6 +867,7 @@ set edit:completion:arg-completer[hbctl] = {|@words|
             cand --dry-run 'Preview mutating requests without hitting the server (redacts Authorization)'
             cand -q 'Output only created/affected IDs for shell piping'
             cand --quiet 'Output only created/affected IDs for shell piping'
+            cand --asset-id 'Treat item ID arguments as Homebox asset IDs (auto-detected for numeric/dashed IDs like 000-001)'
             cand -h 'Print help'
             cand --help 'Print help'
         }
@@ -765,7 +875,7 @@ set edit:completion:arg-completer[hbctl] = {|@words|
             cand --type 'Custom field value type'
             cand --url 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
             cand --api-key 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)'
-            cand --output 'Output format (table, json, plain) [env: HBCTL_OUTPUT]'
+            cand --output 'Output format (table, json, plain, csv, markdown) [env: HBCTL_OUTPUT]'
             cand --select 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)'
             cand -C 'Path to explicit TOML configuration file'
             cand --config 'Path to explicit TOML configuration file'
@@ -775,13 +885,14 @@ set edit:completion:arg-completer[hbctl] = {|@words|
             cand --dry-run 'Preview mutating requests without hitting the server (redacts Authorization)'
             cand -q 'Output only created/affected IDs for shell piping'
             cand --quiet 'Output only created/affected IDs for shell piping'
+            cand --asset-id 'Treat item ID arguments as Homebox asset IDs (auto-detected for numeric/dashed IDs like 000-001)'
             cand -h 'Print help'
             cand --help 'Print help'
         }
         &'hbctl;field;delete'= {
             cand --url 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
             cand --api-key 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)'
-            cand --output 'Output format (table, json, plain) [env: HBCTL_OUTPUT]'
+            cand --output 'Output format (table, json, plain, csv, markdown) [env: HBCTL_OUTPUT]'
             cand --select 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)'
             cand -C 'Path to explicit TOML configuration file'
             cand --config 'Path to explicit TOML configuration file'
@@ -791,6 +902,7 @@ set edit:completion:arg-completer[hbctl] = {|@words|
             cand --dry-run 'Preview mutating requests without hitting the server (redacts Authorization)'
             cand -q 'Output only created/affected IDs for shell piping'
             cand --quiet 'Output only created/affected IDs for shell piping'
+            cand --asset-id 'Treat item ID arguments as Homebox asset IDs (auto-detected for numeric/dashed IDs like 000-001)'
             cand -h 'Print help'
             cand --help 'Print help'
         }
@@ -814,7 +926,7 @@ set edit:completion:arg-completer[hbctl] = {|@words|
         &'hbctl;tag'= {
             cand --url 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
             cand --api-key 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)'
-            cand --output 'Output format (table, json, plain) [env: HBCTL_OUTPUT]'
+            cand --output 'Output format (table, json, plain, csv, markdown) [env: HBCTL_OUTPUT]'
             cand --select 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)'
             cand -C 'Path to explicit TOML configuration file'
             cand --config 'Path to explicit TOML configuration file'
@@ -824,6 +936,7 @@ set edit:completion:arg-completer[hbctl] = {|@words|
             cand --dry-run 'Preview mutating requests without hitting the server (redacts Authorization)'
             cand -q 'Output only created/affected IDs for shell piping'
             cand --quiet 'Output only created/affected IDs for shell piping'
+            cand --asset-id 'Treat item ID arguments as Homebox asset IDs (auto-detected for numeric/dashed IDs like 000-001)'
             cand -h 'Print help'
             cand --help 'Print help'
             cand list 'List all tags'
@@ -835,7 +948,7 @@ set edit:completion:arg-completer[hbctl] = {|@words|
         &'hbctl;tag;list'= {
             cand --url 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
             cand --api-key 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)'
-            cand --output 'Output format (table, json, plain) [env: HBCTL_OUTPUT]'
+            cand --output 'Output format (table, json, plain, csv, markdown) [env: HBCTL_OUTPUT]'
             cand --select 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)'
             cand -C 'Path to explicit TOML configuration file'
             cand --config 'Path to explicit TOML configuration file'
@@ -845,13 +958,14 @@ set edit:completion:arg-completer[hbctl] = {|@words|
             cand --dry-run 'Preview mutating requests without hitting the server (redacts Authorization)'
             cand -q 'Output only created/affected IDs for shell piping'
             cand --quiet 'Output only created/affected IDs for shell piping'
+            cand --asset-id 'Treat item ID arguments as Homebox asset IDs (auto-detected for numeric/dashed IDs like 000-001)'
             cand -h 'Print help'
             cand --help 'Print help'
         }
         &'hbctl;tag;create'= {
             cand --url 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
             cand --api-key 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)'
-            cand --output 'Output format (table, json, plain) [env: HBCTL_OUTPUT]'
+            cand --output 'Output format (table, json, plain, csv, markdown) [env: HBCTL_OUTPUT]'
             cand --select 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)'
             cand -C 'Path to explicit TOML configuration file'
             cand --config 'Path to explicit TOML configuration file'
@@ -861,6 +975,7 @@ set edit:completion:arg-completer[hbctl] = {|@words|
             cand --dry-run 'Preview mutating requests without hitting the server (redacts Authorization)'
             cand -q 'Output only created/affected IDs for shell piping'
             cand --quiet 'Output only created/affected IDs for shell piping'
+            cand --asset-id 'Treat item ID arguments as Homebox asset IDs (auto-detected for numeric/dashed IDs like 000-001)'
             cand -h 'Print help'
             cand --help 'Print help'
         }
@@ -870,7 +985,7 @@ set edit:completion:arg-completer[hbctl] = {|@words|
             cand --color 'Updated tag hex color'
             cand --url 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
             cand --api-key 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)'
-            cand --output 'Output format (table, json, plain) [env: HBCTL_OUTPUT]'
+            cand --output 'Output format (table, json, plain, csv, markdown) [env: HBCTL_OUTPUT]'
             cand --select 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)'
             cand -C 'Path to explicit TOML configuration file'
             cand --config 'Path to explicit TOML configuration file'
@@ -880,13 +995,14 @@ set edit:completion:arg-completer[hbctl] = {|@words|
             cand --dry-run 'Preview mutating requests without hitting the server (redacts Authorization)'
             cand -q 'Output only created/affected IDs for shell piping'
             cand --quiet 'Output only created/affected IDs for shell piping'
+            cand --asset-id 'Treat item ID arguments as Homebox asset IDs (auto-detected for numeric/dashed IDs like 000-001)'
             cand -h 'Print help'
             cand --help 'Print help'
         }
         &'hbctl;tag;delete'= {
             cand --url 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
             cand --api-key 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)'
-            cand --output 'Output format (table, json, plain) [env: HBCTL_OUTPUT]'
+            cand --output 'Output format (table, json, plain, csv, markdown) [env: HBCTL_OUTPUT]'
             cand --select 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)'
             cand -C 'Path to explicit TOML configuration file'
             cand --config 'Path to explicit TOML configuration file'
@@ -897,6 +1013,7 @@ set edit:completion:arg-completer[hbctl] = {|@words|
             cand --dry-run 'Preview mutating requests without hitting the server (redacts Authorization)'
             cand -q 'Output only created/affected IDs for shell piping'
             cand --quiet 'Output only created/affected IDs for shell piping'
+            cand --asset-id 'Treat item ID arguments as Homebox asset IDs (auto-detected for numeric/dashed IDs like 000-001)'
             cand -h 'Print help'
             cand --help 'Print help'
         }
@@ -920,7 +1037,7 @@ set edit:completion:arg-completer[hbctl] = {|@words|
         &'hbctl;entity-types'= {
             cand --url 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
             cand --api-key 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)'
-            cand --output 'Output format (table, json, plain) [env: HBCTL_OUTPUT]'
+            cand --output 'Output format (table, json, plain, csv, markdown) [env: HBCTL_OUTPUT]'
             cand --select 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)'
             cand -C 'Path to explicit TOML configuration file'
             cand --config 'Path to explicit TOML configuration file'
@@ -930,6 +1047,7 @@ set edit:completion:arg-completer[hbctl] = {|@words|
             cand --dry-run 'Preview mutating requests without hitting the server (redacts Authorization)'
             cand -q 'Output only created/affected IDs for shell piping'
             cand --quiet 'Output only created/affected IDs for shell piping'
+            cand --asset-id 'Treat item ID arguments as Homebox asset IDs (auto-detected for numeric/dashed IDs like 000-001)'
             cand -h 'Print help'
             cand --help 'Print help'
             cand list 'List all entity types'
@@ -940,7 +1058,7 @@ set edit:completion:arg-completer[hbctl] = {|@words|
         &'hbctl;entity-type'= {
             cand --url 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
             cand --api-key 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)'
-            cand --output 'Output format (table, json, plain) [env: HBCTL_OUTPUT]'
+            cand --output 'Output format (table, json, plain, csv, markdown) [env: HBCTL_OUTPUT]'
             cand --select 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)'
             cand -C 'Path to explicit TOML configuration file'
             cand --config 'Path to explicit TOML configuration file'
@@ -950,6 +1068,7 @@ set edit:completion:arg-completer[hbctl] = {|@words|
             cand --dry-run 'Preview mutating requests without hitting the server (redacts Authorization)'
             cand -q 'Output only created/affected IDs for shell piping'
             cand --quiet 'Output only created/affected IDs for shell piping'
+            cand --asset-id 'Treat item ID arguments as Homebox asset IDs (auto-detected for numeric/dashed IDs like 000-001)'
             cand -h 'Print help'
             cand --help 'Print help'
             cand list 'List all entity types'
@@ -960,7 +1079,7 @@ set edit:completion:arg-completer[hbctl] = {|@words|
         &'hbctl;entity-types;list'= {
             cand --url 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
             cand --api-key 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)'
-            cand --output 'Output format (table, json, plain) [env: HBCTL_OUTPUT]'
+            cand --output 'Output format (table, json, plain, csv, markdown) [env: HBCTL_OUTPUT]'
             cand --select 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)'
             cand -C 'Path to explicit TOML configuration file'
             cand --config 'Path to explicit TOML configuration file'
@@ -970,13 +1089,14 @@ set edit:completion:arg-completer[hbctl] = {|@words|
             cand --dry-run 'Preview mutating requests without hitting the server (redacts Authorization)'
             cand -q 'Output only created/affected IDs for shell piping'
             cand --quiet 'Output only created/affected IDs for shell piping'
+            cand --asset-id 'Treat item ID arguments as Homebox asset IDs (auto-detected for numeric/dashed IDs like 000-001)'
             cand -h 'Print help'
             cand --help 'Print help'
         }
         &'hbctl;entity-type;list'= {
             cand --url 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
             cand --api-key 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)'
-            cand --output 'Output format (table, json, plain) [env: HBCTL_OUTPUT]'
+            cand --output 'Output format (table, json, plain, csv, markdown) [env: HBCTL_OUTPUT]'
             cand --select 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)'
             cand -C 'Path to explicit TOML configuration file'
             cand --config 'Path to explicit TOML configuration file'
@@ -986,6 +1106,7 @@ set edit:completion:arg-completer[hbctl] = {|@words|
             cand --dry-run 'Preview mutating requests without hitting the server (redacts Authorization)'
             cand -q 'Output only created/affected IDs for shell piping'
             cand --quiet 'Output only created/affected IDs for shell piping'
+            cand --asset-id 'Treat item ID arguments as Homebox asset IDs (auto-detected for numeric/dashed IDs like 000-001)'
             cand -h 'Print help'
             cand --help 'Print help'
         }
@@ -993,7 +1114,7 @@ set edit:completion:arg-completer[hbctl] = {|@words|
             cand --description 'Optional description'
             cand --url 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
             cand --api-key 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)'
-            cand --output 'Output format (table, json, plain) [env: HBCTL_OUTPUT]'
+            cand --output 'Output format (table, json, plain, csv, markdown) [env: HBCTL_OUTPUT]'
             cand --select 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)'
             cand -C 'Path to explicit TOML configuration file'
             cand --config 'Path to explicit TOML configuration file'
@@ -1004,6 +1125,7 @@ set edit:completion:arg-completer[hbctl] = {|@words|
             cand --dry-run 'Preview mutating requests without hitting the server (redacts Authorization)'
             cand -q 'Output only created/affected IDs for shell piping'
             cand --quiet 'Output only created/affected IDs for shell piping'
+            cand --asset-id 'Treat item ID arguments as Homebox asset IDs (auto-detected for numeric/dashed IDs like 000-001)'
             cand -h 'Print help'
             cand --help 'Print help'
         }
@@ -1011,7 +1133,7 @@ set edit:completion:arg-completer[hbctl] = {|@words|
             cand --description 'Optional description'
             cand --url 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
             cand --api-key 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)'
-            cand --output 'Output format (table, json, plain) [env: HBCTL_OUTPUT]'
+            cand --output 'Output format (table, json, plain, csv, markdown) [env: HBCTL_OUTPUT]'
             cand --select 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)'
             cand -C 'Path to explicit TOML configuration file'
             cand --config 'Path to explicit TOML configuration file'
@@ -1022,13 +1144,14 @@ set edit:completion:arg-completer[hbctl] = {|@words|
             cand --dry-run 'Preview mutating requests without hitting the server (redacts Authorization)'
             cand -q 'Output only created/affected IDs for shell piping'
             cand --quiet 'Output only created/affected IDs for shell piping'
+            cand --asset-id 'Treat item ID arguments as Homebox asset IDs (auto-detected for numeric/dashed IDs like 000-001)'
             cand -h 'Print help'
             cand --help 'Print help'
         }
         &'hbctl;entity-types;delete'= {
             cand --url 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
             cand --api-key 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)'
-            cand --output 'Output format (table, json, plain) [env: HBCTL_OUTPUT]'
+            cand --output 'Output format (table, json, plain, csv, markdown) [env: HBCTL_OUTPUT]'
             cand --select 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)'
             cand -C 'Path to explicit TOML configuration file'
             cand --config 'Path to explicit TOML configuration file'
@@ -1039,13 +1162,14 @@ set edit:completion:arg-completer[hbctl] = {|@words|
             cand --dry-run 'Preview mutating requests without hitting the server (redacts Authorization)'
             cand -q 'Output only created/affected IDs for shell piping'
             cand --quiet 'Output only created/affected IDs for shell piping'
+            cand --asset-id 'Treat item ID arguments as Homebox asset IDs (auto-detected for numeric/dashed IDs like 000-001)'
             cand -h 'Print help'
             cand --help 'Print help'
         }
         &'hbctl;entity-type;delete'= {
             cand --url 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
             cand --api-key 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)'
-            cand --output 'Output format (table, json, plain) [env: HBCTL_OUTPUT]'
+            cand --output 'Output format (table, json, plain, csv, markdown) [env: HBCTL_OUTPUT]'
             cand --select 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)'
             cand -C 'Path to explicit TOML configuration file'
             cand --config 'Path to explicit TOML configuration file'
@@ -1056,6 +1180,7 @@ set edit:completion:arg-completer[hbctl] = {|@words|
             cand --dry-run 'Preview mutating requests without hitting the server (redacts Authorization)'
             cand -q 'Output only created/affected IDs for shell piping'
             cand --quiet 'Output only created/affected IDs for shell piping'
+            cand --asset-id 'Treat item ID arguments as Homebox asset IDs (auto-detected for numeric/dashed IDs like 000-001)'
             cand -h 'Print help'
             cand --help 'Print help'
         }
@@ -1090,7 +1215,7 @@ set edit:completion:arg-completer[hbctl] = {|@words|
         &'hbctl;status'= {
             cand --url 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
             cand --api-key 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)'
-            cand --output 'Output format (table, json, plain) [env: HBCTL_OUTPUT]'
+            cand --output 'Output format (table, json, plain, csv, markdown) [env: HBCTL_OUTPUT]'
             cand --select 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)'
             cand -C 'Path to explicit TOML configuration file'
             cand --config 'Path to explicit TOML configuration file'
@@ -1100,6 +1225,7 @@ set edit:completion:arg-completer[hbctl] = {|@words|
             cand --dry-run 'Preview mutating requests without hitting the server (redacts Authorization)'
             cand -q 'Output only created/affected IDs for shell piping'
             cand --quiet 'Output only created/affected IDs for shell piping'
+            cand --asset-id 'Treat item ID arguments as Homebox asset IDs (auto-detected for numeric/dashed IDs like 000-001)'
             cand -h 'Print help'
             cand --help 'Print help'
         }
@@ -1110,7 +1236,7 @@ set edit:completion:arg-completer[hbctl] = {|@words|
             cand --query 'Query parameter KEY=VALUE (repeatable; appended to any inline path query)'
             cand --url 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
             cand --api-key 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)'
-            cand --output 'Output format (table, json, plain) [env: HBCTL_OUTPUT]'
+            cand --output 'Output format (table, json, plain, csv, markdown) [env: HBCTL_OUTPUT]'
             cand --select 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)'
             cand -C 'Path to explicit TOML configuration file'
             cand --config 'Path to explicit TOML configuration file'
@@ -1120,13 +1246,14 @@ set edit:completion:arg-completer[hbctl] = {|@words|
             cand --dry-run 'Preview mutating requests without hitting the server (redacts Authorization)'
             cand -q 'Output only created/affected IDs for shell piping'
             cand --quiet 'Output only created/affected IDs for shell piping'
+            cand --asset-id 'Treat item ID arguments as Homebox asset IDs (auto-detected for numeric/dashed IDs like 000-001)'
             cand -h 'Print help'
             cand --help 'Print help'
         }
         &'hbctl;maintenance'= {
             cand --url 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
             cand --api-key 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)'
-            cand --output 'Output format (table, json, plain) [env: HBCTL_OUTPUT]'
+            cand --output 'Output format (table, json, plain, csv, markdown) [env: HBCTL_OUTPUT]'
             cand --select 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)'
             cand -C 'Path to explicit TOML configuration file'
             cand --config 'Path to explicit TOML configuration file'
@@ -1136,6 +1263,7 @@ set edit:completion:arg-completer[hbctl] = {|@words|
             cand --dry-run 'Preview mutating requests without hitting the server (redacts Authorization)'
             cand -q 'Output only created/affected IDs for shell piping'
             cand --quiet 'Output only created/affected IDs for shell piping'
+            cand --asset-id 'Treat item ID arguments as Homebox asset IDs (auto-detected for numeric/dashed IDs like 000-001)'
             cand -h 'Print help'
             cand --help 'Print help'
             cand list 'List maintenance log entries (globally or for a specific entity)'
@@ -1148,7 +1276,7 @@ set edit:completion:arg-completer[hbctl] = {|@words|
             cand --status 'Filter by maintenance status (both, completed, scheduled)'
             cand --url 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
             cand --api-key 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)'
-            cand --output 'Output format (table, json, plain) [env: HBCTL_OUTPUT]'
+            cand --output 'Output format (table, json, plain, csv, markdown) [env: HBCTL_OUTPUT]'
             cand --select 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)'
             cand -C 'Path to explicit TOML configuration file'
             cand --config 'Path to explicit TOML configuration file'
@@ -1158,6 +1286,7 @@ set edit:completion:arg-completer[hbctl] = {|@words|
             cand --dry-run 'Preview mutating requests without hitting the server (redacts Authorization)'
             cand -q 'Output only created/affected IDs for shell piping'
             cand --quiet 'Output only created/affected IDs for shell piping'
+            cand --asset-id 'Treat item ID arguments as Homebox asset IDs (auto-detected for numeric/dashed IDs like 000-001)'
             cand -h 'Print help'
             cand --help 'Print help'
         }
@@ -1169,7 +1298,7 @@ set edit:completion:arg-completer[hbctl] = {|@words|
             cand --description 'Maintenance description or notes'
             cand --url 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
             cand --api-key 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)'
-            cand --output 'Output format (table, json, plain) [env: HBCTL_OUTPUT]'
+            cand --output 'Output format (table, json, plain, csv, markdown) [env: HBCTL_OUTPUT]'
             cand --select 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)'
             cand -C 'Path to explicit TOML configuration file'
             cand --config 'Path to explicit TOML configuration file'
@@ -1179,6 +1308,7 @@ set edit:completion:arg-completer[hbctl] = {|@words|
             cand --dry-run 'Preview mutating requests without hitting the server (redacts Authorization)'
             cand -q 'Output only created/affected IDs for shell piping'
             cand --quiet 'Output only created/affected IDs for shell piping'
+            cand --asset-id 'Treat item ID arguments as Homebox asset IDs (auto-detected for numeric/dashed IDs like 000-001)'
             cand -h 'Print help'
             cand --help 'Print help'
         }
@@ -1190,7 +1320,7 @@ set edit:completion:arg-completer[hbctl] = {|@words|
             cand --description 'Updated maintenance description or notes'
             cand --url 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
             cand --api-key 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)'
-            cand --output 'Output format (table, json, plain) [env: HBCTL_OUTPUT]'
+            cand --output 'Output format (table, json, plain, csv, markdown) [env: HBCTL_OUTPUT]'
             cand --select 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)'
             cand -C 'Path to explicit TOML configuration file'
             cand --config 'Path to explicit TOML configuration file'
@@ -1200,13 +1330,14 @@ set edit:completion:arg-completer[hbctl] = {|@words|
             cand --dry-run 'Preview mutating requests without hitting the server (redacts Authorization)'
             cand -q 'Output only created/affected IDs for shell piping'
             cand --quiet 'Output only created/affected IDs for shell piping'
+            cand --asset-id 'Treat item ID arguments as Homebox asset IDs (auto-detected for numeric/dashed IDs like 000-001)'
             cand -h 'Print help'
             cand --help 'Print help'
         }
         &'hbctl;maintenance;delete'= {
             cand --url 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
             cand --api-key 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)'
-            cand --output 'Output format (table, json, plain) [env: HBCTL_OUTPUT]'
+            cand --output 'Output format (table, json, plain, csv, markdown) [env: HBCTL_OUTPUT]'
             cand --select 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)'
             cand -C 'Path to explicit TOML configuration file'
             cand --config 'Path to explicit TOML configuration file'
@@ -1217,6 +1348,7 @@ set edit:completion:arg-completer[hbctl] = {|@words|
             cand --dry-run 'Preview mutating requests without hitting the server (redacts Authorization)'
             cand -q 'Output only created/affected IDs for shell piping'
             cand --quiet 'Output only created/affected IDs for shell piping'
+            cand --asset-id 'Treat item ID arguments as Homebox asset IDs (auto-detected for numeric/dashed IDs like 000-001)'
             cand -h 'Print help'
             cand --help 'Print help'
         }
@@ -1248,7 +1380,7 @@ set edit:completion:arg-completer[hbctl] = {|@words|
             cand --empty 'Placeholder string for empty/missing cells'
             cand --url 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
             cand --api-key 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)'
-            cand --output 'Output format (table, json, plain) [env: HBCTL_OUTPUT]'
+            cand --output 'Output format (table, json, plain, csv, markdown) [env: HBCTL_OUTPUT]'
             cand --select 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)'
             cand -C 'Path to explicit TOML configuration file'
             cand --config 'Path to explicit TOML configuration file'
@@ -1258,13 +1390,1149 @@ set edit:completion:arg-completer[hbctl] = {|@words|
             cand --dry-run 'Preview mutating requests without hitting the server (redacts Authorization)'
             cand -q 'Output only created/affected IDs for shell piping'
             cand --quiet 'Output only created/affected IDs for shell piping'
+            cand --asset-id 'Treat item ID arguments as Homebox asset IDs (auto-detected for numeric/dashed IDs like 000-001)'
             cand -h 'Print help'
             cand --help 'Print help'
+        }
+        &'hbctl;backup'= {
+            cand -o 'Destination directory or .tar.gz / .tgz archive path'
+            cand --out 'Destination directory or .tar.gz / .tgz archive path'
+            cand --url 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
+            cand --api-key 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)'
+            cand --output 'Output format (table, json, plain, csv, markdown) [env: HBCTL_OUTPUT]'
+            cand --select 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)'
+            cand -C 'Path to explicit TOML configuration file'
+            cand --config 'Path to explicit TOML configuration file'
+            cand -P 'Named configuration profile (env: HBCTL_PROFILE)'
+            cand --profile 'Named configuration profile (env: HBCTL_PROFILE)'
+            cand --no-attachments 'Skip downloading attachment binary files (attachment metadata stays in entities.json)'
+            cand --exclude-archived 'Exclude archived items from the backup (archived items are included by default)'
+            cand --overwrite 'Overwrite an existing archive file or write into a non-empty directory'
+            cand --json 'Shorthand for --output json (emits compact JSON)'
+            cand --dry-run 'Preview mutating requests without hitting the server (redacts Authorization)'
+            cand -q 'Output only created/affected IDs for shell piping'
+            cand --quiet 'Output only created/affected IDs for shell piping'
+            cand --asset-id 'Treat item ID arguments as Homebox asset IDs (auto-detected for numeric/dashed IDs like 000-001)'
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'hbctl;label'= {
+            cand -o 'Output file path, or ''-'' to write raw label bytes to stdout'
+            cand --out 'Output file path, or ''-'' to write raw label bytes to stdout'
+            cand --kind 'Target label endpoint kind (auto detects numeric/dashed asset IDs)'
+            cand --url 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
+            cand --api-key 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)'
+            cand --output 'Output format (table, json, plain, csv, markdown) [env: HBCTL_OUTPUT]'
+            cand --select 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)'
+            cand -C 'Path to explicit TOML configuration file'
+            cand --config 'Path to explicit TOML configuration file'
+            cand -P 'Named configuration profile (env: HBCTL_PROFILE)'
+            cand --profile 'Named configuration profile (env: HBCTL_PROFILE)'
+            cand --print 'Send the label directly to the server''s configured printer (?print=true)'
+            cand --overwrite 'Overwrite output file if it already exists'
+            cand --json 'Shorthand for --output json (emits compact JSON)'
+            cand --dry-run 'Preview mutating requests without hitting the server (redacts Authorization)'
+            cand -q 'Output only created/affected IDs for shell piping'
+            cand --quiet 'Output only created/affected IDs for shell piping'
+            cand --asset-id 'Treat item ID arguments as Homebox asset IDs (auto-detected for numeric/dashed IDs like 000-001)'
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'hbctl;qr'= {
+            cand -o 'Output file path, or ''-'' to write raw QR image bytes to stdout'
+            cand --out 'Output file path, or ''-'' to write raw QR image bytes to stdout'
+            cand --url 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
+            cand --api-key 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)'
+            cand --output 'Output format (table, json, plain, csv, markdown) [env: HBCTL_OUTPUT]'
+            cand --select 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)'
+            cand -C 'Path to explicit TOML configuration file'
+            cand --config 'Path to explicit TOML configuration file'
+            cand -P 'Named configuration profile (env: HBCTL_PROFILE)'
+            cand --profile 'Named configuration profile (env: HBCTL_PROFILE)'
+            cand --raw 'Encode <ID> verbatim as QR `data` instead of building a Homebox item/asset URL'
+            cand --overwrite 'Overwrite output file if it already exists'
+            cand --json 'Shorthand for --output json (emits compact JSON)'
+            cand --dry-run 'Preview mutating requests without hitting the server (redacts Authorization)'
+            cand -q 'Output only created/affected IDs for shell piping'
+            cand --quiet 'Output only created/affected IDs for shell piping'
+            cand --asset-id 'Treat item ID arguments as Homebox asset IDs (auto-detected for numeric/dashed IDs like 000-001)'
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'hbctl;actions'= {
+            cand --url 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
+            cand --api-key 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)'
+            cand --output 'Output format (table, json, plain, csv, markdown) [env: HBCTL_OUTPUT]'
+            cand --select 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)'
+            cand -C 'Path to explicit TOML configuration file'
+            cand --config 'Path to explicit TOML configuration file'
+            cand -P 'Named configuration profile (env: HBCTL_PROFILE)'
+            cand --profile 'Named configuration profile (env: HBCTL_PROFILE)'
+            cand --json 'Shorthand for --output json (emits compact JSON)'
+            cand --dry-run 'Preview mutating requests without hitting the server (redacts Authorization)'
+            cand -q 'Output only created/affected IDs for shell piping'
+            cand --quiet 'Output only created/affected IDs for shell piping'
+            cand --asset-id 'Treat item ID arguments as Homebox asset IDs (auto-detected for numeric/dashed IDs like 000-001)'
+            cand -h 'Print help'
+            cand --help 'Print help'
+            cand ensure-asset-ids 'Ensure all items in Homebox have an asset ID assigned (/api/v1/actions/ensure-asset-ids)'
+            cand create-missing-thumbnails 'Create thumbnails for attachments missing them (/api/v1/actions/create-missing-thumbnails)'
+            cand help 'Print this message or the help of the given subcommand(s)'
+        }
+        &'hbctl;action'= {
+            cand --url 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
+            cand --api-key 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)'
+            cand --output 'Output format (table, json, plain, csv, markdown) [env: HBCTL_OUTPUT]'
+            cand --select 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)'
+            cand -C 'Path to explicit TOML configuration file'
+            cand --config 'Path to explicit TOML configuration file'
+            cand -P 'Named configuration profile (env: HBCTL_PROFILE)'
+            cand --profile 'Named configuration profile (env: HBCTL_PROFILE)'
+            cand --json 'Shorthand for --output json (emits compact JSON)'
+            cand --dry-run 'Preview mutating requests without hitting the server (redacts Authorization)'
+            cand -q 'Output only created/affected IDs for shell piping'
+            cand --quiet 'Output only created/affected IDs for shell piping'
+            cand --asset-id 'Treat item ID arguments as Homebox asset IDs (auto-detected for numeric/dashed IDs like 000-001)'
+            cand -h 'Print help'
+            cand --help 'Print help'
+            cand ensure-asset-ids 'Ensure all items in Homebox have an asset ID assigned (/api/v1/actions/ensure-asset-ids)'
+            cand create-missing-thumbnails 'Create thumbnails for attachments missing them (/api/v1/actions/create-missing-thumbnails)'
+            cand help 'Print this message or the help of the given subcommand(s)'
+        }
+        &'hbctl;actions;ensure-asset-ids'= {
+            cand --url 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
+            cand --api-key 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)'
+            cand --output 'Output format (table, json, plain, csv, markdown) [env: HBCTL_OUTPUT]'
+            cand --select 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)'
+            cand -C 'Path to explicit TOML configuration file'
+            cand --config 'Path to explicit TOML configuration file'
+            cand -P 'Named configuration profile (env: HBCTL_PROFILE)'
+            cand --profile 'Named configuration profile (env: HBCTL_PROFILE)'
+            cand --json 'Shorthand for --output json (emits compact JSON)'
+            cand --dry-run 'Preview mutating requests without hitting the server (redacts Authorization)'
+            cand -q 'Output only created/affected IDs for shell piping'
+            cand --quiet 'Output only created/affected IDs for shell piping'
+            cand --asset-id 'Treat item ID arguments as Homebox asset IDs (auto-detected for numeric/dashed IDs like 000-001)'
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'hbctl;action;ensure-asset-ids'= {
+            cand --url 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
+            cand --api-key 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)'
+            cand --output 'Output format (table, json, plain, csv, markdown) [env: HBCTL_OUTPUT]'
+            cand --select 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)'
+            cand -C 'Path to explicit TOML configuration file'
+            cand --config 'Path to explicit TOML configuration file'
+            cand -P 'Named configuration profile (env: HBCTL_PROFILE)'
+            cand --profile 'Named configuration profile (env: HBCTL_PROFILE)'
+            cand --json 'Shorthand for --output json (emits compact JSON)'
+            cand --dry-run 'Preview mutating requests without hitting the server (redacts Authorization)'
+            cand -q 'Output only created/affected IDs for shell piping'
+            cand --quiet 'Output only created/affected IDs for shell piping'
+            cand --asset-id 'Treat item ID arguments as Homebox asset IDs (auto-detected for numeric/dashed IDs like 000-001)'
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'hbctl;actions;create-missing-thumbnails'= {
+            cand --url 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
+            cand --api-key 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)'
+            cand --output 'Output format (table, json, plain, csv, markdown) [env: HBCTL_OUTPUT]'
+            cand --select 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)'
+            cand -C 'Path to explicit TOML configuration file'
+            cand --config 'Path to explicit TOML configuration file'
+            cand -P 'Named configuration profile (env: HBCTL_PROFILE)'
+            cand --profile 'Named configuration profile (env: HBCTL_PROFILE)'
+            cand --json 'Shorthand for --output json (emits compact JSON)'
+            cand --dry-run 'Preview mutating requests without hitting the server (redacts Authorization)'
+            cand -q 'Output only created/affected IDs for shell piping'
+            cand --quiet 'Output only created/affected IDs for shell piping'
+            cand --asset-id 'Treat item ID arguments as Homebox asset IDs (auto-detected for numeric/dashed IDs like 000-001)'
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'hbctl;action;create-missing-thumbnails'= {
+            cand --url 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
+            cand --api-key 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)'
+            cand --output 'Output format (table, json, plain, csv, markdown) [env: HBCTL_OUTPUT]'
+            cand --select 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)'
+            cand -C 'Path to explicit TOML configuration file'
+            cand --config 'Path to explicit TOML configuration file'
+            cand -P 'Named configuration profile (env: HBCTL_PROFILE)'
+            cand --profile 'Named configuration profile (env: HBCTL_PROFILE)'
+            cand --json 'Shorthand for --output json (emits compact JSON)'
+            cand --dry-run 'Preview mutating requests without hitting the server (redacts Authorization)'
+            cand -q 'Output only created/affected IDs for shell piping'
+            cand --quiet 'Output only created/affected IDs for shell piping'
+            cand --asset-id 'Treat item ID arguments as Homebox asset IDs (auto-detected for numeric/dashed IDs like 000-001)'
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'hbctl;actions;help'= {
+            cand ensure-asset-ids 'Ensure all items in Homebox have an asset ID assigned (/api/v1/actions/ensure-asset-ids)'
+            cand create-missing-thumbnails 'Create thumbnails for attachments missing them (/api/v1/actions/create-missing-thumbnails)'
+            cand help 'Print this message or the help of the given subcommand(s)'
+        }
+        &'hbctl;actions;help;ensure-asset-ids'= {
+        }
+        &'hbctl;actions;help;create-missing-thumbnails'= {
+        }
+        &'hbctl;actions;help;help'= {
+        }
+        &'hbctl;action;help'= {
+            cand ensure-asset-ids 'Ensure all items in Homebox have an asset ID assigned (/api/v1/actions/ensure-asset-ids)'
+            cand create-missing-thumbnails 'Create thumbnails for attachments missing them (/api/v1/actions/create-missing-thumbnails)'
+            cand help 'Print this message or the help of the given subcommand(s)'
+        }
+        &'hbctl;action;help;ensure-asset-ids'= {
+        }
+        &'hbctl;action;help;create-missing-thumbnails'= {
+        }
+        &'hbctl;action;help;help'= {
+        }
+        &'hbctl;stats'= {
+            cand --warranty-days 'Also count non-lifetime warranties expiring within DAYS days'
+            cand --url 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
+            cand --api-key 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)'
+            cand --output 'Output format (table, json, plain, csv, markdown) [env: HBCTL_OUTPUT]'
+            cand --select 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)'
+            cand -C 'Path to explicit TOML configuration file'
+            cand --config 'Path to explicit TOML configuration file'
+            cand -P 'Named configuration profile (env: HBCTL_PROFILE)'
+            cand --profile 'Named configuration profile (env: HBCTL_PROFILE)'
+            cand --json 'Shorthand for --output json (emits compact JSON)'
+            cand --dry-run 'Preview mutating requests without hitting the server (redacts Authorization)'
+            cand -q 'Output only created/affected IDs for shell piping'
+            cand --quiet 'Output only created/affected IDs for shell piping'
+            cand --asset-id 'Treat item ID arguments as Homebox asset IDs (auto-detected for numeric/dashed IDs like 000-001)'
+            cand -h 'Print help'
+            cand --help 'Print help'
+            cand overview 'Group-wide overview statistics (/api/v1/groups/statistics + upcoming maintenance)'
+            cand tags 'Tag purchase-value breakdown (/api/v1/groups/statistics/tags)'
+            cand locations 'Location purchase-value breakdown (/api/v1/groups/statistics/locations)'
+            cand entity-types 'Entity-type count and purchase-value breakdown'
+            cand types 'Entity-type count and purchase-value breakdown'
+            cand purchase-price 'Purchase value over time (/api/v1/groups/statistics/purchase-price)'
+            cand price 'Purchase value over time (/api/v1/groups/statistics/purchase-price)'
+            cand help 'Print this message or the help of the given subcommand(s)'
+        }
+        &'hbctl;stats;overview'= {
+            cand --url 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
+            cand --api-key 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)'
+            cand --output 'Output format (table, json, plain, csv, markdown) [env: HBCTL_OUTPUT]'
+            cand --select 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)'
+            cand -C 'Path to explicit TOML configuration file'
+            cand --config 'Path to explicit TOML configuration file'
+            cand -P 'Named configuration profile (env: HBCTL_PROFILE)'
+            cand --profile 'Named configuration profile (env: HBCTL_PROFILE)'
+            cand --json 'Shorthand for --output json (emits compact JSON)'
+            cand --dry-run 'Preview mutating requests without hitting the server (redacts Authorization)'
+            cand -q 'Output only created/affected IDs for shell piping'
+            cand --quiet 'Output only created/affected IDs for shell piping'
+            cand --asset-id 'Treat item ID arguments as Homebox asset IDs (auto-detected for numeric/dashed IDs like 000-001)'
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'hbctl;stats;tags'= {
+            cand --url 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
+            cand --api-key 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)'
+            cand --output 'Output format (table, json, plain, csv, markdown) [env: HBCTL_OUTPUT]'
+            cand --select 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)'
+            cand -C 'Path to explicit TOML configuration file'
+            cand --config 'Path to explicit TOML configuration file'
+            cand -P 'Named configuration profile (env: HBCTL_PROFILE)'
+            cand --profile 'Named configuration profile (env: HBCTL_PROFILE)'
+            cand --json 'Shorthand for --output json (emits compact JSON)'
+            cand --dry-run 'Preview mutating requests without hitting the server (redacts Authorization)'
+            cand -q 'Output only created/affected IDs for shell piping'
+            cand --quiet 'Output only created/affected IDs for shell piping'
+            cand --asset-id 'Treat item ID arguments as Homebox asset IDs (auto-detected for numeric/dashed IDs like 000-001)'
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'hbctl;stats;locations'= {
+            cand --url 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
+            cand --api-key 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)'
+            cand --output 'Output format (table, json, plain, csv, markdown) [env: HBCTL_OUTPUT]'
+            cand --select 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)'
+            cand -C 'Path to explicit TOML configuration file'
+            cand --config 'Path to explicit TOML configuration file'
+            cand -P 'Named configuration profile (env: HBCTL_PROFILE)'
+            cand --profile 'Named configuration profile (env: HBCTL_PROFILE)'
+            cand --json 'Shorthand for --output json (emits compact JSON)'
+            cand --dry-run 'Preview mutating requests without hitting the server (redacts Authorization)'
+            cand -q 'Output only created/affected IDs for shell piping'
+            cand --quiet 'Output only created/affected IDs for shell piping'
+            cand --asset-id 'Treat item ID arguments as Homebox asset IDs (auto-detected for numeric/dashed IDs like 000-001)'
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'hbctl;stats;entity-types'= {
+            cand --url 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
+            cand --api-key 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)'
+            cand --output 'Output format (table, json, plain, csv, markdown) [env: HBCTL_OUTPUT]'
+            cand --select 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)'
+            cand -C 'Path to explicit TOML configuration file'
+            cand --config 'Path to explicit TOML configuration file'
+            cand -P 'Named configuration profile (env: HBCTL_PROFILE)'
+            cand --profile 'Named configuration profile (env: HBCTL_PROFILE)'
+            cand --json 'Shorthand for --output json (emits compact JSON)'
+            cand --dry-run 'Preview mutating requests without hitting the server (redacts Authorization)'
+            cand -q 'Output only created/affected IDs for shell piping'
+            cand --quiet 'Output only created/affected IDs for shell piping'
+            cand --asset-id 'Treat item ID arguments as Homebox asset IDs (auto-detected for numeric/dashed IDs like 000-001)'
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'hbctl;stats;types'= {
+            cand --url 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
+            cand --api-key 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)'
+            cand --output 'Output format (table, json, plain, csv, markdown) [env: HBCTL_OUTPUT]'
+            cand --select 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)'
+            cand -C 'Path to explicit TOML configuration file'
+            cand --config 'Path to explicit TOML configuration file'
+            cand -P 'Named configuration profile (env: HBCTL_PROFILE)'
+            cand --profile 'Named configuration profile (env: HBCTL_PROFILE)'
+            cand --json 'Shorthand for --output json (emits compact JSON)'
+            cand --dry-run 'Preview mutating requests without hitting the server (redacts Authorization)'
+            cand -q 'Output only created/affected IDs for shell piping'
+            cand --quiet 'Output only created/affected IDs for shell piping'
+            cand --asset-id 'Treat item ID arguments as Homebox asset IDs (auto-detected for numeric/dashed IDs like 000-001)'
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'hbctl;stats;purchase-price'= {
+            cand --start 'Start date (YYYY-MM-DD)'
+            cand --end 'End date (YYYY-MM-DD)'
+            cand --url 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
+            cand --api-key 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)'
+            cand --output 'Output format (table, json, plain, csv, markdown) [env: HBCTL_OUTPUT]'
+            cand --select 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)'
+            cand -C 'Path to explicit TOML configuration file'
+            cand --config 'Path to explicit TOML configuration file'
+            cand -P 'Named configuration profile (env: HBCTL_PROFILE)'
+            cand --profile 'Named configuration profile (env: HBCTL_PROFILE)'
+            cand --json 'Shorthand for --output json (emits compact JSON)'
+            cand --dry-run 'Preview mutating requests without hitting the server (redacts Authorization)'
+            cand -q 'Output only created/affected IDs for shell piping'
+            cand --quiet 'Output only created/affected IDs for shell piping'
+            cand --asset-id 'Treat item ID arguments as Homebox asset IDs (auto-detected for numeric/dashed IDs like 000-001)'
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'hbctl;stats;price'= {
+            cand --start 'Start date (YYYY-MM-DD)'
+            cand --end 'End date (YYYY-MM-DD)'
+            cand --url 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
+            cand --api-key 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)'
+            cand --output 'Output format (table, json, plain, csv, markdown) [env: HBCTL_OUTPUT]'
+            cand --select 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)'
+            cand -C 'Path to explicit TOML configuration file'
+            cand --config 'Path to explicit TOML configuration file'
+            cand -P 'Named configuration profile (env: HBCTL_PROFILE)'
+            cand --profile 'Named configuration profile (env: HBCTL_PROFILE)'
+            cand --json 'Shorthand for --output json (emits compact JSON)'
+            cand --dry-run 'Preview mutating requests without hitting the server (redacts Authorization)'
+            cand -q 'Output only created/affected IDs for shell piping'
+            cand --quiet 'Output only created/affected IDs for shell piping'
+            cand --asset-id 'Treat item ID arguments as Homebox asset IDs (auto-detected for numeric/dashed IDs like 000-001)'
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'hbctl;stats;help'= {
+            cand overview 'Group-wide overview statistics (/api/v1/groups/statistics + upcoming maintenance)'
+            cand tags 'Tag purchase-value breakdown (/api/v1/groups/statistics/tags)'
+            cand locations 'Location purchase-value breakdown (/api/v1/groups/statistics/locations)'
+            cand entity-types 'Entity-type count and purchase-value breakdown'
+            cand purchase-price 'Purchase value over time (/api/v1/groups/statistics/purchase-price)'
+            cand help 'Print this message or the help of the given subcommand(s)'
+        }
+        &'hbctl;stats;help;overview'= {
+        }
+        &'hbctl;stats;help;tags'= {
+        }
+        &'hbctl;stats;help;locations'= {
+        }
+        &'hbctl;stats;help;entity-types'= {
+        }
+        &'hbctl;stats;help;purchase-price'= {
+        }
+        &'hbctl;stats;help;help'= {
+        }
+        &'hbctl;config'= {
+            cand --url 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
+            cand --api-key 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)'
+            cand --output 'Output format (table, json, plain, csv, markdown) [env: HBCTL_OUTPUT]'
+            cand --select 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)'
+            cand -C 'Path to explicit TOML configuration file'
+            cand --config 'Path to explicit TOML configuration file'
+            cand -P 'Named configuration profile (env: HBCTL_PROFILE)'
+            cand --profile 'Named configuration profile (env: HBCTL_PROFILE)'
+            cand --json 'Shorthand for --output json (emits compact JSON)'
+            cand --dry-run 'Preview mutating requests without hitting the server (redacts Authorization)'
+            cand -q 'Output only created/affected IDs for shell piping'
+            cand --quiet 'Output only created/affected IDs for shell piping'
+            cand --asset-id 'Treat item ID arguments as Homebox asset IDs (auto-detected for numeric/dashed IDs like 000-001)'
+            cand -h 'Print help'
+            cand --help 'Print help'
+            cand show 'Display effective resolved configuration (secrets redacted as Bearer ***)'
+            cand profiles 'List configured profiles and indicate active/default selection'
+            cand use 'Switch the active default profile in user config'
+            cand help 'Print this message or the help of the given subcommand(s)'
+        }
+        &'hbctl;config;show'= {
+            cand --url 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
+            cand --api-key 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)'
+            cand --output 'Output format (table, json, plain, csv, markdown) [env: HBCTL_OUTPUT]'
+            cand --select 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)'
+            cand -C 'Path to explicit TOML configuration file'
+            cand --config 'Path to explicit TOML configuration file'
+            cand -P 'Named configuration profile (env: HBCTL_PROFILE)'
+            cand --profile 'Named configuration profile (env: HBCTL_PROFILE)'
+            cand --json 'Shorthand for --output json (emits compact JSON)'
+            cand --dry-run 'Preview mutating requests without hitting the server (redacts Authorization)'
+            cand -q 'Output only created/affected IDs for shell piping'
+            cand --quiet 'Output only created/affected IDs for shell piping'
+            cand --asset-id 'Treat item ID arguments as Homebox asset IDs (auto-detected for numeric/dashed IDs like 000-001)'
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'hbctl;config;profiles'= {
+            cand --url 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
+            cand --api-key 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)'
+            cand --output 'Output format (table, json, plain, csv, markdown) [env: HBCTL_OUTPUT]'
+            cand --select 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)'
+            cand -C 'Path to explicit TOML configuration file'
+            cand --config 'Path to explicit TOML configuration file'
+            cand -P 'Named configuration profile (env: HBCTL_PROFILE)'
+            cand --profile 'Named configuration profile (env: HBCTL_PROFILE)'
+            cand --json 'Shorthand for --output json (emits compact JSON)'
+            cand --dry-run 'Preview mutating requests without hitting the server (redacts Authorization)'
+            cand -q 'Output only created/affected IDs for shell piping'
+            cand --quiet 'Output only created/affected IDs for shell piping'
+            cand --asset-id 'Treat item ID arguments as Homebox asset IDs (auto-detected for numeric/dashed IDs like 000-001)'
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'hbctl;config;use'= {
+            cand --url 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
+            cand --api-key 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)'
+            cand --output 'Output format (table, json, plain, csv, markdown) [env: HBCTL_OUTPUT]'
+            cand --select 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)'
+            cand -C 'Path to explicit TOML configuration file'
+            cand --config 'Path to explicit TOML configuration file'
+            cand --json 'Shorthand for --output json (emits compact JSON)'
+            cand --dry-run 'Preview mutating requests without hitting the server (redacts Authorization)'
+            cand -q 'Output only created/affected IDs for shell piping'
+            cand --quiet 'Output only created/affected IDs for shell piping'
+            cand --asset-id 'Treat item ID arguments as Homebox asset IDs (auto-detected for numeric/dashed IDs like 000-001)'
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'hbctl;config;help'= {
+            cand show 'Display effective resolved configuration (secrets redacted as Bearer ***)'
+            cand profiles 'List configured profiles and indicate active/default selection'
+            cand use 'Switch the active default profile in user config'
+            cand help 'Print this message or the help of the given subcommand(s)'
+        }
+        &'hbctl;config;help;show'= {
+        }
+        &'hbctl;config;help;profiles'= {
+        }
+        &'hbctl;config;help;use'= {
+        }
+        &'hbctl;config;help;help'= {
+        }
+        &'hbctl;template'= {
+            cand --url 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
+            cand --api-key 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)'
+            cand --output 'Output format (table, json, plain, csv, markdown) [env: HBCTL_OUTPUT]'
+            cand --select 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)'
+            cand -C 'Path to explicit TOML configuration file'
+            cand --config 'Path to explicit TOML configuration file'
+            cand -P 'Named configuration profile (env: HBCTL_PROFILE)'
+            cand --profile 'Named configuration profile (env: HBCTL_PROFILE)'
+            cand --json 'Shorthand for --output json (emits compact JSON)'
+            cand --dry-run 'Preview mutating requests without hitting the server (redacts Authorization)'
+            cand -q 'Output only created/affected IDs for shell piping'
+            cand --quiet 'Output only created/affected IDs for shell piping'
+            cand --asset-id 'Treat item ID arguments as Homebox asset IDs (auto-detected for numeric/dashed IDs like 000-001)'
+            cand -h 'Print help'
+            cand --help 'Print help'
+            cand list 'List all entity templates'
+            cand get 'Fetch a single entity template by ID'
+            cand create 'Create a new entity template'
+            cand update 'Update an existing entity template (GET -> Merge -> PUT)'
+            cand delete 'Delete an entity template'
+            cand apply 'Create a new item from a template (/api/v1/templates/{id}/create-item)'
+            cand help 'Print this message or the help of the given subcommand(s)'
+        }
+        &'hbctl;templates'= {
+            cand --url 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
+            cand --api-key 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)'
+            cand --output 'Output format (table, json, plain, csv, markdown) [env: HBCTL_OUTPUT]'
+            cand --select 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)'
+            cand -C 'Path to explicit TOML configuration file'
+            cand --config 'Path to explicit TOML configuration file'
+            cand -P 'Named configuration profile (env: HBCTL_PROFILE)'
+            cand --profile 'Named configuration profile (env: HBCTL_PROFILE)'
+            cand --json 'Shorthand for --output json (emits compact JSON)'
+            cand --dry-run 'Preview mutating requests without hitting the server (redacts Authorization)'
+            cand -q 'Output only created/affected IDs for shell piping'
+            cand --quiet 'Output only created/affected IDs for shell piping'
+            cand --asset-id 'Treat item ID arguments as Homebox asset IDs (auto-detected for numeric/dashed IDs like 000-001)'
+            cand -h 'Print help'
+            cand --help 'Print help'
+            cand list 'List all entity templates'
+            cand get 'Fetch a single entity template by ID'
+            cand create 'Create a new entity template'
+            cand update 'Update an existing entity template (GET -> Merge -> PUT)'
+            cand delete 'Delete an entity template'
+            cand apply 'Create a new item from a template (/api/v1/templates/{id}/create-item)'
+            cand help 'Print this message or the help of the given subcommand(s)'
+        }
+        &'hbctl;template;list'= {
+            cand --url 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
+            cand --api-key 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)'
+            cand --output 'Output format (table, json, plain, csv, markdown) [env: HBCTL_OUTPUT]'
+            cand --select 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)'
+            cand -C 'Path to explicit TOML configuration file'
+            cand --config 'Path to explicit TOML configuration file'
+            cand -P 'Named configuration profile (env: HBCTL_PROFILE)'
+            cand --profile 'Named configuration profile (env: HBCTL_PROFILE)'
+            cand --json 'Shorthand for --output json (emits compact JSON)'
+            cand --dry-run 'Preview mutating requests without hitting the server (redacts Authorization)'
+            cand -q 'Output only created/affected IDs for shell piping'
+            cand --quiet 'Output only created/affected IDs for shell piping'
+            cand --asset-id 'Treat item ID arguments as Homebox asset IDs (auto-detected for numeric/dashed IDs like 000-001)'
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'hbctl;templates;list'= {
+            cand --url 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
+            cand --api-key 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)'
+            cand --output 'Output format (table, json, plain, csv, markdown) [env: HBCTL_OUTPUT]'
+            cand --select 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)'
+            cand -C 'Path to explicit TOML configuration file'
+            cand --config 'Path to explicit TOML configuration file'
+            cand -P 'Named configuration profile (env: HBCTL_PROFILE)'
+            cand --profile 'Named configuration profile (env: HBCTL_PROFILE)'
+            cand --json 'Shorthand for --output json (emits compact JSON)'
+            cand --dry-run 'Preview mutating requests without hitting the server (redacts Authorization)'
+            cand -q 'Output only created/affected IDs for shell piping'
+            cand --quiet 'Output only created/affected IDs for shell piping'
+            cand --asset-id 'Treat item ID arguments as Homebox asset IDs (auto-detected for numeric/dashed IDs like 000-001)'
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'hbctl;template;get'= {
+            cand --url 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
+            cand --api-key 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)'
+            cand --output 'Output format (table, json, plain, csv, markdown) [env: HBCTL_OUTPUT]'
+            cand --select 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)'
+            cand -C 'Path to explicit TOML configuration file'
+            cand --config 'Path to explicit TOML configuration file'
+            cand -P 'Named configuration profile (env: HBCTL_PROFILE)'
+            cand --profile 'Named configuration profile (env: HBCTL_PROFILE)'
+            cand --json 'Shorthand for --output json (emits compact JSON)'
+            cand --dry-run 'Preview mutating requests without hitting the server (redacts Authorization)'
+            cand -q 'Output only created/affected IDs for shell piping'
+            cand --quiet 'Output only created/affected IDs for shell piping'
+            cand --asset-id 'Treat item ID arguments as Homebox asset IDs (auto-detected for numeric/dashed IDs like 000-001)'
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'hbctl;templates;get'= {
+            cand --url 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
+            cand --api-key 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)'
+            cand --output 'Output format (table, json, plain, csv, markdown) [env: HBCTL_OUTPUT]'
+            cand --select 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)'
+            cand -C 'Path to explicit TOML configuration file'
+            cand --config 'Path to explicit TOML configuration file'
+            cand -P 'Named configuration profile (env: HBCTL_PROFILE)'
+            cand --profile 'Named configuration profile (env: HBCTL_PROFILE)'
+            cand --json 'Shorthand for --output json (emits compact JSON)'
+            cand --dry-run 'Preview mutating requests without hitting the server (redacts Authorization)'
+            cand -q 'Output only created/affected IDs for shell piping'
+            cand --quiet 'Output only created/affected IDs for shell piping'
+            cand --asset-id 'Treat item ID arguments as Homebox asset IDs (auto-detected for numeric/dashed IDs like 000-001)'
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'hbctl;template;create'= {
+            cand --name 'Template name'
+            cand --description 'Template description'
+            cand --notes 'Template notes'
+            cand --default-name 'Default item name'
+            cand --default-description 'Default item description'
+            cand --default-quantity 'Default item quantity'
+            cand --default-manufacturer 'Default item manufacturer'
+            cand --default-model 'Default item model number'
+            cand --default-insured 'Default insured flag (true/false; bare flag means true)'
+            cand --default-lifetime-warranty 'Default lifetime warranty flag (true/false; bare flag means true)'
+            cand --default-warranty-details 'Default warranty details'
+            cand --default-location 'Default location name or UUID'
+            cand --default-tag 'Default tag name or UUID (repeatable; missing tags auto-created)'
+            cand --include-warranty-fields 'Include warranty fields on created items (true/false; bare flag means true)'
+            cand --include-purchase-fields 'Include purchase fields on created items (true/false; bare flag means true)'
+            cand --include-sold-fields 'Include sold fields on created items (true/false; bare flag means true)'
+            cand --field 'Default custom field KEY=VAL (repeatable)'
+            cand --field-type 'Value type for --field entries'
+            cand --url 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
+            cand --api-key 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)'
+            cand --output 'Output format (table, json, plain, csv, markdown) [env: HBCTL_OUTPUT]'
+            cand --select 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)'
+            cand -C 'Path to explicit TOML configuration file'
+            cand --config 'Path to explicit TOML configuration file'
+            cand -P 'Named configuration profile (env: HBCTL_PROFILE)'
+            cand --profile 'Named configuration profile (env: HBCTL_PROFILE)'
+            cand --json 'Shorthand for --output json (emits compact JSON)'
+            cand --dry-run 'Preview mutating requests without hitting the server (redacts Authorization)'
+            cand -q 'Output only created/affected IDs for shell piping'
+            cand --quiet 'Output only created/affected IDs for shell piping'
+            cand --asset-id 'Treat item ID arguments as Homebox asset IDs (auto-detected for numeric/dashed IDs like 000-001)'
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'hbctl;templates;create'= {
+            cand --name 'Template name'
+            cand --description 'Template description'
+            cand --notes 'Template notes'
+            cand --default-name 'Default item name'
+            cand --default-description 'Default item description'
+            cand --default-quantity 'Default item quantity'
+            cand --default-manufacturer 'Default item manufacturer'
+            cand --default-model 'Default item model number'
+            cand --default-insured 'Default insured flag (true/false; bare flag means true)'
+            cand --default-lifetime-warranty 'Default lifetime warranty flag (true/false; bare flag means true)'
+            cand --default-warranty-details 'Default warranty details'
+            cand --default-location 'Default location name or UUID'
+            cand --default-tag 'Default tag name or UUID (repeatable; missing tags auto-created)'
+            cand --include-warranty-fields 'Include warranty fields on created items (true/false; bare flag means true)'
+            cand --include-purchase-fields 'Include purchase fields on created items (true/false; bare flag means true)'
+            cand --include-sold-fields 'Include sold fields on created items (true/false; bare flag means true)'
+            cand --field 'Default custom field KEY=VAL (repeatable)'
+            cand --field-type 'Value type for --field entries'
+            cand --url 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
+            cand --api-key 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)'
+            cand --output 'Output format (table, json, plain, csv, markdown) [env: HBCTL_OUTPUT]'
+            cand --select 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)'
+            cand -C 'Path to explicit TOML configuration file'
+            cand --config 'Path to explicit TOML configuration file'
+            cand -P 'Named configuration profile (env: HBCTL_PROFILE)'
+            cand --profile 'Named configuration profile (env: HBCTL_PROFILE)'
+            cand --json 'Shorthand for --output json (emits compact JSON)'
+            cand --dry-run 'Preview mutating requests without hitting the server (redacts Authorization)'
+            cand -q 'Output only created/affected IDs for shell piping'
+            cand --quiet 'Output only created/affected IDs for shell piping'
+            cand --asset-id 'Treat item ID arguments as Homebox asset IDs (auto-detected for numeric/dashed IDs like 000-001)'
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'hbctl;template;update'= {
+            cand --name 'Updated template name'
+            cand --description 'Updated template description'
+            cand --notes 'Updated template notes'
+            cand --default-name 'Updated default item name'
+            cand --default-description 'Updated default item description'
+            cand --default-quantity 'Updated default item quantity'
+            cand --default-manufacturer 'Updated default item manufacturer'
+            cand --default-model 'Updated default item model number'
+            cand --default-insured 'Updated default insured flag (true/false; bare flag means true)'
+            cand --default-lifetime-warranty 'Updated default lifetime warranty flag (true/false; bare flag means true)'
+            cand --default-warranty-details 'Updated default warranty details'
+            cand --default-location 'Updated default location name, UUID, or ''none'''
+            cand --default-tag 'Updated default tag name or UUID (repeatable; replaces tag list)'
+            cand --include-warranty-fields 'Include warranty fields on created items (true/false; bare flag means true)'
+            cand --include-purchase-fields 'Include purchase fields on created items (true/false; bare flag means true)'
+            cand --include-sold-fields 'Include sold fields on created items (true/false; bare flag means true)'
+            cand --field 'Default custom field KEY=VAL to add/update (repeatable)'
+            cand --field-type 'Value type for --field entries'
+            cand --url 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
+            cand --api-key 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)'
+            cand --output 'Output format (table, json, plain, csv, markdown) [env: HBCTL_OUTPUT]'
+            cand --select 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)'
+            cand -C 'Path to explicit TOML configuration file'
+            cand --config 'Path to explicit TOML configuration file'
+            cand -P 'Named configuration profile (env: HBCTL_PROFILE)'
+            cand --profile 'Named configuration profile (env: HBCTL_PROFILE)'
+            cand --json 'Shorthand for --output json (emits compact JSON)'
+            cand --dry-run 'Preview mutating requests without hitting the server (redacts Authorization)'
+            cand -q 'Output only created/affected IDs for shell piping'
+            cand --quiet 'Output only created/affected IDs for shell piping'
+            cand --asset-id 'Treat item ID arguments as Homebox asset IDs (auto-detected for numeric/dashed IDs like 000-001)'
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'hbctl;templates;update'= {
+            cand --name 'Updated template name'
+            cand --description 'Updated template description'
+            cand --notes 'Updated template notes'
+            cand --default-name 'Updated default item name'
+            cand --default-description 'Updated default item description'
+            cand --default-quantity 'Updated default item quantity'
+            cand --default-manufacturer 'Updated default item manufacturer'
+            cand --default-model 'Updated default item model number'
+            cand --default-insured 'Updated default insured flag (true/false; bare flag means true)'
+            cand --default-lifetime-warranty 'Updated default lifetime warranty flag (true/false; bare flag means true)'
+            cand --default-warranty-details 'Updated default warranty details'
+            cand --default-location 'Updated default location name, UUID, or ''none'''
+            cand --default-tag 'Updated default tag name or UUID (repeatable; replaces tag list)'
+            cand --include-warranty-fields 'Include warranty fields on created items (true/false; bare flag means true)'
+            cand --include-purchase-fields 'Include purchase fields on created items (true/false; bare flag means true)'
+            cand --include-sold-fields 'Include sold fields on created items (true/false; bare flag means true)'
+            cand --field 'Default custom field KEY=VAL to add/update (repeatable)'
+            cand --field-type 'Value type for --field entries'
+            cand --url 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
+            cand --api-key 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)'
+            cand --output 'Output format (table, json, plain, csv, markdown) [env: HBCTL_OUTPUT]'
+            cand --select 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)'
+            cand -C 'Path to explicit TOML configuration file'
+            cand --config 'Path to explicit TOML configuration file'
+            cand -P 'Named configuration profile (env: HBCTL_PROFILE)'
+            cand --profile 'Named configuration profile (env: HBCTL_PROFILE)'
+            cand --json 'Shorthand for --output json (emits compact JSON)'
+            cand --dry-run 'Preview mutating requests without hitting the server (redacts Authorization)'
+            cand -q 'Output only created/affected IDs for shell piping'
+            cand --quiet 'Output only created/affected IDs for shell piping'
+            cand --asset-id 'Treat item ID arguments as Homebox asset IDs (auto-detected for numeric/dashed IDs like 000-001)'
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'hbctl;template;delete'= {
+            cand --url 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
+            cand --api-key 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)'
+            cand --output 'Output format (table, json, plain, csv, markdown) [env: HBCTL_OUTPUT]'
+            cand --select 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)'
+            cand -C 'Path to explicit TOML configuration file'
+            cand --config 'Path to explicit TOML configuration file'
+            cand -P 'Named configuration profile (env: HBCTL_PROFILE)'
+            cand --profile 'Named configuration profile (env: HBCTL_PROFILE)'
+            cand -y 'Skip interactive confirmation prompt'
+            cand --yes 'Skip interactive confirmation prompt'
+            cand --force 'Skip interactive confirmation prompt'
+            cand --json 'Shorthand for --output json (emits compact JSON)'
+            cand --dry-run 'Preview mutating requests without hitting the server (redacts Authorization)'
+            cand -q 'Output only created/affected IDs for shell piping'
+            cand --quiet 'Output only created/affected IDs for shell piping'
+            cand --asset-id 'Treat item ID arguments as Homebox asset IDs (auto-detected for numeric/dashed IDs like 000-001)'
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'hbctl;templates;delete'= {
+            cand --url 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
+            cand --api-key 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)'
+            cand --output 'Output format (table, json, plain, csv, markdown) [env: HBCTL_OUTPUT]'
+            cand --select 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)'
+            cand -C 'Path to explicit TOML configuration file'
+            cand --config 'Path to explicit TOML configuration file'
+            cand -P 'Named configuration profile (env: HBCTL_PROFILE)'
+            cand --profile 'Named configuration profile (env: HBCTL_PROFILE)'
+            cand -y 'Skip interactive confirmation prompt'
+            cand --yes 'Skip interactive confirmation prompt'
+            cand --force 'Skip interactive confirmation prompt'
+            cand --json 'Shorthand for --output json (emits compact JSON)'
+            cand --dry-run 'Preview mutating requests without hitting the server (redacts Authorization)'
+            cand -q 'Output only created/affected IDs for shell piping'
+            cand --quiet 'Output only created/affected IDs for shell piping'
+            cand --asset-id 'Treat item ID arguments as Homebox asset IDs (auto-detected for numeric/dashed IDs like 000-001)'
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'hbctl;template;apply'= {
+            cand --name 'Item name (defaults to template''s defaultName if omitted)'
+            cand --description 'Item description (defaults to template''s defaultDescription if omitted)'
+            cand --parent 'Parent item/location name, ID, or ''none'''
+            cand --location 'Location name or ID (falls back to template''s defaultLocation if omitted)'
+            cand --type 'Entity type name or UUID'
+            cand --tag 'Tag name or UUID (repeatable; defaults to template''s defaultTags if omitted)'
+            cand --quantity 'Item quantity override'
+            cand --url 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
+            cand --api-key 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)'
+            cand --output 'Output format (table, json, plain, csv, markdown) [env: HBCTL_OUTPUT]'
+            cand --select 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)'
+            cand -C 'Path to explicit TOML configuration file'
+            cand --config 'Path to explicit TOML configuration file'
+            cand -P 'Named configuration profile (env: HBCTL_PROFILE)'
+            cand --profile 'Named configuration profile (env: HBCTL_PROFILE)'
+            cand --json 'Shorthand for --output json (emits compact JSON)'
+            cand --dry-run 'Preview mutating requests without hitting the server (redacts Authorization)'
+            cand -q 'Output only created/affected IDs for shell piping'
+            cand --quiet 'Output only created/affected IDs for shell piping'
+            cand --asset-id 'Treat item ID arguments as Homebox asset IDs (auto-detected for numeric/dashed IDs like 000-001)'
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'hbctl;templates;apply'= {
+            cand --name 'Item name (defaults to template''s defaultName if omitted)'
+            cand --description 'Item description (defaults to template''s defaultDescription if omitted)'
+            cand --parent 'Parent item/location name, ID, or ''none'''
+            cand --location 'Location name or ID (falls back to template''s defaultLocation if omitted)'
+            cand --type 'Entity type name or UUID'
+            cand --tag 'Tag name or UUID (repeatable; defaults to template''s defaultTags if omitted)'
+            cand --quantity 'Item quantity override'
+            cand --url 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
+            cand --api-key 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)'
+            cand --output 'Output format (table, json, plain, csv, markdown) [env: HBCTL_OUTPUT]'
+            cand --select 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)'
+            cand -C 'Path to explicit TOML configuration file'
+            cand --config 'Path to explicit TOML configuration file'
+            cand -P 'Named configuration profile (env: HBCTL_PROFILE)'
+            cand --profile 'Named configuration profile (env: HBCTL_PROFILE)'
+            cand --json 'Shorthand for --output json (emits compact JSON)'
+            cand --dry-run 'Preview mutating requests without hitting the server (redacts Authorization)'
+            cand -q 'Output only created/affected IDs for shell piping'
+            cand --quiet 'Output only created/affected IDs for shell piping'
+            cand --asset-id 'Treat item ID arguments as Homebox asset IDs (auto-detected for numeric/dashed IDs like 000-001)'
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'hbctl;template;help'= {
+            cand list 'List all entity templates'
+            cand get 'Fetch a single entity template by ID'
+            cand create 'Create a new entity template'
+            cand update 'Update an existing entity template (GET -> Merge -> PUT)'
+            cand delete 'Delete an entity template'
+            cand apply 'Create a new item from a template (/api/v1/templates/{id}/create-item)'
+            cand help 'Print this message or the help of the given subcommand(s)'
+        }
+        &'hbctl;template;help;list'= {
+        }
+        &'hbctl;template;help;get'= {
+        }
+        &'hbctl;template;help;create'= {
+        }
+        &'hbctl;template;help;update'= {
+        }
+        &'hbctl;template;help;delete'= {
+        }
+        &'hbctl;template;help;apply'= {
+        }
+        &'hbctl;template;help;help'= {
+        }
+        &'hbctl;templates;help'= {
+            cand list 'List all entity templates'
+            cand get 'Fetch a single entity template by ID'
+            cand create 'Create a new entity template'
+            cand update 'Update an existing entity template (GET -> Merge -> PUT)'
+            cand delete 'Delete an entity template'
+            cand apply 'Create a new item from a template (/api/v1/templates/{id}/create-item)'
+            cand help 'Print this message or the help of the given subcommand(s)'
+        }
+        &'hbctl;templates;help;list'= {
+        }
+        &'hbctl;templates;help;get'= {
+        }
+        &'hbctl;templates;help;create'= {
+        }
+        &'hbctl;templates;help;update'= {
+        }
+        &'hbctl;templates;help;delete'= {
+        }
+        &'hbctl;templates;help;apply'= {
+        }
+        &'hbctl;templates;help;help'= {
+        }
+        &'hbctl;barcode'= {
+            cand --url 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
+            cand --api-key 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)'
+            cand --output 'Output format (table, json, plain, csv, markdown) [env: HBCTL_OUTPUT]'
+            cand --select 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)'
+            cand -C 'Path to explicit TOML configuration file'
+            cand --config 'Path to explicit TOML configuration file'
+            cand -P 'Named configuration profile (env: HBCTL_PROFILE)'
+            cand --profile 'Named configuration profile (env: HBCTL_PROFILE)'
+            cand --json 'Shorthand for --output json (emits compact JSON)'
+            cand --dry-run 'Preview mutating requests without hitting the server (redacts Authorization)'
+            cand -q 'Output only created/affected IDs for shell piping'
+            cand --quiet 'Output only created/affected IDs for shell piping'
+            cand --asset-id 'Treat item ID arguments as Homebox asset IDs (auto-detected for numeric/dashed IDs like 000-001)'
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'hbctl;notifier'= {
+            cand --url 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
+            cand --api-key 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)'
+            cand --output 'Output format (table, json, plain, csv, markdown) [env: HBCTL_OUTPUT]'
+            cand --select 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)'
+            cand -C 'Path to explicit TOML configuration file'
+            cand --config 'Path to explicit TOML configuration file'
+            cand -P 'Named configuration profile (env: HBCTL_PROFILE)'
+            cand --profile 'Named configuration profile (env: HBCTL_PROFILE)'
+            cand --json 'Shorthand for --output json (emits compact JSON)'
+            cand --dry-run 'Preview mutating requests without hitting the server (redacts Authorization)'
+            cand -q 'Output only created/affected IDs for shell piping'
+            cand --quiet 'Output only created/affected IDs for shell piping'
+            cand --asset-id 'Treat item ID arguments as Homebox asset IDs (auto-detected for numeric/dashed IDs like 000-001)'
+            cand -h 'Print help'
+            cand --help 'Print help'
+            cand list 'List configured notifiers (URLs redacted unless --reveal is passed)'
+            cand create 'Create a new notifier'
+            cand update 'Update an existing notifier'
+            cand delete 'Delete a notifier'
+            cand test 'Send a test notification to a notifier ID/name or Shoutrrr URL'
+            cand help 'Print this message or the help of the given subcommand(s)'
+        }
+        &'hbctl;notifiers'= {
+            cand --url 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
+            cand --api-key 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)'
+            cand --output 'Output format (table, json, plain, csv, markdown) [env: HBCTL_OUTPUT]'
+            cand --select 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)'
+            cand -C 'Path to explicit TOML configuration file'
+            cand --config 'Path to explicit TOML configuration file'
+            cand -P 'Named configuration profile (env: HBCTL_PROFILE)'
+            cand --profile 'Named configuration profile (env: HBCTL_PROFILE)'
+            cand --json 'Shorthand for --output json (emits compact JSON)'
+            cand --dry-run 'Preview mutating requests without hitting the server (redacts Authorization)'
+            cand -q 'Output only created/affected IDs for shell piping'
+            cand --quiet 'Output only created/affected IDs for shell piping'
+            cand --asset-id 'Treat item ID arguments as Homebox asset IDs (auto-detected for numeric/dashed IDs like 000-001)'
+            cand -h 'Print help'
+            cand --help 'Print help'
+            cand list 'List configured notifiers (URLs redacted unless --reveal is passed)'
+            cand create 'Create a new notifier'
+            cand update 'Update an existing notifier'
+            cand delete 'Delete a notifier'
+            cand test 'Send a test notification to a notifier ID/name or Shoutrrr URL'
+            cand help 'Print this message or the help of the given subcommand(s)'
+        }
+        &'hbctl;notifier;list'= {
+            cand --url 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
+            cand --api-key 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)'
+            cand --output 'Output format (table, json, plain, csv, markdown) [env: HBCTL_OUTPUT]'
+            cand --select 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)'
+            cand -C 'Path to explicit TOML configuration file'
+            cand --config 'Path to explicit TOML configuration file'
+            cand -P 'Named configuration profile (env: HBCTL_PROFILE)'
+            cand --profile 'Named configuration profile (env: HBCTL_PROFILE)'
+            cand --reveal 'Display unredacted notifier URLs'
+            cand --json 'Shorthand for --output json (emits compact JSON)'
+            cand --dry-run 'Preview mutating requests without hitting the server (redacts Authorization)'
+            cand -q 'Output only created/affected IDs for shell piping'
+            cand --quiet 'Output only created/affected IDs for shell piping'
+            cand --asset-id 'Treat item ID arguments as Homebox asset IDs (auto-detected for numeric/dashed IDs like 000-001)'
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'hbctl;notifiers;list'= {
+            cand --url 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
+            cand --api-key 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)'
+            cand --output 'Output format (table, json, plain, csv, markdown) [env: HBCTL_OUTPUT]'
+            cand --select 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)'
+            cand -C 'Path to explicit TOML configuration file'
+            cand --config 'Path to explicit TOML configuration file'
+            cand -P 'Named configuration profile (env: HBCTL_PROFILE)'
+            cand --profile 'Named configuration profile (env: HBCTL_PROFILE)'
+            cand --reveal 'Display unredacted notifier URLs'
+            cand --json 'Shorthand for --output json (emits compact JSON)'
+            cand --dry-run 'Preview mutating requests without hitting the server (redacts Authorization)'
+            cand -q 'Output only created/affected IDs for shell piping'
+            cand --quiet 'Output only created/affected IDs for shell piping'
+            cand --asset-id 'Treat item ID arguments as Homebox asset IDs (auto-detected for numeric/dashed IDs like 000-001)'
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'hbctl;notifier;create'= {
+            cand --name 'Notifier display name'
+            cand --notifier-url 'Shoutrrr destination URL'
+            cand --target 'Shoutrrr destination URL'
+            cand --active 'Whether the notifier is active (true/false; bare flag means true, defaults to true)'
+            cand --url 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
+            cand --api-key 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)'
+            cand --output 'Output format (table, json, plain, csv, markdown) [env: HBCTL_OUTPUT]'
+            cand --select 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)'
+            cand -C 'Path to explicit TOML configuration file'
+            cand --config 'Path to explicit TOML configuration file'
+            cand -P 'Named configuration profile (env: HBCTL_PROFILE)'
+            cand --profile 'Named configuration profile (env: HBCTL_PROFILE)'
+            cand --json 'Shorthand for --output json (emits compact JSON)'
+            cand --dry-run 'Preview mutating requests without hitting the server (redacts Authorization)'
+            cand -q 'Output only created/affected IDs for shell piping'
+            cand --quiet 'Output only created/affected IDs for shell piping'
+            cand --asset-id 'Treat item ID arguments as Homebox asset IDs (auto-detected for numeric/dashed IDs like 000-001)'
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'hbctl;notifiers;create'= {
+            cand --name 'Notifier display name'
+            cand --notifier-url 'Shoutrrr destination URL'
+            cand --target 'Shoutrrr destination URL'
+            cand --active 'Whether the notifier is active (true/false; bare flag means true, defaults to true)'
+            cand --url 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
+            cand --api-key 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)'
+            cand --output 'Output format (table, json, plain, csv, markdown) [env: HBCTL_OUTPUT]'
+            cand --select 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)'
+            cand -C 'Path to explicit TOML configuration file'
+            cand --config 'Path to explicit TOML configuration file'
+            cand -P 'Named configuration profile (env: HBCTL_PROFILE)'
+            cand --profile 'Named configuration profile (env: HBCTL_PROFILE)'
+            cand --json 'Shorthand for --output json (emits compact JSON)'
+            cand --dry-run 'Preview mutating requests without hitting the server (redacts Authorization)'
+            cand -q 'Output only created/affected IDs for shell piping'
+            cand --quiet 'Output only created/affected IDs for shell piping'
+            cand --asset-id 'Treat item ID arguments as Homebox asset IDs (auto-detected for numeric/dashed IDs like 000-001)'
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'hbctl;notifier;update'= {
+            cand --name 'Updated notifier name'
+            cand --notifier-url 'Updated Shoutrrr destination URL'
+            cand --target 'Updated Shoutrrr destination URL'
+            cand --active 'Updated active state (true/false; bare flag means true)'
+            cand --url 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
+            cand --api-key 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)'
+            cand --output 'Output format (table, json, plain, csv, markdown) [env: HBCTL_OUTPUT]'
+            cand --select 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)'
+            cand -C 'Path to explicit TOML configuration file'
+            cand --config 'Path to explicit TOML configuration file'
+            cand -P 'Named configuration profile (env: HBCTL_PROFILE)'
+            cand --profile 'Named configuration profile (env: HBCTL_PROFILE)'
+            cand --json 'Shorthand for --output json (emits compact JSON)'
+            cand --dry-run 'Preview mutating requests without hitting the server (redacts Authorization)'
+            cand -q 'Output only created/affected IDs for shell piping'
+            cand --quiet 'Output only created/affected IDs for shell piping'
+            cand --asset-id 'Treat item ID arguments as Homebox asset IDs (auto-detected for numeric/dashed IDs like 000-001)'
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'hbctl;notifiers;update'= {
+            cand --name 'Updated notifier name'
+            cand --notifier-url 'Updated Shoutrrr destination URL'
+            cand --target 'Updated Shoutrrr destination URL'
+            cand --active 'Updated active state (true/false; bare flag means true)'
+            cand --url 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
+            cand --api-key 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)'
+            cand --output 'Output format (table, json, plain, csv, markdown) [env: HBCTL_OUTPUT]'
+            cand --select 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)'
+            cand -C 'Path to explicit TOML configuration file'
+            cand --config 'Path to explicit TOML configuration file'
+            cand -P 'Named configuration profile (env: HBCTL_PROFILE)'
+            cand --profile 'Named configuration profile (env: HBCTL_PROFILE)'
+            cand --json 'Shorthand for --output json (emits compact JSON)'
+            cand --dry-run 'Preview mutating requests without hitting the server (redacts Authorization)'
+            cand -q 'Output only created/affected IDs for shell piping'
+            cand --quiet 'Output only created/affected IDs for shell piping'
+            cand --asset-id 'Treat item ID arguments as Homebox asset IDs (auto-detected for numeric/dashed IDs like 000-001)'
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'hbctl;notifier;delete'= {
+            cand --url 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
+            cand --api-key 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)'
+            cand --output 'Output format (table, json, plain, csv, markdown) [env: HBCTL_OUTPUT]'
+            cand --select 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)'
+            cand -C 'Path to explicit TOML configuration file'
+            cand --config 'Path to explicit TOML configuration file'
+            cand -P 'Named configuration profile (env: HBCTL_PROFILE)'
+            cand --profile 'Named configuration profile (env: HBCTL_PROFILE)'
+            cand -y 'Skip interactive confirmation prompt'
+            cand --yes 'Skip interactive confirmation prompt'
+            cand --force 'Skip interactive confirmation prompt'
+            cand --json 'Shorthand for --output json (emits compact JSON)'
+            cand --dry-run 'Preview mutating requests without hitting the server (redacts Authorization)'
+            cand -q 'Output only created/affected IDs for shell piping'
+            cand --quiet 'Output only created/affected IDs for shell piping'
+            cand --asset-id 'Treat item ID arguments as Homebox asset IDs (auto-detected for numeric/dashed IDs like 000-001)'
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'hbctl;notifiers;delete'= {
+            cand --url 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
+            cand --api-key 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)'
+            cand --output 'Output format (table, json, plain, csv, markdown) [env: HBCTL_OUTPUT]'
+            cand --select 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)'
+            cand -C 'Path to explicit TOML configuration file'
+            cand --config 'Path to explicit TOML configuration file'
+            cand -P 'Named configuration profile (env: HBCTL_PROFILE)'
+            cand --profile 'Named configuration profile (env: HBCTL_PROFILE)'
+            cand -y 'Skip interactive confirmation prompt'
+            cand --yes 'Skip interactive confirmation prompt'
+            cand --force 'Skip interactive confirmation prompt'
+            cand --json 'Shorthand for --output json (emits compact JSON)'
+            cand --dry-run 'Preview mutating requests without hitting the server (redacts Authorization)'
+            cand -q 'Output only created/affected IDs for shell piping'
+            cand --quiet 'Output only created/affected IDs for shell piping'
+            cand --asset-id 'Treat item ID arguments as Homebox asset IDs (auto-detected for numeric/dashed IDs like 000-001)'
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'hbctl;notifier;test'= {
+            cand --url 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
+            cand --api-key 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)'
+            cand --output 'Output format (table, json, plain, csv, markdown) [env: HBCTL_OUTPUT]'
+            cand --select 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)'
+            cand -C 'Path to explicit TOML configuration file'
+            cand --config 'Path to explicit TOML configuration file'
+            cand -P 'Named configuration profile (env: HBCTL_PROFILE)'
+            cand --profile 'Named configuration profile (env: HBCTL_PROFILE)'
+            cand --json 'Shorthand for --output json (emits compact JSON)'
+            cand --dry-run 'Preview mutating requests without hitting the server (redacts Authorization)'
+            cand -q 'Output only created/affected IDs for shell piping'
+            cand --quiet 'Output only created/affected IDs for shell piping'
+            cand --asset-id 'Treat item ID arguments as Homebox asset IDs (auto-detected for numeric/dashed IDs like 000-001)'
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'hbctl;notifiers;test'= {
+            cand --url 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
+            cand --api-key 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)'
+            cand --output 'Output format (table, json, plain, csv, markdown) [env: HBCTL_OUTPUT]'
+            cand --select 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)'
+            cand -C 'Path to explicit TOML configuration file'
+            cand --config 'Path to explicit TOML configuration file'
+            cand -P 'Named configuration profile (env: HBCTL_PROFILE)'
+            cand --profile 'Named configuration profile (env: HBCTL_PROFILE)'
+            cand --json 'Shorthand for --output json (emits compact JSON)'
+            cand --dry-run 'Preview mutating requests without hitting the server (redacts Authorization)'
+            cand -q 'Output only created/affected IDs for shell piping'
+            cand --quiet 'Output only created/affected IDs for shell piping'
+            cand --asset-id 'Treat item ID arguments as Homebox asset IDs (auto-detected for numeric/dashed IDs like 000-001)'
+            cand -h 'Print help'
+            cand --help 'Print help'
+        }
+        &'hbctl;notifier;help'= {
+            cand list 'List configured notifiers (URLs redacted unless --reveal is passed)'
+            cand create 'Create a new notifier'
+            cand update 'Update an existing notifier'
+            cand delete 'Delete a notifier'
+            cand test 'Send a test notification to a notifier ID/name or Shoutrrr URL'
+            cand help 'Print this message or the help of the given subcommand(s)'
+        }
+        &'hbctl;notifier;help;list'= {
+        }
+        &'hbctl;notifier;help;create'= {
+        }
+        &'hbctl;notifier;help;update'= {
+        }
+        &'hbctl;notifier;help;delete'= {
+        }
+        &'hbctl;notifier;help;test'= {
+        }
+        &'hbctl;notifier;help;help'= {
+        }
+        &'hbctl;notifiers;help'= {
+            cand list 'List configured notifiers (URLs redacted unless --reveal is passed)'
+            cand create 'Create a new notifier'
+            cand update 'Update an existing notifier'
+            cand delete 'Delete a notifier'
+            cand test 'Send a test notification to a notifier ID/name or Shoutrrr URL'
+            cand help 'Print this message or the help of the given subcommand(s)'
+        }
+        &'hbctl;notifiers;help;list'= {
+        }
+        &'hbctl;notifiers;help;create'= {
+        }
+        &'hbctl;notifiers;help;update'= {
+        }
+        &'hbctl;notifiers;help;delete'= {
+        }
+        &'hbctl;notifiers;help;test'= {
+        }
+        &'hbctl;notifiers;help;help'= {
         }
         &'hbctl;completions'= {
             cand --url 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
             cand --api-key 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)'
-            cand --output 'Output format (table, json, plain) [env: HBCTL_OUTPUT]'
+            cand --output 'Output format (table, json, plain, csv, markdown) [env: HBCTL_OUTPUT]'
             cand --select 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)'
             cand -C 'Path to explicit TOML configuration file'
             cand --config 'Path to explicit TOML configuration file'
@@ -1274,13 +2542,14 @@ set edit:completion:arg-completer[hbctl] = {|@words|
             cand --dry-run 'Preview mutating requests without hitting the server (redacts Authorization)'
             cand -q 'Output only created/affected IDs for shell piping'
             cand --quiet 'Output only created/affected IDs for shell piping'
+            cand --asset-id 'Treat item ID arguments as Homebox asset IDs (auto-detected for numeric/dashed IDs like 000-001)'
             cand -h 'Print help'
             cand --help 'Print help'
         }
         &'hbctl;man'= {
             cand --url 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
             cand --api-key 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)'
-            cand --output 'Output format (table, json, plain) [env: HBCTL_OUTPUT]'
+            cand --output 'Output format (table, json, plain, csv, markdown) [env: HBCTL_OUTPUT]'
             cand --select 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)'
             cand -C 'Path to explicit TOML configuration file'
             cand --config 'Path to explicit TOML configuration file'
@@ -1290,6 +2559,7 @@ set edit:completion:arg-completer[hbctl] = {|@words|
             cand --dry-run 'Preview mutating requests without hitting the server (redacts Authorization)'
             cand -q 'Output only created/affected IDs for shell piping'
             cand --quiet 'Output only created/affected IDs for shell piping'
+            cand --asset-id 'Treat item ID arguments as Homebox asset IDs (auto-detected for numeric/dashed IDs like 000-001)'
             cand -h 'Print help'
             cand --help 'Print help'
         }
@@ -1297,7 +2567,7 @@ set edit:completion:arg-completer[hbctl] = {|@words|
             cand --version 'Target a specific release version or tag (e.g. 0.1.0 or v0.1.0)'
             cand --url 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
             cand --api-key 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)'
-            cand --output 'Output format (table, json, plain) [env: HBCTL_OUTPUT]'
+            cand --output 'Output format (table, json, plain, csv, markdown) [env: HBCTL_OUTPUT]'
             cand --select 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)'
             cand -C 'Path to explicit TOML configuration file'
             cand --config 'Path to explicit TOML configuration file'
@@ -1310,6 +2580,7 @@ set edit:completion:arg-completer[hbctl] = {|@words|
             cand --dry-run 'Preview mutating requests without hitting the server (redacts Authorization)'
             cand -q 'Output only created/affected IDs for shell piping'
             cand --quiet 'Output only created/affected IDs for shell piping'
+            cand --asset-id 'Treat item ID arguments as Homebox asset IDs (auto-detected for numeric/dashed IDs like 000-001)'
             cand -h 'Print help'
             cand --help 'Print help'
         }
@@ -1317,7 +2588,7 @@ set edit:completion:arg-completer[hbctl] = {|@words|
             cand --version 'Target a specific release version or tag (e.g. 0.1.0 or v0.1.0)'
             cand --url 'Homebox base URL (env: HBCTL_URL > HOMEBOX_URL > http://<HOMEBOX_IP>:7745)'
             cand --api-key 'Homebox API key or Bearer token (env: HBCTL_API_KEY > HOMEBOX_API_KEY)'
-            cand --output 'Output format (table, json, plain) [env: HBCTL_OUTPUT]'
+            cand --output 'Output format (table, json, plain, csv, markdown) [env: HBCTL_OUTPUT]'
             cand --select 'Comma-separated field projection for JSON/table output (e.g. id,name,fields)'
             cand -C 'Path to explicit TOML configuration file'
             cand --config 'Path to explicit TOML configuration file'
@@ -1330,6 +2601,7 @@ set edit:completion:arg-completer[hbctl] = {|@words|
             cand --dry-run 'Preview mutating requests without hitting the server (redacts Authorization)'
             cand -q 'Output only created/affected IDs for shell piping'
             cand --quiet 'Output only created/affected IDs for shell piping'
+            cand --asset-id 'Treat item ID arguments as Homebox asset IDs (auto-detected for numeric/dashed IDs like 000-001)'
             cand -h 'Print help'
             cand --help 'Print help'
         }
@@ -1345,6 +2617,15 @@ set edit:completion:arg-completer[hbctl] = {|@words|
             cand api 'Issue a raw authenticated HTTP request against any Homebox API endpoint'
             cand maintenance 'Manage maintenance log entries (/api/v1/maintenance)'
             cand export 'Export filtered items to JSON, CSV, or Markdown'
+            cand backup 'Create a portable full-inventory backup (directory or .tar.gz archive)'
+            cand label 'Generate or print a Homebox item, asset, or location label (/api/v1/labelmaker)'
+            cand qr 'Generate a QR code image (/api/v1/qrcode)'
+            cand actions 'Run Homebox server maintenance actions (/api/v1/actions/*)'
+            cand stats 'Display inventory statistics and breakdowns (/api/v1/groups/statistics*)'
+            cand config 'Inspect effective configuration and manage named profiles'
+            cand template 'Manage item templates and create items from templates (/api/v1/templates)'
+            cand barcode 'Look up product metadata by barcode (/api/v1/products/search-from-barcode)'
+            cand notifier 'Manage Shoutrrr notification channels (/api/v1/notifiers)'
             cand completions 'Generate shell completion scripts'
             cand man 'Generate UNIX roff man page'
             cand update 'Check for and install the latest hbctl release from GitHub'
@@ -1407,6 +2688,9 @@ set edit:completion:arg-completer[hbctl] = {|@words|
             cand list 'List attachments on an item'
             cand download 'Stream-download attachments from one or multiple items'
             cand delete 'Delete an attachment from an item'
+            cand set-primary 'Mark an existing attachment as the item''s primary photo'
+            cand update 'Update attachment metadata (title, type, primary)'
+            cand add-link 'Attach an external HTTP(S) URL link to an item'
         }
         &'hbctl;help;attachment;upload'= {
         }
@@ -1415,6 +2699,12 @@ set edit:completion:arg-completer[hbctl] = {|@words|
         &'hbctl;help;attachment;download'= {
         }
         &'hbctl;help;attachment;delete'= {
+        }
+        &'hbctl;help;attachment;set-primary'= {
+        }
+        &'hbctl;help;attachment;update'= {
+        }
+        &'hbctl;help;attachment;add-link'= {
         }
         &'hbctl;help;search'= {
         }
@@ -1476,6 +2766,87 @@ set edit:completion:arg-completer[hbctl] = {|@words|
         &'hbctl;help;maintenance;delete'= {
         }
         &'hbctl;help;export'= {
+        }
+        &'hbctl;help;backup'= {
+        }
+        &'hbctl;help;label'= {
+        }
+        &'hbctl;help;qr'= {
+        }
+        &'hbctl;help;actions'= {
+            cand ensure-asset-ids 'Ensure all items in Homebox have an asset ID assigned (/api/v1/actions/ensure-asset-ids)'
+            cand create-missing-thumbnails 'Create thumbnails for attachments missing them (/api/v1/actions/create-missing-thumbnails)'
+        }
+        &'hbctl;help;actions;ensure-asset-ids'= {
+        }
+        &'hbctl;help;actions;create-missing-thumbnails'= {
+        }
+        &'hbctl;help;stats'= {
+            cand overview 'Group-wide overview statistics (/api/v1/groups/statistics + upcoming maintenance)'
+            cand tags 'Tag purchase-value breakdown (/api/v1/groups/statistics/tags)'
+            cand locations 'Location purchase-value breakdown (/api/v1/groups/statistics/locations)'
+            cand entity-types 'Entity-type count and purchase-value breakdown'
+            cand purchase-price 'Purchase value over time (/api/v1/groups/statistics/purchase-price)'
+        }
+        &'hbctl;help;stats;overview'= {
+        }
+        &'hbctl;help;stats;tags'= {
+        }
+        &'hbctl;help;stats;locations'= {
+        }
+        &'hbctl;help;stats;entity-types'= {
+        }
+        &'hbctl;help;stats;purchase-price'= {
+        }
+        &'hbctl;help;config'= {
+            cand show 'Display effective resolved configuration (secrets redacted as Bearer ***)'
+            cand profiles 'List configured profiles and indicate active/default selection'
+            cand use 'Switch the active default profile in user config'
+        }
+        &'hbctl;help;config;show'= {
+        }
+        &'hbctl;help;config;profiles'= {
+        }
+        &'hbctl;help;config;use'= {
+        }
+        &'hbctl;help;template'= {
+            cand list 'List all entity templates'
+            cand get 'Fetch a single entity template by ID'
+            cand create 'Create a new entity template'
+            cand update 'Update an existing entity template (GET -> Merge -> PUT)'
+            cand delete 'Delete an entity template'
+            cand apply 'Create a new item from a template (/api/v1/templates/{id}/create-item)'
+        }
+        &'hbctl;help;template;list'= {
+        }
+        &'hbctl;help;template;get'= {
+        }
+        &'hbctl;help;template;create'= {
+        }
+        &'hbctl;help;template;update'= {
+        }
+        &'hbctl;help;template;delete'= {
+        }
+        &'hbctl;help;template;apply'= {
+        }
+        &'hbctl;help;barcode'= {
+        }
+        &'hbctl;help;notifier'= {
+            cand list 'List configured notifiers (URLs redacted unless --reveal is passed)'
+            cand create 'Create a new notifier'
+            cand update 'Update an existing notifier'
+            cand delete 'Delete a notifier'
+            cand test 'Send a test notification to a notifier ID/name or Shoutrrr URL'
+        }
+        &'hbctl;help;notifier;list'= {
+        }
+        &'hbctl;help;notifier;create'= {
+        }
+        &'hbctl;help;notifier;update'= {
+        }
+        &'hbctl;help;notifier;delete'= {
+        }
+        &'hbctl;help;notifier;test'= {
         }
         &'hbctl;help;completions'= {
         }

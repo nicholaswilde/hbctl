@@ -1,14 +1,174 @@
 # hbctl
 
-> Fast, agent-friendly Rust CLI client for remote Homebox v0.26+ REST APIs.
+> Fast, single-binary, agent-friendly Rust CLI client for interacting with remote Homebox v0.26+ instances over the REST API.
 
-## Capabilities
+`hbctl` centralizes Homebox inventory management for both interactive terminal workflows and AI-agent automation. It separates `stdout` data (`table`, compact `json` with `--select`, `plain`, `csv`, `markdown`, or `-q` IDs) from `stderr` diagnostics, protects mutations with `GET -> Merge -> PUT` semantics and `--dry-run` previews (`Bearer ***` redaction), and resolves settings across CLI flags, environment variables, `.hbctl.toml`, and `~/.config/hbctl/config.toml` profiles with OS keyring + `0600` file fallback storage.
 
-- Inventory CRUD (`item list|get|create|update|upsert|delete|import|dedup`)
-- Attachments (`attachment upload|list|download|delete`) with idempotent skip/overwrite, >500KB image guard, streaming downloads
-- Search (`search`) with full-text query and `--tag`, `--model`, `--serial`, `--manufacturer`
-- Typed custom fields (`field get|set`) supporting `text`, `number`, `boolean`
-- Tag & entity-type management (`tag list|create`, `entity-types`)
-- Filtered export (`export`) in `json`, `csv`, and `markdown`
-- Compact JSON (`--json`), `--select` field projection, `--dry-run` (redacted `Authorization`), `--quiet` ID output
-- Layered config: CLI > env/`.env` (`HBCTL_URL`, `HOMEBOX_URL`, `HOMEBOX_IP`, `HBCTL_API_KEY`, `HOMEBOX_API_KEY`) > `.hbctl.toml` > `~/.config/hbctl/config.toml` > defaults
+## Table of Contents
+
+- [Installation & Shell Integration](#installation--shell-integration)
+- [Global Options & Output Contract](#global-options--output-contract)
+- [CLI Commands Reference](#cli-commands-reference)
+- [Configuration, Profiles & Security](#configuration-profiles--security)
+- [Architecture & Directory Layout](#architecture--directory-layout)
+- [Development, Testing & Quality Gates](#development-testing--quality-gates)
+- [License & Maintainer](#license--maintainer)
+
+## Installation & Shell Integration
+
+Prebuilt binaries are published for Linux (`amd64`, `arm64`, `armv7`, `armv6`), macOS, and Windows:
+
+- **Homebrew (macOS / Linux):** `brew install nicholaswilde/homebrew-tap/hbctl`
+- **APT (Debian / Ubuntu):** Add `https://nicholaswilde.io/apt` (`nicholaswilde/apt`) and run `sudo apt update && sudo apt install hbctl` (includes binary, man page, and completions).
+- **Scoop (Windows):** `scoop bucket add nicholaswilde https://github.com/nicholaswilde/scoop-bucket && scoop install nicholaswilde/hbctl`
+- **Cargo (from source):** `cargo install --git https://github.com/nicholaswilde/hbctl`
+- **Self-Update:** `hbctl update --check`, `hbctl update`, `hbctl update --yes`, or `hbctl update --version <VERSION>` (alias: `self-update`).
+- **Shell Completions:** `hbctl completions <bash|zsh|fish|powershell|elvish>` (pre-generated scripts live in `completions/`).
+- **Man Page:** `hbctl man > assets/hbctl.1` (UNIX roff manual page).
+
+## Global Options & Output Contract
+
+All data writes exclusively to `stdout`; warnings, diagnostics, and errors write to `stderr`.
+
+| Flag | Description | Env / Default |
+| :--- | :--- | :--- |
+| `--url <URL>` | Homebox base URL | `HBCTL_URL` > `HOMEBOX_URL` > `HOMEBOX_IP` |
+| `--api-key <API_KEY>` | Homebox API key (`hb_...`) or Bearer token | `HBCTL_API_KEY` > `HOMEBOX_API_KEY` |
+| `--output <OUTPUT>` | Output format (`table`, `json`, `plain`, `csv`, `markdown`) | `HBCTL_OUTPUT` (default: `table`) |
+| `--json` | Shorthand for `--output json` (emits compact single-line JSON) | `false` |
+| `--select <SELECT>` | Comma-separated field projection for JSON/table output (e.g. `id,name,fields`) | `None` |
+| `--dry-run` | Preview mutating HTTP requests without hitting the server (`Authorization` redacted as `Bearer ***`) | `false` |
+| `-q`, `--quiet` | Output only created/affected IDs (or backup path) for shell piping | `false` |
+| `-C`, `--config <CONFIG>` | Path to explicit TOML configuration file (bypasses default user/project config files) | `None` |
+| `-P`, `--profile <NAME>` | Named configuration profile | `HBCTL_PROFILE` |
+| `--asset-id` | Treat item ID arguments as Homebox asset IDs (auto-detected for numeric/dashed IDs like `000-001`) | `false` |
+
+## CLI Commands Reference
+
+### `auth` & `status`
+
+- `hbctl auth login`: Authenticate via `--with-token` (reads API key from stdin) or `--username <USER>` (`--password-stdin` for non-interactive scripts). Supports `--insecure-storage` to target `0600` file storage directly.
+- `hbctl auth status`: Verify active credentials and display redacted `Bearer ***` status.
+- `hbctl auth refresh`: Refresh an active JWT session token.
+- `hbctl auth logout`: Clear stored credentials for the active profile/instance.
+- `hbctl status`: Check unauthenticated remote server reachability and version (`/api/v1/status`).
+
+### `item` (`/api/v1/entities`)
+
+- `hbctl item list`: Filter by `--tag`, `--type`, `--parent` (or `none`), `--has-field`, `--page-size`, `--all`, `--include-archived`, `--archived-only`, and `--warranty-expiring <DAYS>`.
+- `hbctl item get <ID>`: Fetch by UUID or Homebox asset ID (auto-detected for `000-001`, or force with `--asset-id`).
+- `hbctl item create`: Supports `--name`, `--description`, `--type`, `--parent`, `--tag` (auto-creates missing tags), `--manufacturer`, `--model`, `--serial`, `--quantity`, `--purchase-price`, `--purchase-date`, `--purchase-from`, `--archived`, `--insured`, `--lifetime-warranty`, `--warranty-expires`, `--warranty-details`, `--sold-time`, `--sold-to`, `--sold-price`, `--sold-notes`, `--field KEY=VAL` (`--field-type text|number|boolean`), `--from-json <FILE|->`, `--from-barcode <CODE>`, `--attach <FILE[=NAME]>`, `--attach-url <URL[=NAME]>`, `--optimize`, and `--attach-best-effort`. Automatically issues a follow-up `PUT` when custom `fields` are present.
+- `hbctl item update`: Safe `GET -> Merge -> PUT` for one or more `[ID]...`, `--items-from <FILE|->`, or selectors (`--filter-tag`, `--filter-parent`, `--filter-type`). Supports `--add-tag`, `--remove-tag`, `--remove-field`, `--fill-missing`, `--from-json`, and all warranty/insurance/sold/archived flags.
+- `hbctl item upsert`: Idempotent create-or-update with `--match-by <name|model|serial|field:KEY>`, `--match-mode <exact|contains|fuzzy>`, `--on-match <update|skip|attach-only>`, and `--fill-missing`.
+- `hbctl item delete`: Delete one or many `[ID]...`, `--items-from`, or selector matches (`--tag`, `--parent`, `--type`), skipping prompts with `-y` / `--yes` / `--force`.
+- `hbctl item import <FILE|->`: Bulk import from JSON or CSV (`--format json|csv`, `--skip-existing`, `--update-existing`, `--fill-missing`, `--match-by`, `--match-mode`, `--attach`, `--optimize`).
+- `hbctl item dedup`: Two-pass detector (Pass 1 exact case-insensitive trimmed name; Pass 2 Jaccard token similarity `>= --threshold`, default `0.8`). Supports `--delete` and `--merge` (sums quantities onto keeper).
+- `hbctl item move`: Reparent one or many items (`<ID>... <PARENT>` or `--to <PARENT|none>`) with `--items-from` and `--tag` / `--parent` / `--type` selectors.
+- `hbctl item duplicate <ID> [--count N]`: Duplicate an item one or more times.
+- `hbctl item path <ID>` & `hbctl item tree`: Display breadcrumb paths or render parent/location hierarchy trees (`--root`, `--max-depth`).
+
+### `attachment` (`/api/v1/entities/{id}/attachments`)
+
+- `hbctl attachment upload <ITEM_ID> <FILE...>`: Upload local files, `-` (`--name` required), or `--attach-url <URL[=NAME]>`. Skips existing filenames unless `--overwrite`; enforces >500 KB image guard unless `--optimize` or `--force`; marks primary photo with `--primary`.
+- `hbctl attachment list <ITEM_ID>`: List attachments on an item.
+- `hbctl attachment download`: Stream-download single attachment (`<ITEM_ID> <ATTACHMENT_ID>`), `--all` on an item, or bulk across `--all-items`, `--tag`, or `--items-from <FILE|->` with `--mime`, `--ext`, `--out`, and `--overwrite`.
+- `hbctl attachment set-primary <ITEM_ID> <ATTACHMENT_ID>`: Mark an attachment as the item's primary photo.
+- `hbctl attachment update <ITEM_ID> <ATTACHMENT_ID>`: Update `--title`, `--type`, and `--primary`.
+- `hbctl attachment add-link <ITEM_ID> <URL>`: Attach an external HTTP(S) link with optional `--title` and `--type`.
+- `hbctl attachment delete <ITEM_ID> <ATTACHMENT_ID>`: Remove an attachment.
+
+### `search` & `field`
+
+- `hbctl search [QUERY]`: Filter by `--tag`, `--type`, `--parent`, `--limit`, `--include-archived`, `--archived-only`, `--warranty-expiring <DAYS>`, `--model`, `--serial`, `--manufacturer`, `--field KEY[=VAL]`, `--any` (OR semantics instead of AND), and `--with-path`.
+- `hbctl field <list|get|set|delete> <ITEM_ID> ...`: Inspect or mutate typed custom fields (`--type text|number|boolean`) via `GET -> Merge -> PUT`.
+
+### `tag` & `entity-types`
+
+- `hbctl tag <list|create|update|delete>`: Manage `/api/v1/tags` (`--name`, `--description`, `--color`, `--force`).
+- `hbctl entity-types <list|create|delete>` (alias: `entity-type`, defaults to `list`): Manage `/api/v1/entity-types` (`--description`, `--is-location`, `--force`).
+
+### `maintenance`, `stats`, `template`, & `barcode`
+
+- `hbctl maintenance <list|create|update|delete>`: Manage `/api/v1/maintenance` (`--status both|completed|scheduled`, `--name`, `--completed-date`, `--scheduled-date`, `--cost`, `--description`).
+- `hbctl stats [overview|tags|locations|entity-types|purchase-price]`: Inspect group overview (`--warranty-days <DAYS>`), organizer breakdowns, and purchase value over time (`--start`, `--end`).
+- `hbctl template <list|get|create|update|delete|apply>`: Manage `/api/v1/templates` and instantiate items via `/api/v1/templates/{id}/create-item` (`--name`, `--location`, `--parent`, `--type`, `--tag`, `--quantity`).
+- `hbctl barcode <CODE>`: Look up product metadata via `/api/v1/products/search-from-barcode`.
+
+### `label`, `qr`, `actions`, `notifier`, `config`, & `api`
+
+- `hbctl label <ID>`: Generate or print labels (`/api/v1/labelmaker`) with `--kind <auto|item|asset|location>`, `-o`/`--out <FILE|->`, `--print`, and `--overwrite`.
+- `hbctl qr <ID>`: Generate QR code images (`/api/v1/qrcode`) with `-o`/`--out <FILE|->`, `--raw`, and `--overwrite`.
+- `hbctl actions <ensure-asset-ids|create-missing-thumbnails>` (alias: `action`): Run Homebox server maintenance actions (`/api/v1/actions/*`).
+- `hbctl notifier <list|create|update|delete|test>` (alias: `notifiers`): Manage Shoutrrr notification channels (`/api/v1/notifiers`). URLs are redacted by default unless `--reveal` is passed on `list`.
+- `hbctl config <show|profiles|use>`: Inspect resolved effective config (redacted `Bearer ***`), list profiles, and switch `default_profile`.
+- `hbctl api <METHOD> <PATH>`: Issue raw authenticated HTTP requests (`-d`/`--data`, `--from-json <FILE|->`, repeatable `--query KEY=VALUE`).
+
+### `export` & `backup`
+
+- `hbctl export`: Export filtered items (`--tag`, `--has-field`, `--field`, `--sort <name|id|purchase-price|purchase-date|updated-at|asset-id>`, `--format <json|csv|markdown>`, `--columns COL[=ALIAS]`, `--align <default|left|right|center>`, `--empty <STR>`).
+- `hbctl backup --out <PATH>`: Create a portable full-inventory backup as a directory or `.tar.gz`/`.tgz` archive.
+  - Exports hydrated `entities.json`, `tags.json`, `entity_types.json`, `maintenance.json`, `manifest.json` (`schemaVersion: 1`, UTC `createdAt`, credential-stripped `sourceUrl`, `counts`, `attachments` index), and `attachments/<entity_id>/<filename>` with collision disambiguation.
+  - Flags: `-o`/`--out <PATH>`, `--no-attachments`, `--exclude-archived` (archived included by default), `--overwrite`, plus `--dry-run` summary preview without writing files or downloading attachments.
+
+## Configuration, Profiles & Security
+
+Layered precedence (highest to lowest):
+
+1. CLI flags (`--url`, `--api-key`, `--profile`, `--output`, `--json`, `--config`)
+2. Environment variables / `.env` (`HBCTL_URL` > `HOMEBOX_URL` > `HOMEBOX_IP`, `HBCTL_API_KEY` > `HOMEBOX_API_KEY`, `HBCTL_PROFILE`, `HBCTL_OUTPUT`, `HBCTL_INSECURE_STORAGE`)
+3. Project-local `./.hbctl.toml`
+4. User global `~/.config/hbctl/config.toml` (`[profiles.<name>]` and `default_profile`) + stored credentials (OS keyring with automatic `0600` `~/.config/hbctl/credentials.json` fallback scoped per profile)
+5. Built-in defaults (`output = "table"`, `timeout_secs = 30`, `download_timeout_secs = 120`, `auto_optimize = false`, `max_image_kb = 500`, `max_image_dimension = 1920`)
+
+Security guarantees:
+
+- `Authorization` headers are always masked as `Bearer ***` in `auth status`, `config show`, `--dry-run` previews, and error text (`redact_secret`).
+- Shoutrrr URLs in `notifier list` and `notifier test` redact embedded passwords, tokens, and secret query values unless `--reveal` is passed.
+- `hbctl backup` strips userinfo from `sourceUrl` in `manifest.json`.
+
+## Architecture & Directory Layout
+
+```text
+src/
+├── main.rs            # Binary entrypoint -> hbctl::run()
+├── lib.rs             # Public API & run_with_io()
+├── cli.rs             # clap parser, subcommands, completions, manpage
+├── config.rs          # Layered config, profiles, URL normalization, redact_secret
+├── auth_store.rs      # OS keyring + 0600 JSON fallback store
+├── dedup.rs           # Two-pass exact + Jaccard duplicate detector
+├── image_opt.rs       # EXIF-aware JPEG/PNG/WebP resize & compression
+├── output.rs          # table, compact JSON (--select), plain, csv, markdown
+├── update.rs          # GitHub release self-updater
+├── error.rs           # Typed HbctlError enum
+├── client/
+│   ├── mod.rs         # HomeboxClient, retries/backoff, concurrent hydration, streaming
+│   ├── models.rs      # Homebox v0.26+ models with Go-null tolerance
+│   └── resolve.rs     # Tag & entity-type resolver
+└── commands/
+    ├── mod.rs         # Subcommand dispatch & shared item helpers
+    ├── actions.rs     ├── api.rs         ├── attachment.rs  ├── auth.rs
+    ├── backup.rs      ├── barcode.rs     ├── config.rs      ├── entity_type.rs
+    ├── export.rs      ├── field.rs       ├── item.rs        ├── label.rs
+    ├── maintenance.rs ├── notifier.rs    ├── qr.rs          ├── search.rs
+    ├── stats.rs       ├── status.rs      ├── tag.rs         └── template.rs
+```
+
+## Development, Testing & Quality Gates
+
+Primary `Taskfile.yml` workflows:
+
+- `task check`: `cargo fmt --all -- --check` + `cargo clippy --workspace --all-targets --all-features -- -D warnings` + `cargo test`
+- `task test` / `task test:ci`: Full formatting, linting, and test suite
+- `task fmt`: `cargo fmt --all`
+- `task lint:md`: `rumdl check .` (Markdown lint)
+- `task completions && task man`: Regenerate `completions/*` and `assets/hbctl.1`
+- `task docs:build` / `task serve`: Build or preview Zensical docs site via `uv run zensical`
+- `task coverage` / `task coverage:report`: `cargo llvm-cov` summary and LCOV output
+- `task build`: Cross-compile release binaries (`x86_64`, `aarch64`, `armv7`, `arm` musleabi via `cross`)
+
+Test suites live in unit tests across `src/` plus `tests/cli.rs` (mocked HTTP via `mockito`), `tests/coverage_cli.rs`, and `tests/live_homebox.rs` (ignored by default; uses `testcontainers` against `ghcr.io/sysadminsmedia/homebox:latest`).
+
+## License & Maintainer
+
+- **License:** [Apache License 2.0](LICENSE)
+- **Maintainer:** Nicholas Wilde ([GitHub](https://github.com/nicholaswilde/hbctl), [Docs](https://nicholaswilde.io/hbctl))

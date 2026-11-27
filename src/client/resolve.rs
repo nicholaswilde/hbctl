@@ -140,6 +140,18 @@ impl<'a> Resolver<'a> {
         if let Some(found) = entities.iter().find(|e| e.id == needle) {
             return Ok(Some(found.id.clone()));
         }
+        let needle_asset = normalize_asset_id(needle);
+        if !needle_asset.is_empty() && is_asset_id_like(needle) {
+            if let Some(found) = entities.iter().find(|e| {
+                e.asset_id
+                    .as_deref()
+                    .map(normalize_asset_id)
+                    .filter(|a| !a.is_empty())
+                    .is_some_and(|a| a == needle_asset)
+            }) {
+                return Ok(Some(found.id.clone()));
+            }
+        }
         if let Some(found) = entities
             .iter()
             .find(|e| e.name.trim().eq_ignore_ascii_case(needle))
@@ -176,6 +188,35 @@ pub fn is_uuid_like(s: &str) -> bool {
     true
 }
 
+/// Normalize a Homebox asset ID by trimming whitespace and an optional leading `#`.
+pub fn normalize_asset_id(raw: &str) -> String {
+    let trimmed = raw.trim();
+    trimmed
+        .strip_prefix('#')
+        .unwrap_or(trimmed)
+        .trim()
+        .to_string()
+}
+
+/// Returns true if `s` looks like a Homebox numeric/dashed asset ID (e.g. `000-001`, `42`, `#000-042`).
+///
+/// Strings containing letters (e.g. `ent-1`, `loc-2`, or UUIDs) return `false`.
+pub fn is_asset_id_like(s: &str) -> bool {
+    let trimmed = s.trim();
+    if trimmed.is_empty() || is_uuid_like(trimmed) {
+        return false;
+    }
+    let clean = normalize_asset_id(trimmed);
+    if clean.is_empty() || clean.starts_with('-') || clean.ends_with('-') || clean.contains("--") {
+        return false;
+    }
+    if !clean.bytes().all(|b| b.is_ascii_digit() || b == b'-') {
+        return false;
+    }
+    let compact: String = clean.chars().filter(|&c| c != '-').collect();
+    !compact.is_empty() && compact.parse::<u64>().is_ok()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -187,5 +228,24 @@ mod tests {
         assert!(!is_uuid_like("electronics"));
         assert!(!is_uuid_like("550e8400-e29b-41d4-a716-44665544000"));
         assert!(!is_uuid_like("550e8400xe29b-41d4-a716-446655440000"));
+    }
+
+    #[test]
+    fn test_is_asset_id_like_and_normalize() {
+        assert!(is_asset_id_like("000-001"));
+        assert!(is_asset_id_like("12345"));
+        assert!(is_asset_id_like("#000-042"));
+        assert!(is_asset_id_like(" 1 "));
+        assert!(!is_asset_id_like("ent-1"));
+        assert!(!is_asset_id_like("loc-2"));
+        assert!(!is_asset_id_like("550e8400-e29b-41d4-a716-446655440000"));
+        assert!(!is_asset_id_like(""));
+        assert!(!is_asset_id_like("#"));
+        assert!(!is_asset_id_like("-1"));
+        assert!(!is_asset_id_like("000--001"));
+        assert!(!is_asset_id_like("123-"));
+
+        assert_eq!(normalize_asset_id(" #000-042 "), "000-042");
+        assert_eq!(normalize_asset_id("000-001"), "000-001");
     }
 }

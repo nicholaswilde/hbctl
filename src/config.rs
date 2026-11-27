@@ -1,5 +1,6 @@
 use std::collections::{BTreeMap, HashMap};
-use std::fs;
+use std::fs::{self, OpenOptions};
+use std::io::Write;
 use std::path::{Path, PathBuf};
 
 use clap::ValueEnum;
@@ -25,6 +26,22 @@ pub enum OutputFormat {
     Table,
     Json,
     Plain,
+    Csv,
+    #[value(alias = "md")]
+    #[serde(alias = "md")]
+    Markdown,
+}
+
+impl OutputFormat {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Table => "table",
+            Self::Json => "json",
+            Self::Plain => "plain",
+            Self::Csv => "csv",
+            Self::Markdown => "markdown",
+        }
+    }
 }
 
 impl std::str::FromStr for OutputFormat {
@@ -35,8 +52,10 @@ impl std::str::FromStr for OutputFormat {
             "table" => Ok(Self::Table),
             "json" => Ok(Self::Json),
             "plain" => Ok(Self::Plain),
+            "csv" => Ok(Self::Csv),
+            "markdown" | "md" => Ok(Self::Markdown),
             other => Err(HbctlError::Config(format!(
-                "invalid output format '{other}' (expected table, json, or plain)"
+                "invalid output format '{other}' (expected table, json, plain, csv, or markdown)"
             ))),
         }
     }
@@ -142,12 +161,55 @@ impl ConfigFile {
     }
 
     pub fn save_to_path(&self, path: &Path) -> Result<()> {
-        if let Some(parent) = path.parent() {
-            fs::create_dir_all(parent)?;
-        }
         let text = toml::to_string_pretty(self)
             .map_err(|e| HbctlError::Config(format!("failed to serialize TOML: {e}")))?;
-        fs::write(path, text)?;
+
+        let parent = path
+            .parent()
+            .filter(|p| !p.as_os_str().is_empty())
+            .unwrap_or_else(|| Path::new("."));
+        fs::create_dir_all(parent)?;
+
+        let file_name = path
+            .file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or("config.toml");
+        let tmp_path = parent.join(format!(".{file_name}.tmp.{}", std::process::id()));
+
+        let write_result: Result<()> = (|| {
+            let mut file = OpenOptions::new()
+                .write(true)
+                .create(true)
+                .truncate(true)
+                .open(&tmp_path)?;
+            #[cfg(unix)]
+            if let Ok(meta) = fs::metadata(path) {
+                let _ = fs::set_permissions(&tmp_path, meta.permissions());
+            }
+            file.write_all(text.as_bytes())?;
+            file.sync_all()?;
+            Ok(())
+        })();
+
+        if let Err(err) = write_result {
+            let _ = fs::remove_file(&tmp_path);
+            return Err(err);
+        }
+
+        if let Err(err) = fs::rename(&tmp_path, path) {
+            #[cfg(windows)]
+            {
+                if path.exists()
+                    && fs::remove_file(path).is_ok()
+                    && fs::rename(&tmp_path, path).is_ok()
+                {
+                    return Ok(());
+                }
+            }
+            let _ = fs::remove_file(&tmp_path);
+            return Err(err.into());
+        }
+
         Ok(())
     }
 }
@@ -238,33 +300,8 @@ impl AppConfig {
         user_config_path: Option<&Path>,
         secret_store: Option<&dyn SecretStore>,
     ) -> Result<Self> {
-        let loaded_files: Vec<(ConfigFile, CredentialSource)> =
-            if let Some(explicit_path) = &overrides.config_path {
-                vec![(
-                    ConfigFile::load_from_path(explicit_path)?,
-                    CredentialSource::LocalConfig,
-                )]
-            } else {
-                let mut files = Vec::new();
-                // Tier 4: User global ~/.config/hbctl/config.toml
-                if let Some(user_path) = user_config_path {
-                    if user_path.is_file() {
-                        files.push((
-                            ConfigFile::load_from_path(user_path)?,
-                            CredentialSource::UserConfig,
-                        ));
-                    }
-                }
-                // Tier 3: Project-local .hbctl.toml
-                let local_path = cwd.join(".hbctl.toml");
-                if local_path.is_file() {
-                    files.push((
-                        ConfigFile::load_from_path(&local_path)?,
-                        CredentialSource::LocalConfig,
-                    ));
-                }
-                files
-            };
+        let loaded_files =
+            load_config_layers(overrides.config_path.as_deref(), cwd, user_config_path)?;
 
         let explicit_profile = normalize_profile_name(overrides.profile.as_deref())?.or(
             normalize_profile_name(env_non_empty(env_vars, "HBCTL_PROFILE").as_deref())?,
@@ -550,6 +587,141 @@ fn env_non_empty(env_vars: &HashMap<String, String>, key: &str) -> Option<String
         .map(ToOwned::to_owned)
 }
 
+fn load_config_layers(
+    explicit_config: Option<&Path>,
+    cwd: &Path,
+    user_config_path: Option<&Path>,
+) -> Result<Vec<(ConfigFile, CredentialSource)>> {
+    if let Some(explicit_path) = explicit_config {
+        return Ok(vec![(
+            ConfigFile::load_from_path(explicit_path)?,
+            CredentialSource::LocalConfig,
+        )]);
+    }
+
+    let mut files = Vec::new();
+    // Tier 4: User global ~/.config/hbctl/config.toml
+    if let Some(user_path) = user_config_path {
+        if user_path.is_file() {
+            files.push((
+                ConfigFile::load_from_path(user_path)?,
+                CredentialSource::UserConfig,
+            ));
+        }
+    }
+    // Tier 3: Project-local .hbctl.toml
+    let local_path = cwd.join(".hbctl.toml");
+    if local_path.is_file() {
+        files.push((
+            ConfigFile::load_from_path(&local_path)?,
+            CredentialSource::LocalConfig,
+        ));
+    }
+    Ok(files)
+}
+
+/// Summary of a discovered `[profiles.<name>]` entry (secrets excluded).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProfileSummary {
+    pub name: String,
+    pub active: bool,
+    pub default: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub url: Option<String>,
+    pub source: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub output: Option<OutputFormat>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub timeout_secs: Option<u64>,
+}
+
+/// Discover configured `[profiles.*]` across user and local config layers (never exposing secrets).
+pub fn discover_profiles(
+    explicit_config: Option<&Path>,
+    cwd: &Path,
+    user_config_path: Option<&Path>,
+    active_profile: Option<&str>,
+) -> Result<Vec<ProfileSummary>> {
+    let layers = load_config_layers(explicit_config, cwd, user_config_path)?;
+
+    let mut cfg_default_profile: Option<String> = None;
+    for (file, _) in layers.iter().rev() {
+        if let Some(prof) = normalize_profile_name(file.default_profile.as_deref())? {
+            cfg_default_profile = Some(prof);
+            break;
+        }
+    }
+    let effective_default = cfg_default_profile.or_else(|| {
+        layers
+            .iter()
+            .any(|(f, _)| f.profiles.contains_key("default"))
+            .then(|| "default".to_string())
+    });
+
+    let mut profiles: BTreeMap<String, ProfileSummary> = BTreeMap::new();
+    for (file, source) in layers {
+        for (name, p_cfg) in file.profiles {
+            let url = non_empty(p_cfg.url.as_deref())
+                .map(|raw| normalize_base_url(raw).unwrap_or_else(|_| raw.to_string()))
+                .map(|u| redact_url_credentials(&u));
+            profiles.insert(
+                name.clone(),
+                ProfileSummary {
+                    active: active_profile == Some(name.as_str()),
+                    default: effective_default.as_deref() == Some(name.as_str()),
+                    name,
+                    url,
+                    source: source.as_str().to_string(),
+                    output: p_cfg.output,
+                    timeout_secs: p_cfg.timeout_secs,
+                },
+            );
+        }
+    }
+
+    Ok(profiles.into_values().collect())
+}
+
+/// Validate that `profile` exists in `path` and return the loaded `ConfigFile` and normalized name.
+pub fn validate_profile_in_file(path: &Path, profile: &str) -> Result<(ConfigFile, String)> {
+    let name = normalize_profile_name(Some(profile))?
+        .ok_or_else(|| HbctlError::Config("profile name cannot be empty".into()))?;
+    if !path.is_file() {
+        return Err(HbctlError::Config(format!(
+            "config file '{}' does not exist; no profiles configured",
+            path.display()
+        )));
+    }
+    let cfg_file = ConfigFile::load_from_path(path)?;
+    if !cfg_file.profiles.contains_key(&name) {
+        let available = if cfg_file.profiles.is_empty() {
+            "none".to_string()
+        } else {
+            cfg_file
+                .profiles
+                .keys()
+                .cloned()
+                .collect::<Vec<_>>()
+                .join(", ")
+        };
+        return Err(HbctlError::Config(format!(
+            "profile '{name}' not found in '{}' (available: {available})",
+            path.display()
+        )));
+    }
+    Ok((cfg_file, name))
+}
+
+/// Persist `default_profile = <profile>` inside `path`, returning the previous default if any.
+pub fn set_default_profile(path: &Path, profile: &str) -> Result<Option<String>> {
+    let (mut cfg_file, name) = validate_profile_in_file(path, profile)?;
+    let previous = cfg_file.default_profile.clone();
+    cfg_file.default_profile = Some(name);
+    cfg_file.save_to_path(path)?;
+    Ok(previous)
+}
+
 /// Default path for user-global config: `~/.config/hbctl/config.toml` (or XDG equivalent).
 pub fn default_user_config_path() -> Option<PathBuf> {
     if let Ok(xdg) = std::env::var("XDG_CONFIG_HOME") {
@@ -563,6 +735,16 @@ pub fn default_user_config_path() -> Option<PathBuf> {
             .join(".config")
             .join("hbctl")
             .join("config.toml")
+    })
+}
+
+/// Resolve the target configuration file path (`--config` if given, else `~/.config/hbctl/config.toml`).
+pub fn resolve_config_target_path(explicit: Option<&PathBuf>) -> Result<PathBuf> {
+    if let Some(p) = explicit {
+        return Ok(p.clone());
+    }
+    default_user_config_path().ok_or_else(|| {
+        HbctlError::Config("unable to determine ~/.config/hbctl/config.toml path".into())
     })
 }
 
@@ -628,6 +810,102 @@ pub fn normalize_auth_header(raw: &str) -> String {
 /// Always mask `Authorization` headers for logs, errors, and `--dry-run`.
 pub fn redact_auth_header(_raw: &str) -> &'static str {
     "Bearer ***"
+}
+
+/// Mask any embedded userinfo password inside a URL as `***`.
+pub fn redact_url_credentials(raw: &str) -> String {
+    let Ok(mut parsed) = Url::parse(raw) else {
+        return raw.to_string();
+    };
+    if parsed.password().is_some() {
+        let _ = parsed.set_password(Some("***"));
+        return parsed.to_string();
+    }
+    if !parsed.username().is_empty() {
+        return parsed.to_string();
+    }
+    raw.to_string()
+}
+
+/// Mask credentials, tokens, and secret path/query components in Shoutrrr and webhook notifier URLs.
+pub fn redact_notifier_url(raw: &str) -> String {
+    let trimmed = raw.trim();
+    if trimmed.is_empty() {
+        return String::new();
+    }
+
+    let Ok(mut parsed) = Url::parse(trimmed) else {
+        if let Some(scheme_pos) = trimmed.find("://") {
+            let after_scheme = &trimmed[scheme_pos + 3..];
+            let authority_end = after_scheme
+                .find(['/', '?', '#'])
+                .unwrap_or(after_scheme.len());
+            let authority = &after_scheme[..authority_end];
+            if let Some(at_pos) = authority.rfind('@') {
+                return format!(
+                    "{}://***@{}",
+                    &trimmed[..scheme_pos],
+                    &after_scheme[at_pos + 1..]
+                );
+            }
+        }
+        return "***".to_string();
+    };
+
+    if parsed.password().is_some() {
+        let _ = parsed.set_password(Some("***"));
+    } else if !parsed.username().is_empty() {
+        let _ = parsed.set_username("***");
+    }
+
+    if let Some(raw_query) = parsed.query().map(str::to_string) {
+        let parts: Vec<String> = raw_query
+            .split('&')
+            .filter(|s| !s.is_empty())
+            .map(|part| {
+                let key = part.split_once('=').map(|(k, _)| k).unwrap_or(part);
+                let lower = key.to_ascii_lowercase();
+                let is_sensitive = [
+                    "token", "secret", "key", "password", "pass", "auth", "webhook", "apikey",
+                ]
+                .iter()
+                .any(|needle| lower.contains(needle));
+                if is_sensitive {
+                    format!("{key}=***")
+                } else {
+                    part.to_string()
+                }
+            })
+            .collect();
+        if parts.is_empty() {
+            parsed.set_query(None);
+        } else {
+            parsed.set_query(Some(&parts.join("&")));
+        }
+    }
+
+    let scheme_lower = parsed.scheme().to_ascii_lowercase();
+    let path = parsed.path().to_string();
+    if matches!(scheme_lower.as_str(), "slack" | "gotify") {
+        if !path.is_empty() && path != "/" {
+            parsed.set_path("/***");
+        }
+    } else {
+        let segments: Vec<&str> = path.split('/').filter(|s| !s.is_empty()).collect();
+        if let Some(idx) = segments
+            .iter()
+            .position(|s| matches!(s.to_ascii_lowercase().as_str(), "webhooks" | "services"))
+        {
+            if segments.len() > idx + 2 {
+                let mut kept: Vec<&str> = segments[..=idx + 1].to_vec();
+                kept.push("***");
+                let new_path = format!("/{}", kept.join("/"));
+                parsed.set_path(&new_path);
+            }
+        }
+    }
+
+    parsed.to_string()
 }
 
 /// Redact any accidental occurrence of the raw API key inside arbitrary diagnostic strings.
@@ -1129,6 +1407,17 @@ max_image_dimension = 1280
             "Plain".parse::<OutputFormat>().unwrap(),
             OutputFormat::Plain
         );
+        assert_eq!("csv".parse::<OutputFormat>().unwrap(), OutputFormat::Csv);
+        assert_eq!(
+            "markdown".parse::<OutputFormat>().unwrap(),
+            OutputFormat::Markdown
+        );
+        assert_eq!(
+            "MD".parse::<OutputFormat>().unwrap(),
+            OutputFormat::Markdown
+        );
+        assert_eq!(OutputFormat::Csv.as_str(), "csv");
+        assert_eq!(OutputFormat::Markdown.as_str(), "markdown");
         assert!("xml".parse::<OutputFormat>().is_err());
 
         for (src, label) in [
@@ -1157,5 +1446,167 @@ max_image_dimension = 1280
             normalize_base_url("http://"),
             Err(HbctlError::InvalidUrl { .. })
         ));
+    }
+
+    #[test]
+    fn test_redact_url_credentials_and_profile_discovery_and_switching() {
+        assert_eq!(
+            redact_url_credentials("http://alice:topsecret@staging.local:7745/api/v1"),
+            "http://alice:***@staging.local:7745/api/v1"
+        );
+        assert_eq!(
+            redact_url_credentials("http://192.168.1.50:7745/api/v1"),
+            "http://192.168.1.50:7745/api/v1"
+        );
+        assert_eq!(redact_url_credentials("not a url"), "not a url");
+
+        let dir = tempdir().unwrap();
+        let empty_dir = dir.path().join("empty");
+        fs::create_dir_all(&empty_dir).unwrap();
+
+        let user_cfg = dir.path().join("config.toml");
+        fs::write(
+            &user_cfg,
+            r#"
+default_profile = "homelab"
+timeout_secs = 40
+
+[profiles.homelab]
+url = "http://homelab.local:7745"
+api_key = "hb_super_secret"
+output = "plain"
+
+[profiles.staging]
+url = "http://alice:topsecret@staging.local:7745"
+timeout_secs = 15
+"#,
+        )
+        .unwrap();
+
+        let local_dir = dir.path().join("project");
+        fs::create_dir_all(&local_dir).unwrap();
+        fs::write(
+            local_dir.join(".hbctl.toml"),
+            r#"
+[profiles.staging]
+url = "http://bob:localpass@staging-override.local:7745"
+
+[profiles.localdev]
+url = "http://127.0.0.1:7745"
+"#,
+        )
+        .unwrap();
+
+        // Discovery across user + local (local overrides user for `staging`, passwords redacted)
+        let profiles =
+            discover_profiles(None, &local_dir, Some(&user_cfg), Some("staging")).unwrap();
+        assert_eq!(profiles.len(), 3);
+
+        assert_eq!(profiles[0].name, "homelab");
+        assert!(!profiles[0].active);
+        assert!(profiles[0].default);
+        assert_eq!(profiles[0].source, "user_config");
+        assert_eq!(profiles[0].output, Some(OutputFormat::Plain));
+
+        assert_eq!(profiles[1].name, "localdev");
+        assert_eq!(profiles[1].source, "local_config");
+
+        assert_eq!(profiles[2].name, "staging");
+        assert!(profiles[2].active);
+        assert!(!profiles[2].default);
+        assert_eq!(profiles[2].source, "local_config");
+        assert_eq!(
+            profiles[2].url.as_deref(),
+            Some("http://bob:***@staging-override.local:7745/api/v1")
+        );
+
+        // Explicit config ignores user/local layers
+        let explicit_profiles =
+            discover_profiles(Some(&user_cfg), &local_dir, Some(&user_cfg), None).unwrap();
+        assert_eq!(explicit_profiles.len(), 2);
+        assert_eq!(
+            explicit_profiles[1].url.as_deref(),
+            Some("http://alice:***@staging.local:7745/api/v1")
+        );
+
+        // Empty directory with no config files -> empty profile list
+        assert!(discover_profiles(None, &empty_dir, None, None)
+            .unwrap()
+            .is_empty());
+
+        // Switching default profile preserves existing profiles/fields
+        let prev = set_default_profile(&user_cfg, "staging").unwrap();
+        assert_eq!(prev.as_deref(), Some("homelab"));
+        let reloaded = ConfigFile::load_from_path(&user_cfg).unwrap();
+        assert_eq!(reloaded.default_profile.as_deref(), Some("staging"));
+        assert_eq!(reloaded.timeout_secs, Some(40));
+        assert!(reloaded.profiles.contains_key("homelab"));
+        assert_eq!(
+            reloaded.profiles["homelab"].api_key.as_deref(),
+            Some("hb_super_secret")
+        );
+
+        // Error cases for set_default_profile
+        assert!(set_default_profile(&dir.path().join("missing.toml"), "staging").is_err());
+        let missing_prof = set_default_profile(&user_cfg, "nope").unwrap_err();
+        assert!(missing_prof
+            .to_string()
+            .contains("available: homelab, staging"));
+        assert!(set_default_profile(&user_cfg, "bad/name").is_err());
+        assert!(set_default_profile(&user_cfg, "   ").is_err());
+    }
+
+    #[test]
+    fn test_redact_notifier_url_variants() {
+        assert_eq!(redact_notifier_url(""), "");
+        assert_eq!(
+            redact_notifier_url("smtp://user:s3cr3t@mail.example.com:587"),
+            "smtp://user:***@mail.example.com:587"
+        );
+        assert_eq!(
+            redact_notifier_url("ntfy://alice:my_pass@ntfy.sh/alerts"),
+            "ntfy://alice:***@ntfy.sh/alerts"
+        );
+        assert_eq!(
+            redact_notifier_url("discord://tok123abc@123456789"),
+            "discord://***@123456789"
+        );
+        assert_eq!(
+            redact_notifier_url("telegram://bot123:XYZ@telegram?chats=123"),
+            "telegram://bot123:***@telegram?chats=123"
+        );
+        assert_eq!(
+            redact_notifier_url("telegram://bot_token@telegram?chats=123"),
+            "telegram://***@telegram?chats=123"
+        );
+        assert_eq!(
+            redact_notifier_url("generic+https://example.com/hook?token=secret_val&channel=ops"),
+            "generic+https://example.com/hook?token=***&channel=ops"
+        );
+        assert_eq!(
+            redact_notifier_url("https://discord.com/api/webhooks/12345/secret_tok"),
+            "https://discord.com/api/webhooks/12345/***"
+        );
+        assert_eq!(
+            redact_notifier_url("https://hooks.slack.com/services/T00/B00/XXX"),
+            "https://hooks.slack.com/services/T00/***"
+        );
+        assert_eq!(
+            redact_notifier_url("slack://T00/B00/XXX"),
+            "slack://T00/***"
+        );
+        assert_eq!(
+            redact_notifier_url("gotify://gotify.local/AbCdEf123"),
+            "gotify://gotify.local/***"
+        );
+        assert_eq!(redact_notifier_url("not-a-valid-url-secret"), "***");
+        assert_eq!(
+            redact_notifier_url("not a valid url://secret_tok@host/path"),
+            "not a valid url://***@host/path"
+        );
+        assert_eq!(
+            redact_notifier_url("custom://tok_abc@host with spaces/path"),
+            "custom://***@host with spaces/path"
+        );
     }
 }
