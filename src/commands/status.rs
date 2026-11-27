@@ -44,9 +44,7 @@ pub fn handle(
     if ctx.quiet {
         let val = report
             .status
-            .version
-            .as_deref()
-            .filter(|s| !s.trim().is_empty())
+            .effective_version()
             .unwrap_or("ok")
             .to_string();
         return write_quiet_ids(&[val], out);
@@ -65,9 +63,7 @@ pub fn handle(
             "version".to_string(),
             report
                 .status
-                .version
-                .as_deref()
-                .filter(|s| !s.trim().is_empty())
+                .effective_version()
                 .unwrap_or("(unknown)")
                 .to_string(),
         ],
@@ -78,20 +74,10 @@ pub fn handle(
             if health { "ok" } else { "unhealthy" }.to_string(),
         ]);
     }
-    if let Some(commit) = report
-        .status
-        .commit
-        .as_deref()
-        .filter(|s| !s.trim().is_empty())
-    {
+    if let Some(commit) = report.status.effective_commit() {
         rows.push(vec!["commit".to_string(), commit.to_string()]);
     }
-    if let Some(build_time) = report
-        .status
-        .build_time
-        .as_deref()
-        .filter(|s| !s.trim().is_empty())
-    {
+    if let Some(build_time) = report.status.effective_build_time() {
         rows.push(vec!["buildTime".to_string(), build_time.to_string()]);
     }
     if let Some(title) = report

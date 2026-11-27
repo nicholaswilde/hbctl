@@ -1,9 +1,11 @@
+pub mod api;
 pub mod attachment;
 pub mod auth;
 pub mod entity_type;
 pub mod export;
 pub mod field;
 pub mod item;
+pub mod maintenance;
 pub mod search;
 pub mod status;
 pub mod tag;
@@ -46,6 +48,10 @@ pub fn dispatch(
         }
         Commands::Export(args) => export::handle(args, config, ctx, out, err),
         Commands::Status => status::handle(cli.dry_run, config, ctx, out),
+        Commands::Api(args) => api::handle(args, cli.dry_run, config, ctx, out),
+        Commands::Maintenance(args) => {
+            maintenance::handle(args, cli.dry_run, config, ctx, out, err)
+        }
         Commands::Completions { .. } | Commands::Man | Commands::Update { .. } => Ok(()),
     }
 }

@@ -5901,3 +5901,586 @@ fn test_search_any_or_filter_and_unit_tolerant_number_fields() {
             .stderr(predicate::str::contains("invalid number"));
     }
 }
+
+#[test]
+fn test_status_homebox_v027_nested_build() {
+    if !can_execute_binary() {
+        return;
+    }
+
+    let mut server = Server::new();
+    let empty_cfg = tempdir().unwrap();
+
+    let status_mock = server
+        .mock("GET", "/api/v1/status")
+        .match_header("authorization", Matcher::Missing)
+        .with_status(200)
+        .with_body(
+            r#"{"health":true,"versions":null,"title":"Homebox","message":"Track, Manage, and Organize your Things","build":{"version":"0.27.1","commit":"1fd28822634a3d5935c002d569559ef46530d4a0","buildTime":"now"}}"#,
+        )
+        .expect(4)
+        .create();
+
+    let unauth_hbctl = || {
+        let mut cmd = Command::new(env!("CARGO_BIN_EXE_hbctl"));
+        for var in [
+            "HBCTL_URL",
+            "HBCTL_API_KEY",
+            "HBCTL_OUTPUT",
+            "HBCTL_CONFIG",
+            "HOMEBOX_URL",
+            "HOMEBOX_IP",
+            "HOMEBOX_API_KEY",
+        ] {
+            cmd.env_remove(var);
+        }
+        cmd.env("HOME", empty_cfg.path())
+            .env("XDG_CONFIG_HOME", empty_cfg.path())
+            .env("HBCTL_INSECURE_STORAGE", "1")
+            .args(["--url", &server.url()]);
+        cmd
+    };
+
+    // 1. `--json status` exposes top-level version/commit/buildTime from nested `build`
+    let status_json = unauth_hbctl()
+        .args(["--json", "status"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let parsed: Value = serde_json::from_slice(&status_json).unwrap();
+    assert_eq!(parsed["reachable"], true);
+    assert_eq!(parsed["health"], true);
+    assert_eq!(parsed["version"], "0.27.1");
+    assert_eq!(parsed["commit"], "1fd28822634a3d5935c002d569559ef46530d4a0");
+    assert_eq!(parsed["buildTime"], "now");
+
+    // 2. Default table includes version, commit, buildTime and never "(unknown)"
+    unauth_hbctl().args(["status"]).assert().success().stdout(
+        predicate::str::contains("0.27.1")
+            .and(predicate::str::contains(
+                "1fd28822634a3d5935c002d569559ef46530d4a0",
+            ))
+            .and(predicate::str::contains("now"))
+            .and(predicate::str::contains("(unknown)").not()),
+    );
+
+    // 3. `-q status` prints version
+    unauth_hbctl()
+        .args(["-q", "status"])
+        .assert()
+        .success()
+        .stdout(predicate::eq("0.27.1\n"));
+
+    // 4. `status --select version,commit,buildTime` includes all three values
+    unauth_hbctl()
+        .args(["status", "--select", "version,commit,buildTime"])
+        .assert()
+        .success()
+        .stdout(
+            predicate::str::contains("0.27.1")
+                .and(predicate::str::contains(
+                    "1fd28822634a3d5935c002d569559ef46530d4a0",
+                ))
+                .and(predicate::str::contains("now")),
+        );
+
+    status_mock.assert();
+}
+
+#[test]
+fn test_api_subcommand_methods_query_body_select_and_dry_run() {
+    if !can_execute_binary() {
+        return;
+    }
+
+    let mut server = Server::new();
+
+    // 1. `hbctl api GET /api/v1/maintenance --query status=both --query limit=5`
+    let m_maint = server
+        .mock("GET", "/api/v1/maintenance")
+        .match_query(Matcher::AllOf(vec![
+            Matcher::UrlEncoded("status".into(), "both".into()),
+            Matcher::UrlEncoded("limit".into(), "5".into()),
+        ]))
+        .match_header("authorization", "Bearer hb_test_secret_token_999")
+        .with_status(200)
+        .with_body(r#"[{"id":"m-1","name":"Filter"}]"#)
+        .expect(1)
+        .create();
+
+    let out_maint = hbctl(&server.url())
+        .args([
+            "api",
+            "GET",
+            "/api/v1/maintenance",
+            "--query",
+            "status=both",
+            "--query",
+            "limit=5",
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let maint_val: Value = serde_json::from_slice(&out_maint).unwrap();
+    assert_eq!(maint_val, json!([{ "id": "m-1", "name": "Filter" }]));
+    m_maint.assert();
+
+    // 2. `--json api GET groups --select id,name`, table `--select`, and `-q`
+    let m_groups = server
+        .mock("GET", "/api/v1/groups")
+        .match_header("authorization", "Bearer hb_test_secret_token_999")
+        .with_status(200)
+        .with_body(
+            r#"[{"id":"g-1","name":"Home","extra":true},{"id":"g-2","name":"Shop","extra":false}]"#,
+        )
+        .expect(3)
+        .create();
+
+    let out_groups_json = hbctl(&server.url())
+        .args(["--json", "api", "GET", "groups", "--select", "id,name"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let groups_val: Value = serde_json::from_slice(&out_groups_json).unwrap();
+    assert_eq!(
+        groups_val,
+        json!([
+            { "id": "g-1", "name": "Home" },
+            { "id": "g-2", "name": "Shop" }
+        ])
+    );
+
+    hbctl(&server.url())
+        .args(["api", "GET", "groups", "--select", "id,name"])
+        .assert()
+        .success()
+        .stdout(
+            predicate::str::contains("g-1")
+                .and(predicate::str::contains("Home"))
+                .and(predicate::str::contains("Shop")),
+        );
+
+    hbctl(&server.url())
+        .args(["-q", "api", "GET", "groups"])
+        .assert()
+        .success()
+        .stdout(predicate::eq("g-1\ng-2\n"));
+    m_groups.assert();
+
+    // 3. `POST /templates --data '{"name":"Appliance"}'`
+    let m_post = server
+        .mock("POST", "/api/v1/templates")
+        .match_header("authorization", "Bearer hb_test_secret_token_999")
+        .match_header("content-type", Matcher::Regex("application/json".into()))
+        .match_body(Matcher::Json(json!({ "name": "Appliance" })))
+        .with_status(201)
+        .with_body(r#"{"id":"t1","name":"Appliance"}"#)
+        .expect(1)
+        .create();
+
+    let out_post = hbctl(&server.url())
+        .args([
+            "api",
+            "POST",
+            "/templates",
+            "--data",
+            r#"{"name":"Appliance"}"#,
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let post_val: Value = serde_json::from_slice(&out_post).unwrap();
+    assert_eq!(post_val, json!({ "id": "t1", "name": "Appliance" }));
+    m_post.assert();
+
+    // 4. `PUT /templates/t1 --from-json -` from stdin
+    let m_put = server
+        .mock("PUT", "/api/v1/templates/t1")
+        .match_header("authorization", "Bearer hb_test_secret_token_999")
+        .match_header("content-type", Matcher::Regex("application/json".into()))
+        .match_body(Matcher::Json(json!({ "name": "Updated Appliance" })))
+        .with_status(200)
+        .with_body(r#"{"id":"t1","name":"Updated Appliance"}"#)
+        .expect(1)
+        .create();
+
+    let out_put = hbctl(&server.url())
+        .args(["api", "PUT", "/templates/t1", "--from-json", "-"])
+        .write_stdin(r#"{"name":"Updated Appliance"}"#)
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let put_val: Value = serde_json::from_slice(&out_put).unwrap();
+    assert_eq!(put_val, json!({ "id": "t1", "name": "Updated Appliance" }));
+    m_put.assert();
+
+    // 5. `DELETE /templates/t1` with 204 No Content -> empty stdout
+    let m_del = server
+        .mock("DELETE", "/api/v1/templates/t1")
+        .match_header("authorization", "Bearer hb_test_secret_token_999")
+        .with_status(204)
+        .expect(1)
+        .create();
+
+    hbctl(&server.url())
+        .args(["api", "DELETE", "/templates/t1"])
+        .assert()
+        .success()
+        .stdout(predicate::eq(""));
+    m_del.assert();
+
+    // 6. `--dry-run --json` does not hit server, normalizes URL + query, redacts Authorization
+    let dry_out = hbctl("http://127.0.0.1:1")
+        .args([
+            "--dry-run",
+            "--json",
+            "api",
+            "POST",
+            "/api/v1/maintenance",
+            "--query",
+            "status=both",
+            "--data",
+            r#"{"name":"Filter"}"#,
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let dry_val: Value = serde_json::from_slice(&dry_out).unwrap();
+    assert_eq!(dry_val[0]["method"], "POST");
+    assert_eq!(
+        dry_val[0]["url"],
+        "http://127.0.0.1:1/api/v1/maintenance?status=both"
+    );
+    assert_eq!(dry_val[0]["headers"]["Authorization"], "Bearer ***");
+    assert_eq!(dry_val[0]["headers"]["Content-Type"], "application/json");
+    assert_eq!(dry_val[0]["body"], json!({ "name": "Filter" }));
+
+    // 7. Input validation errors
+    hbctl(&server.url())
+        .args(["api", "BOGUS", "groups"])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("unsupported HTTP method"));
+
+    hbctl(&server.url())
+        .args(["api", "GET", "https://evil.example/groups"])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("relative"));
+
+    hbctl(&server.url())
+        .args(["api", "GET", "groups", "--query", "bad_query"])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("invalid --query"));
+
+    hbctl(&server.url())
+        .args(["api", "POST", "groups", "--data", "{not-json"])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("invalid JSON"));
+}
+
+#[test]
+fn test_maintenance_crud_list_filters_and_dry_runs() {
+    if !can_execute_binary() {
+        return;
+    }
+
+    let mut server = Server::new();
+
+    // 1. `hbctl maintenance list` defaults to `?status=both`
+    let m_list_both = server
+        .mock("GET", "/api/v1/maintenance")
+        .match_query(Matcher::UrlEncoded("status".into(), "both".into()))
+        .match_header("authorization", "Bearer hb_test_secret_token_999")
+        .with_status(200)
+        .with_body(
+            r#"[{"id":"m-1","name":"Filter Swap","cost":"29.99","completedDate":"2026-11-27","itemID":"ent-1","itemName":"HVAC"}]"#,
+        )
+        .expect(1)
+        .create();
+
+    hbctl(&server.url())
+        .args(["maintenance", "list"])
+        .assert()
+        .success()
+        .stdout(
+            predicate::str::contains("m-1")
+                .and(predicate::str::contains("HVAC"))
+                .and(predicate::str::contains("Filter Swap"))
+                .and(predicate::str::contains("completed"))
+                .and(predicate::str::contains("29.99")),
+        );
+    m_list_both.assert();
+
+    // 2. `--json maintenance list --status completed --select id,name,cost`
+    let m_list_completed = server
+        .mock("GET", "/api/v1/maintenance")
+        .match_query(Matcher::UrlEncoded("status".into(), "completed".into()))
+        .with_status(200)
+        .with_body(
+            r#"[{"id":"m-1","name":"Filter Swap","cost":"29.99","completedDate":"2026-11-27"}]"#,
+        )
+        .expect(1)
+        .create();
+
+    let out_completed = hbctl(&server.url())
+        .args([
+            "--json",
+            "maintenance",
+            "list",
+            "--status",
+            "completed",
+            "--select",
+            "id,name,cost",
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let completed_val: Value = serde_json::from_slice(&out_completed).unwrap();
+    assert_eq!(
+        completed_val,
+        json!([{ "id": "m-1", "name": "Filter Swap", "cost": "29.99" }])
+    );
+    m_list_completed.assert();
+
+    // 3. `-q maintenance list ent-1` hits `/api/v1/entities/ent-1/maintenance`
+    let m_list_entity = server
+        .mock("GET", "/api/v1/entities/ent-1/maintenance")
+        .match_query(Matcher::Missing)
+        .with_status(200)
+        .with_body(r#"[{"id":"m-1","name":"Filter Swap"},{"id":"m-2","name":"Coil Clean"}]"#)
+        .expect(1)
+        .create();
+
+    hbctl(&server.url())
+        .args(["-q", "maintenance", "list", "ent-1"])
+        .assert()
+        .success()
+        .stdout(predicate::eq("m-1\nm-2\n"));
+    m_list_entity.assert();
+
+    // 4. `maintenance create`
+    let m_create = server
+        .mock("POST", "/api/v1/entities/ent-1/maintenance")
+        .match_header("content-type", Matcher::Regex("application/json".into()))
+        .match_body(Matcher::Json(json!({
+            "name": "Filter Swap",
+            "description": "MERV 13",
+            "completedDate": "2026-11-27",
+            "cost": "29.99"
+        })))
+        .with_status(201)
+        .with_body(
+            r#"{"id":"m-1","name":"Filter Swap","description":"MERV 13","completedDate":"2026-11-27","cost":"29.99"}"#,
+        )
+        .expect(1)
+        .create();
+
+    let out_create = hbctl(&server.url())
+        .args([
+            "--json",
+            "maintenance",
+            "create",
+            "ent-1",
+            "--name",
+            "Filter Swap",
+            "--completed-date",
+            "2026-11-27",
+            "--cost",
+            "$29.99",
+            "--description",
+            "MERV 13",
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let create_val: Value = serde_json::from_slice(&out_create).unwrap();
+    assert_eq!(create_val["id"], "m-1");
+    assert_eq!(create_val["cost"], "29.99");
+    m_create.assert();
+
+    // 5. `maintenance update`
+    let m_update = server
+        .mock("PUT", "/api/v1/maintenance/m-1")
+        .match_body(Matcher::Json(json!({
+            "scheduledDate": "2027-05-01",
+            "cost": "35"
+        })))
+        .with_status(200)
+        .with_body(r#"{"id":"m-1","name":"Filter Swap","scheduledDate":"2027-05-01","cost":"35"}"#)
+        .expect(1)
+        .create();
+
+    let out_update = hbctl(&server.url())
+        .args([
+            "--json",
+            "maintenance",
+            "update",
+            "m-1",
+            "--scheduled-date",
+            "2027-05-01",
+            "--cost",
+            "35",
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let update_val: Value = serde_json::from_slice(&out_update).unwrap();
+    assert_eq!(update_val["scheduledDate"], "2027-05-01");
+    assert_eq!(update_val["cost"], "35");
+    m_update.assert();
+
+    // 6. `maintenance delete`
+    let m_delete = server
+        .mock("DELETE", "/api/v1/maintenance/m-1")
+        .with_status(204)
+        .expect(1)
+        .create();
+
+    let out_del = hbctl(&server.url())
+        .args(["--json", "maintenance", "delete", "m-1", "--force"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let del_val: Value = serde_json::from_slice(&out_del).unwrap();
+    assert_eq!(del_val, json!({ "id": "m-1", "deleted": true }));
+    m_delete.assert();
+
+    // 7. `--dry-run --json` previews for list, create, update, delete
+    let dry_list: Value = serde_json::from_slice(
+        &hbctl("http://127.0.0.1:1")
+            .args(["--dry-run", "--json", "maintenance", "list"])
+            .assert()
+            .success()
+            .get_output()
+            .stdout,
+    )
+    .unwrap();
+    assert_eq!(dry_list[0]["method"], "GET");
+    assert_eq!(
+        dry_list[0]["url"],
+        "http://127.0.0.1:1/api/v1/maintenance?status=both"
+    );
+    assert_eq!(dry_list[0]["headers"]["Authorization"], "Bearer ***");
+
+    let dry_create: Value = serde_json::from_slice(
+        &hbctl("http://127.0.0.1:1")
+            .args([
+                "--dry-run",
+                "--json",
+                "maintenance",
+                "create",
+                "ent-1",
+                "--name",
+                "Filter",
+                "--cost",
+                "$12.50",
+            ])
+            .assert()
+            .success()
+            .get_output()
+            .stdout,
+    )
+    .unwrap();
+    assert_eq!(dry_create[0]["method"], "POST");
+    assert_eq!(
+        dry_create[0]["url"],
+        "http://127.0.0.1:1/api/v1/entities/ent-1/maintenance"
+    );
+    assert_eq!(dry_create[0]["headers"]["Authorization"], "Bearer ***");
+    assert_eq!(dry_create[0]["body"]["cost"], "12.50");
+
+    let dry_update: Value = serde_json::from_slice(
+        &hbctl("http://127.0.0.1:1")
+            .args([
+                "--dry-run",
+                "--json",
+                "maintenance",
+                "update",
+                "m-1",
+                "--name",
+                "Renamed",
+            ])
+            .assert()
+            .success()
+            .get_output()
+            .stdout,
+    )
+    .unwrap();
+    assert_eq!(dry_update[0]["method"], "PUT");
+    assert_eq!(
+        dry_update[0]["url"],
+        "http://127.0.0.1:1/api/v1/maintenance/m-1"
+    );
+
+    let dry_delete: Value = serde_json::from_slice(
+        &hbctl("http://127.0.0.1:1")
+            .args(["--dry-run", "--json", "maintenance", "delete", "m-1"])
+            .assert()
+            .success()
+            .get_output()
+            .stdout,
+    )
+    .unwrap();
+    assert_eq!(dry_delete[0]["method"], "DELETE");
+    assert_eq!(
+        dry_delete[0]["url"],
+        "http://127.0.0.1:1/api/v1/maintenance/m-1"
+    );
+
+    // 8. Validation failures
+    hbctl(&server.url())
+        .args(["maintenance", "update", "m-1"])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("provide at least one"));
+
+    hbctl(&server.url())
+        .args([
+            "maintenance",
+            "create",
+            "ent-1",
+            "--name",
+            "Filter",
+            "--completed-date",
+            "2026-02-30",
+        ])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("invalid date"));
+
+    hbctl(&server.url())
+        .args([
+            "maintenance",
+            "create",
+            "ent-1",
+            "--name",
+            "Filter",
+            "--cost=-5",
+        ])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("invalid cost"));
+}

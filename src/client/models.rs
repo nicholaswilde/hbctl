@@ -38,6 +38,20 @@ where
     Ok(opt.unwrap_or_else(default_quantity))
 }
 
+fn deserialize_cost_string<'de, D>(deserializer: D) -> std::result::Result<String, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    match Option::<Value>::deserialize(deserializer)? {
+        None | Some(Value::Null) => Ok(String::new()),
+        Some(Value::String(s)) => Ok(s),
+        Some(Value::Number(n)) => Ok(n.to_string()),
+        Some(other) => Err(serde::de::Error::custom(format!(
+            "expected string, number, or null for cost, got {other}"
+        ))),
+    }
+}
+
 fn default_field_type() -> String {
     "text".to_string()
 }
@@ -413,6 +427,27 @@ pub struct CreateEntityTypeRequest {
     pub is_location: bool,
 }
 
+/// Nested `build` metadata returned by Homebox v0.27+ `GET /api/v1/status`.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+pub struct ServerBuildInfo {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub version: Option<String>,
+
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub commit: Option<String>,
+
+    #[serde(
+        rename = "buildTime",
+        alias = "build_time",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub build_time: Option<String>,
+
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
 /// Homebox server status response (`GET /api/v1/status`).
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct ServerStatus {
@@ -439,8 +474,184 @@ pub struct ServerStatus {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub message: Option<String>,
 
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub build: Option<ServerBuildInfo>,
+
     #[serde(flatten)]
     pub extra: BTreeMap<String, Value>,
+}
+
+fn non_empty_str(opt: Option<&str>) -> Option<&str> {
+    opt.filter(|s| !s.trim().is_empty())
+}
+
+impl ServerStatus {
+    /// Effective version, falling back to nested `build.version` (Homebox v0.27+).
+    pub fn effective_version(&self) -> Option<&str> {
+        non_empty_str(self.version.as_deref()).or_else(|| {
+            self.build
+                .as_ref()
+                .and_then(|b| non_empty_str(b.version.as_deref()))
+        })
+    }
+
+    /// Effective commit hash, falling back to nested `build.commit` (Homebox v0.27+).
+    pub fn effective_commit(&self) -> Option<&str> {
+        non_empty_str(self.commit.as_deref()).or_else(|| {
+            self.build
+                .as_ref()
+                .and_then(|b| non_empty_str(b.commit.as_deref()))
+        })
+    }
+
+    /// Effective build timestamp, falling back to nested `build.build_time` (Homebox v0.27+).
+    pub fn effective_build_time(&self) -> Option<&str> {
+        non_empty_str(self.build_time.as_deref()).or_else(|| {
+            self.build
+                .as_ref()
+                .and_then(|b| non_empty_str(b.build_time.as_deref()))
+        })
+    }
+
+    /// Populate empty or missing top-level build fields from nested `build` metadata.
+    pub fn resolve_build_fields(&mut self) {
+        if non_empty_str(self.version.as_deref()).is_none() {
+            if let Some(v) = self
+                .build
+                .as_ref()
+                .and_then(|b| non_empty_str(b.version.as_deref()))
+            {
+                self.version = Some(v.to_string());
+            }
+        }
+        if non_empty_str(self.commit.as_deref()).is_none() {
+            if let Some(c) = self
+                .build
+                .as_ref()
+                .and_then(|b| non_empty_str(b.commit.as_deref()))
+            {
+                self.commit = Some(c.to_string());
+            }
+        }
+        if non_empty_str(self.build_time.as_deref()).is_none() {
+            if let Some(bt) = self
+                .build
+                .as_ref()
+                .and_then(|b| non_empty_str(b.build_time.as_deref()))
+            {
+                self.build_time = Some(bt.to_string());
+            }
+        }
+    }
+}
+
+/// Maintenance log entry (`GET /api/v1/maintenance`, `/api/v1/entities/{id}/maintenance`).
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+pub struct MaintenanceEntry {
+    #[serde(default)]
+    pub id: String,
+
+    #[serde(default)]
+    pub name: String,
+
+    #[serde(default, deserialize_with = "deserialize_null_default")]
+    pub description: String,
+
+    #[serde(default, deserialize_with = "deserialize_cost_string")]
+    pub cost: String,
+
+    #[serde(
+        rename = "scheduledDate",
+        alias = "scheduled_date",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub scheduled_date: Option<String>,
+
+    #[serde(
+        rename = "completedDate",
+        alias = "completed_date",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub completed_date: Option<String>,
+
+    #[serde(
+        rename = "itemID",
+        alias = "itemId",
+        alias = "item_id",
+        alias = "entityId",
+        alias = "entity_id",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub item_id: Option<String>,
+
+    #[serde(
+        rename = "itemName",
+        alias = "item_name",
+        alias = "entityName",
+        alias = "entity_name",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub item_name: Option<String>,
+
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+/// Request payload for `POST /api/v1/entities/{id}/maintenance`.
+#[derive(Debug, Clone, Default, PartialEq, Serialize)]
+pub struct CreateMaintenanceRequest {
+    pub name: String,
+
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+
+    #[serde(
+        rename = "scheduledDate",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub scheduled_date: Option<String>,
+
+    #[serde(
+        rename = "completedDate",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub completed_date: Option<String>,
+
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cost: Option<String>,
+}
+
+/// Request payload for `PUT /api/v1/maintenance/{entry_id}`.
+#[derive(Debug, Clone, Default, PartialEq, Serialize)]
+pub struct UpdateMaintenanceRequest {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+
+    #[serde(
+        rename = "scheduledDate",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub scheduled_date: Option<String>,
+
+    #[serde(
+        rename = "completedDate",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub completed_date: Option<String>,
+
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cost: Option<String>,
 }
 
 /// Homebox entity attachment (`title` / `name` / `mimeType`).
@@ -1614,6 +1825,147 @@ mod tests {
                 "name": "Storage Bin",
                 "description": "Container",
                 "isLocation": true
+            })
+        );
+    }
+
+    #[test]
+    fn test_server_status_nested_build_fallback_and_precedence() {
+        let v27_raw = json!({
+            "health": true,
+            "versions": null,
+            "title": "Homebox",
+            "message": "Track, Manage, and Organize your Things",
+            "build": {
+                "version": "0.27.1",
+                "commit": "1fd28822634a3d5935c002d569559ef46530d4a0",
+                "buildTime": "now"
+            }
+        });
+        let mut v27: ServerStatus = serde_json::from_value(v27_raw).unwrap();
+        assert_eq!(v27.effective_version(), Some("0.27.1"));
+        assert_eq!(
+            v27.effective_commit(),
+            Some("1fd28822634a3d5935c002d569559ef46530d4a0")
+        );
+        assert_eq!(v27.effective_build_time(), Some("now"));
+
+        v27.resolve_build_fields();
+        assert_eq!(v27.version.as_deref(), Some("0.27.1"));
+        assert_eq!(
+            v27.commit.as_deref(),
+            Some("1fd28822634a3d5935c002d569559ef46530d4a0")
+        );
+        assert_eq!(v27.build_time.as_deref(), Some("now"));
+        assert!(v27.build.is_some());
+
+        // Top-level values take precedence over nested `build` when non-empty.
+        let both_raw = json!({
+            "version": "0.26.2",
+            "commit": "top-commit",
+            "buildTime": "top-time",
+            "build": {
+                "version": "0.27.1",
+                "commit": "nested-commit",
+                "buildTime": "nested-time"
+            }
+        });
+        let mut both: ServerStatus = serde_json::from_value(both_raw).unwrap();
+        assert_eq!(both.effective_version(), Some("0.26.2"));
+        assert_eq!(both.effective_commit(), Some("top-commit"));
+        assert_eq!(both.effective_build_time(), Some("top-time"));
+        both.resolve_build_fields();
+        assert_eq!(both.version.as_deref(), Some("0.26.2"));
+        assert_eq!(both.commit.as_deref(), Some("top-commit"));
+        assert_eq!(both.build_time.as_deref(), Some("top-time"));
+
+        // Empty or whitespace-only top-level fields fall back to `build`.
+        let blank_raw = json!({
+            "version": "",
+            "commit": "   ",
+            "buildTime": "\t",
+            "build": {
+                "version": "0.27.1",
+                "commit": "nested-commit",
+                "buildTime": "nested-time"
+            }
+        });
+        let mut blank: ServerStatus = serde_json::from_value(blank_raw).unwrap();
+        assert_eq!(blank.effective_version(), Some("0.27.1"));
+        assert_eq!(blank.effective_commit(), Some("nested-commit"));
+        assert_eq!(blank.effective_build_time(), Some("nested-time"));
+        blank.resolve_build_fields();
+        assert_eq!(blank.version.as_deref(), Some("0.27.1"));
+        assert_eq!(blank.commit.as_deref(), Some("nested-commit"));
+        assert_eq!(blank.build_time.as_deref(), Some("nested-time"));
+
+        // Explicit `"build": null` deserializes cleanly to `None`.
+        let null_build: ServerStatus =
+            serde_json::from_value(json!({ "health": true, "build": null })).unwrap();
+        assert_eq!(null_build.build, None);
+        assert_eq!(null_build.effective_version(), None);
+    }
+
+    #[test]
+    fn test_maintenance_models_serde() {
+        let raw_num = json!({
+            "id": "m-1",
+            "name": "Filter Replacement",
+            "description": null,
+            "cost": 29.99,
+            "completedDate": "2026-11-27",
+            "scheduledDate": null,
+            "itemID": "ent-1",
+            "itemName": "HVAC"
+        });
+        let entry: MaintenanceEntry = serde_json::from_value(raw_num).unwrap();
+        assert_eq!(entry.id, "m-1");
+        assert_eq!(entry.name, "Filter Replacement");
+        assert_eq!(entry.description, "");
+        assert_eq!(entry.cost, "29.99");
+        assert_eq!(entry.completed_date.as_deref(), Some("2026-11-27"));
+        assert_eq!(entry.scheduled_date, None);
+        assert_eq!(entry.item_id.as_deref(), Some("ent-1"));
+        assert_eq!(entry.item_name.as_deref(), Some("HVAC"));
+
+        let raw_str = json!({
+            "id": "m-2",
+            "name": "Annual Descale",
+            "cost": null,
+            "scheduledDate": "2027-01-15"
+        });
+        let entry2: MaintenanceEntry = serde_json::from_value(raw_str).unwrap();
+        assert_eq!(entry2.cost, "");
+        assert_eq!(entry2.scheduled_date.as_deref(), Some("2027-01-15"));
+
+        let create_req = CreateMaintenanceRequest {
+            name: "Filter Swap".into(),
+            description: None,
+            scheduled_date: None,
+            completed_date: Some("2026-11-27".into()),
+            cost: Some("29.99".into()),
+        };
+        assert_eq!(
+            serde_json::to_value(&create_req).unwrap(),
+            json!({
+                "name": "Filter Swap",
+                "completedDate": "2026-11-27",
+                "cost": "29.99"
+            })
+        );
+
+        let update_req = UpdateMaintenanceRequest {
+            name: None,
+            description: Some("Updated notes".into()),
+            scheduled_date: Some("2027-05-01".into()),
+            completed_date: None,
+            cost: None,
+        };
+        assert_eq!(
+            serde_json::to_value(&update_req).unwrap(),
+            json!({
+                "description": "Updated notes",
+                "scheduledDate": "2027-05-01"
             })
         );
     }

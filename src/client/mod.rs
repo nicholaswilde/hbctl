@@ -11,14 +11,17 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use reqwest::blocking::{multipart, Client, RequestBuilder, Response};
 use reqwest::header::{AUTHORIZATION, CONTENT_DISPOSITION, CONTENT_TYPE, RETRY_AFTER};
+use reqwest::Method;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 use serde_json::{json, Value};
+use url::Url;
 
 use crate::client::models::{
     merge_entity_patch, upsert_custom_fields, Attachment, CreateEntityRequest,
-    CreateEntityTypeRequest, Entity, EntityPatch, EntityType, ListResponse, LoginResponse,
-    ServerStatus, Tag, UserProfile, UserSelfResponse,
+    CreateEntityTypeRequest, CreateMaintenanceRequest, Entity, EntityPatch, EntityType,
+    ListResponse, LoginResponse, MaintenanceEntry, ServerStatus, Tag, UpdateMaintenanceRequest,
+    UserProfile, UserSelfResponse,
 };
 use crate::config::{
     normalize_auth_header, normalize_base_url, redact_auth_header, redact_secret, AppConfig,
@@ -228,6 +231,21 @@ pub struct FetchedRemoteFile {
     pub final_url: String,
     pub content_type: Option<String>,
     pub content_disposition: Option<String>,
+}
+
+/// Decoded payload returned by `HomeboxClient::raw_request`.
+#[derive(Debug, Clone, PartialEq)]
+pub enum ApiResponseBody {
+    Empty,
+    Json(Value),
+    Text(String),
+}
+
+/// Response returned by `HomeboxClient::raw_request`.
+#[derive(Debug, Clone, PartialEq)]
+pub struct RawApiResponse {
+    pub status: u16,
+    pub body: ApiResponseBody,
 }
 
 /// Blocking REST client for Homebox v0.26+.
@@ -959,7 +977,9 @@ impl HomeboxClient {
         if text.trim().is_empty() {
             return Ok(ServerStatus::default());
         }
-        serde_json::from_str(&text).map_err(HbctlError::from)
+        let mut parsed: ServerStatus = serde_json::from_str(&text)?;
+        parsed.resolve_build_fields();
+        Ok(parsed)
     }
 
     /// Authenticate with email/username and password via `POST /api/v1/users/login`.
@@ -1029,6 +1049,244 @@ impl HomeboxClient {
         }
 
         self.handle_response(resp)
+    }
+
+    // -------------------------------------------------------------------------
+    // Raw API Escape Hatch (`hbctl api`)
+    // -------------------------------------------------------------------------
+
+    /// Parse and validate an HTTP method supported by `hbctl api`.
+    pub fn parse_http_method(raw: &str) -> Result<Method> {
+        match raw.trim().to_ascii_uppercase().as_str() {
+            "GET" => Ok(Method::GET),
+            "POST" => Ok(Method::POST),
+            "PUT" => Ok(Method::PUT),
+            "PATCH" => Ok(Method::PATCH),
+            "DELETE" => Ok(Method::DELETE),
+            "HEAD" => Ok(Method::HEAD),
+            "OPTIONS" => Ok(Method::OPTIONS),
+            other => Err(HbctlError::InvalidInput(format!(
+                "unsupported HTTP method '{other}' (expected GET, POST, PUT, PATCH, DELETE, HEAD, or OPTIONS)"
+            ))),
+        }
+    }
+
+    /// Normalize a relative or `/api/v1`-prefixed endpoint path and append query parameters.
+    pub fn build_api_url(base_url: &str, path: &str, query: &[(String, String)]) -> Result<String> {
+        let normalized = normalize_base_url(base_url)?;
+        let trimmed = path.trim();
+        if trimmed.is_empty() {
+            return Err(HbctlError::InvalidInput(
+                "API path cannot be empty".to_string(),
+            ));
+        }
+        if trimmed.contains("://") {
+            return Err(HbctlError::InvalidInput(format!(
+                "API path must be relative to the configured server, got '{trimmed}'"
+            )));
+        }
+
+        let stripped = trimmed.trim_start_matches('/');
+        let clean = if stripped == "api/v1" {
+            String::new()
+        } else if let Some(rest) = stripped.strip_prefix("api/v1/") {
+            rest.to_string()
+        } else if let Some(rest) = stripped.strip_prefix("api/v1?") {
+            format!("?{rest}")
+        } else {
+            stripped.to_string()
+        };
+
+        let combined = if clean.is_empty() {
+            normalized
+        } else if clean.starts_with('?') {
+            format!("{normalized}{clean}")
+        } else {
+            format!("{normalized}/{clean}")
+        };
+
+        let mut url = Url::parse(&combined)
+            .map_err(|e| HbctlError::InvalidInput(format!("invalid API path '{trimmed}': {e}")))?;
+        if !query.is_empty() {
+            let mut pairs = url.query_pairs_mut();
+            for (k, v) in query {
+                pairs.append_pair(k, v);
+            }
+        }
+        Ok(url.into())
+    }
+
+    /// Build a redacted `--dry-run` preview for `hbctl api`.
+    pub fn build_api_dry_run(
+        base_url: &str,
+        method: &str,
+        path: &str,
+        query: &[(String, String)],
+        body: Option<Value>,
+    ) -> Result<DryRunRequest> {
+        let parsed_method = Self::parse_http_method(method)?;
+        let normalized_base = normalize_base_url(base_url)?;
+        let url = Self::build_api_url(&normalized_base, path, query)?;
+        let mut headers = BTreeMap::new();
+        headers.insert(
+            "Authorization".to_string(),
+            redact_auth_header("Bearer secret").to_string(),
+        );
+        if body.is_some() {
+            headers.insert("Content-Type".to_string(), "application/json".to_string());
+        }
+        Ok(DryRunRequest {
+            method: parsed_method.as_str().to_string(),
+            url,
+            headers,
+            body,
+        })
+    }
+
+    /// Issue an authenticated raw HTTP request against any Homebox API endpoint.
+    pub fn raw_request(
+        &self,
+        method: &str,
+        path: &str,
+        query: &[(String, String)],
+        body: Option<&Value>,
+    ) -> Result<RawApiResponse> {
+        let http_method = Self::parse_http_method(method)?;
+        let url = Self::build_api_url(&self.base_url, path, query)?;
+        let mode = match http_method {
+            Method::POST | Method::PATCH => RetryMode::SafeMutation,
+            _ => RetryMode::Idempotent,
+        };
+
+        let resp = self.send_with_retry(mode, || {
+            let mut req = self
+                .http
+                .request(http_method.clone(), &url)
+                .header(AUTHORIZATION, &self.auth_header);
+            if let Some(payload) = body {
+                req = req.json(payload);
+            }
+            Ok(req)
+        })?;
+
+        let status = resp.status();
+        let text = resp.text()?;
+        if !status.is_success() {
+            let safe_msg = redact_secret(&text, &self.raw_secret);
+            return Err(HbctlError::Http {
+                status: status.as_u16(),
+                message: safe_msg,
+            });
+        }
+
+        let decoded = if text.trim().is_empty() {
+            ApiResponseBody::Empty
+        } else if let Ok(val) = serde_json::from_str::<Value>(&text) {
+            ApiResponseBody::Json(val)
+        } else {
+            ApiResponseBody::Text(text)
+        };
+
+        Ok(RawApiResponse {
+            status: status.as_u16(),
+            body: decoded,
+        })
+    }
+
+    // -------------------------------------------------------------------------
+    // Maintenance Logs (`/api/v1/maintenance`, `/api/v1/entities/{id}/maintenance`)
+    // -------------------------------------------------------------------------
+
+    /// List maintenance entries globally (always includes `status` to avoid Homebox v0.27+ HTTP 500)
+    /// or scoped to a single entity.
+    pub fn list_maintenance(
+        &self,
+        entity_id: Option<&str>,
+        status: &str,
+    ) -> Result<Vec<MaintenanceEntry>> {
+        let effective_status = if status.trim().is_empty() {
+            "both"
+        } else {
+            status.trim()
+        };
+        let (url, query_status): (String, Option<&str>) = match entity_id {
+            Some(id) => (
+                self.endpoint(&format!("entities/{id}/maintenance")),
+                (effective_status != "both").then_some(effective_status),
+            ),
+            None => (self.endpoint("maintenance"), Some(effective_status)),
+        };
+
+        let resp = self.send_with_retry(RetryMode::Idempotent, || {
+            let mut req = self.http.get(&url).header(AUTHORIZATION, &self.auth_header);
+            if let Some(st) = query_status {
+                req = req.query(&[("status", st)]);
+            }
+            Ok(req)
+        })?;
+
+        let status_code = resp.status();
+        let text = resp.text()?;
+        if !status_code.is_success() {
+            let safe_msg = redact_secret(&text, &self.raw_secret);
+            return Err(HbctlError::Http {
+                status: status_code.as_u16(),
+                message: safe_msg,
+            });
+        }
+        if text.trim().is_empty() {
+            return Ok(Vec::new());
+        }
+        let parsed: Option<ListResponse<MaintenanceEntry>> = serde_json::from_str(&text)?;
+        Ok(parsed.map(|p| p.into_parts().0).unwrap_or_default())
+    }
+
+    /// Create a maintenance entry on an entity (`POST /api/v1/entities/{entity_id}/maintenance`).
+    pub fn create_maintenance(
+        &self,
+        entity_id: &str,
+        req: &CreateMaintenanceRequest,
+    ) -> Result<MaintenanceEntry> {
+        let url = self.endpoint(&format!("entities/{entity_id}/maintenance"));
+        let resp = self.send_with_retry(RetryMode::SafeMutation, || {
+            Ok(self
+                .http
+                .post(&url)
+                .header(AUTHORIZATION, &self.auth_header)
+                .header(CONTENT_TYPE, "application/json")
+                .json(req))
+        })?;
+        self.handle_response(resp)
+    }
+
+    /// Update a maintenance entry (`PUT /api/v1/maintenance/{entry_id}`).
+    pub fn update_maintenance(
+        &self,
+        entry_id: &str,
+        req: &UpdateMaintenanceRequest,
+    ) -> Result<MaintenanceEntry> {
+        let url = self.endpoint(&format!("maintenance/{entry_id}"));
+        let resp = self.send_with_retry(RetryMode::Idempotent, || {
+            Ok(self
+                .http
+                .put(&url)
+                .header(AUTHORIZATION, &self.auth_header)
+                .header(CONTENT_TYPE, "application/json")
+                .json(req))
+        })?;
+        self.handle_response(resp)
+    }
+
+    /// Delete a maintenance entry (`DELETE /api/v1/maintenance/{entry_id}`).
+    pub fn delete_maintenance(&self, entry_id: &str) -> Result<()> {
+        let url = self.endpoint(&format!("maintenance/{entry_id}"));
+        let resp = self.send_with_retry(RetryMode::Idempotent, || {
+            Ok(self
+                .http
+                .delete(&url)
+                .header(AUTHORIZATION, &self.auth_header))
+        })?;
+        self.handle_empty_response(resp)
     }
 }
 
@@ -1722,6 +1980,337 @@ mod tests {
         client
             .delete_entity_type("et-bin")
             .expect("delete entity type");
+        m_del.assert();
+    }
+
+    #[test]
+    fn test_get_status_homebox_v027_nested_build() {
+        let mut server = Server::new();
+        let m_status = server
+            .mock("GET", "/api/v1/status")
+            .match_header("authorization", Matcher::Missing)
+            .with_status(200)
+            .with_body(
+                r#"{"health":true,"versions":null,"title":"Homebox","message":"Track, Manage, and Organize your Things","build":{"version":"0.27.1","commit":"1fd28822634a3d5935c002d569559ef46530d4a0","buildTime":"now"}}"#,
+            )
+            .expect(1)
+            .create();
+
+        let st = HomeboxClient::get_status(&server.url(), 10).expect("get status v0.27+");
+        assert_eq!(st.version.as_deref(), Some("0.27.1"));
+        assert_eq!(
+            st.commit.as_deref(),
+            Some("1fd28822634a3d5935c002d569559ef46530d4a0")
+        );
+        assert_eq!(st.build_time.as_deref(), Some("now"));
+        assert_eq!(st.health, Some(true));
+        m_status.assert();
+    }
+
+    #[test]
+    fn test_build_api_url_normalization_and_query() {
+        let empty: Vec<(String, String)> = Vec::new();
+        assert_eq!(
+            HomeboxClient::build_api_url("http://localhost:7745", "groups", &empty).unwrap(),
+            "http://localhost:7745/api/v1/groups"
+        );
+        assert_eq!(
+            HomeboxClient::build_api_url("http://localhost:7745/api/v1/", "/groups", &empty)
+                .unwrap(),
+            "http://localhost:7745/api/v1/groups"
+        );
+        assert_eq!(
+            HomeboxClient::build_api_url("http://localhost:7745", "/api/v1/groups", &empty)
+                .unwrap(),
+            "http://localhost:7745/api/v1/groups"
+        );
+        assert_eq!(
+            HomeboxClient::build_api_url(
+                "http://localhost:7745",
+                "api/v1/maintenance?status=both",
+                &[("limit".to_string(), "10".to_string())]
+            )
+            .unwrap(),
+            "http://localhost:7745/api/v1/maintenance?status=both&limit=10"
+        );
+        assert_eq!(
+            HomeboxClient::build_api_url(
+                "http://localhost:7745",
+                "api/v1?foo=bar",
+                &[("baz".to_string(), "1".to_string())]
+            )
+            .unwrap(),
+            "http://localhost:7745/api/v1?foo=bar&baz=1"
+        );
+
+        assert!(HomeboxClient::build_api_url(
+            "http://localhost:7745",
+            "https://evil.example/steal",
+            &empty
+        )
+        .is_err());
+        assert!(HomeboxClient::build_api_url("http://localhost:7745", "   ", &empty).is_err());
+    }
+
+    #[test]
+    fn test_raw_request_methods_retry_and_redaction() {
+        let mut server = Server::new();
+        let client = test_client(&server.url()).with_retry_policy(RetryPolicy {
+            max_retries: 2,
+            base_delay: Duration::from_millis(1),
+            max_delay: Duration::from_millis(5),
+        });
+
+        // GET with query params retries 503 and decodes JSON
+        let m_get_503 = server
+            .mock("GET", "/api/v1/maintenance")
+            .match_query(Matcher::AllOf(vec![
+                Matcher::UrlEncoded("status".into(), "both".into()),
+                Matcher::UrlEncoded("limit".into(), "5".into()),
+            ]))
+            .match_header("authorization", "Bearer hb_super_secret_key")
+            .with_status(503)
+            .with_body("busy")
+            .expect(1)
+            .create();
+        let m_get_ok = server
+            .mock("GET", "/api/v1/maintenance")
+            .match_query(Matcher::AllOf(vec![
+                Matcher::UrlEncoded("status".into(), "both".into()),
+                Matcher::UrlEncoded("limit".into(), "5".into()),
+            ]))
+            .match_header("authorization", "Bearer hb_super_secret_key")
+            .with_status(200)
+            .with_body(r#"[{"id":"m-1","name":"Filter"}]"#)
+            .expect(1)
+            .create();
+        let res = client
+            .raw_request(
+                "get",
+                "/api/v1/maintenance",
+                &[
+                    ("status".to_string(), "both".to_string()),
+                    ("limit".to_string(), "5".to_string()),
+                ],
+                None,
+            )
+            .expect("GET raw_request");
+        assert_eq!(res.status, 200);
+        assert_eq!(
+            res.body,
+            ApiResponseBody::Json(json!([{ "id": "m-1", "name": "Filter" }]))
+        );
+        m_get_503.assert();
+        m_get_ok.assert();
+
+        // POST uses SafeMutation: does NOT retry 502, does retry 503
+        let m_post_502 = server
+            .mock("POST", "/api/v1/templates")
+            .match_header("content-type", Matcher::Regex("application/json".into()))
+            .match_body(Matcher::Json(json!({ "name": "Appliance" })))
+            .with_status(502)
+            .with_body("bad gateway hb_super_secret_key")
+            .expect(1)
+            .create();
+        let err = client
+            .raw_request(
+                "POST",
+                "templates",
+                &[],
+                Some(&json!({ "name": "Appliance" })),
+            )
+            .expect_err("POST 502 should fail without retry");
+        match err {
+            HbctlError::Http { status, message } => {
+                assert_eq!(status, 502);
+                assert!(!message.contains("hb_super_secret_key"));
+                assert!(message.contains("***"));
+            }
+            other => panic!("unexpected error: {other:?}"),
+        }
+        m_post_502.assert();
+
+        let m_post_503 = server
+            .mock("POST", "/api/v1/templates")
+            .with_status(503)
+            .expect(1)
+            .create();
+        let m_post_ok = server
+            .mock("POST", "/api/v1/templates")
+            .with_status(201)
+            .with_body(r#"{"id":"tpl-1"}"#)
+            .expect(1)
+            .create();
+        let created = client
+            .raw_request(
+                "POST",
+                "templates",
+                &[],
+                Some(&json!({ "name": "Appliance" })),
+            )
+            .expect("POST retries 503");
+        assert_eq!(created.status, 201);
+        assert_eq!(
+            created.body,
+            ApiResponseBody::Json(json!({ "id": "tpl-1" }))
+        );
+        m_post_503.assert();
+        m_post_ok.assert();
+
+        // DELETE 204 returns Empty
+        let m_del = server
+            .mock("DELETE", "/api/v1/templates/tpl-1")
+            .with_status(204)
+            .expect(1)
+            .create();
+        let deleted = client
+            .raw_request("DELETE", "/templates/tpl-1", &[], None)
+            .expect("DELETE 204");
+        assert_eq!(deleted.status, 204);
+        assert_eq!(deleted.body, ApiResponseBody::Empty);
+        m_del.assert();
+
+        // Plain text 200 returns Text
+        let m_txt = server
+            .mock("GET", "/api/v1/ping")
+            .with_status(200)
+            .with_body("pong")
+            .expect(1)
+            .create();
+        let ping = client
+            .raw_request("GET", "ping", &[], None)
+            .expect("GET text");
+        assert_eq!(ping.body, ApiResponseBody::Text("pong".to_string()));
+        m_txt.assert();
+    }
+
+    #[test]
+    fn test_maintenance_client_crud_and_null_list() {
+        let mut server = Server::new();
+        let client = test_client(&server.url());
+
+        // Global list defaults empty status to `both` and handles Go `null` list
+        let m_null = server
+            .mock("GET", "/api/v1/maintenance")
+            .match_query(Matcher::UrlEncoded("status".into(), "both".into()))
+            .with_status(200)
+            .with_body("null")
+            .expect(1)
+            .create();
+        let empty = client.list_maintenance(None, "").expect("null list");
+        assert!(empty.is_empty());
+        m_null.assert();
+
+        // Global list with explicit status
+        let m_global = server
+            .mock("GET", "/api/v1/maintenance")
+            .match_query(Matcher::UrlEncoded("status".into(), "both".into()))
+            .with_status(200)
+            .with_body(r#"[{"id":"m-1","name":"Filter","cost":"29.99","itemID":"ent-1","itemName":"HVAC"}]"#)
+            .expect(1)
+            .create();
+        let entries = client.list_maintenance(None, "both").expect("global list");
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0].id, "m-1");
+        assert_eq!(entries[0].cost, "29.99");
+        m_global.assert();
+
+        // Entity list omits `?status` for `both` and includes `?status=scheduled` when filtered
+        let m_ent_both = server
+            .mock("GET", "/api/v1/entities/ent-1/maintenance")
+            .match_query(Matcher::Missing)
+            .with_status(200)
+            .with_body(r#"[{"id":"m-1","name":"Filter"}]"#)
+            .expect(1)
+            .create();
+        assert_eq!(
+            client
+                .list_maintenance(Some("ent-1"), "both")
+                .expect("entity list both")
+                .len(),
+            1
+        );
+        m_ent_both.assert();
+
+        let m_ent_sched = server
+            .mock("GET", "/api/v1/entities/ent-1/maintenance")
+            .match_query(Matcher::UrlEncoded("status".into(), "scheduled".into()))
+            .with_status(200)
+            .with_body(r#"[{"id":"m-2","name":"Inspect","scheduledDate":"2027-01-01"}]"#)
+            .expect(1)
+            .create();
+        let sched = client
+            .list_maintenance(Some("ent-1"), "scheduled")
+            .expect("entity list scheduled");
+        assert_eq!(sched[0].scheduled_date.as_deref(), Some("2027-01-01"));
+        m_ent_sched.assert();
+
+        // Create
+        let m_create = server
+            .mock("POST", "/api/v1/entities/ent-1/maintenance")
+            .match_body(Matcher::Json(json!({
+                "name": "Filter Swap",
+                "completedDate": "2026-11-27",
+                "cost": "29.99"
+            })))
+            .with_status(201)
+            .with_body(
+                r#"{"id":"m-3","name":"Filter Swap","completedDate":"2026-11-27","cost":"29.99"}"#,
+            )
+            .expect(1)
+            .create();
+        let created = client
+            .create_maintenance(
+                "ent-1",
+                &CreateMaintenanceRequest {
+                    name: "Filter Swap".into(),
+                    description: None,
+                    scheduled_date: None,
+                    completed_date: Some("2026-11-27".into()),
+                    cost: Some("29.99".into()),
+                },
+            )
+            .expect("create maintenance");
+        assert_eq!(created.id, "m-3");
+        m_create.assert();
+
+        // Update
+        let m_update = server
+            .mock("PUT", "/api/v1/maintenance/m-3")
+            .match_body(Matcher::Json(json!({
+                "scheduledDate": "2027-05-01",
+                "cost": "35"
+            })))
+            .with_status(200)
+            .with_body(
+                r#"{"id":"m-3","name":"Filter Swap","scheduledDate":"2027-05-01","cost":"35"}"#,
+            )
+            .expect(1)
+            .create();
+        let updated = client
+            .update_maintenance(
+                "m-3",
+                &UpdateMaintenanceRequest {
+                    name: None,
+                    description: None,
+                    scheduled_date: Some("2027-05-01".into()),
+                    completed_date: None,
+                    cost: Some("35".into()),
+                },
+            )
+            .expect("update maintenance");
+        assert_eq!(updated.cost, "35");
+        m_update.assert();
+
+        // Delete
+        let m_del = server
+            .mock("DELETE", "/api/v1/maintenance/m-3")
+            .with_status(204)
+            .expect(1)
+            .create();
+        client
+            .delete_maintenance("m-3")
+            .expect("delete maintenance");
         m_del.assert();
     }
 }

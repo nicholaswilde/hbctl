@@ -100,6 +100,12 @@ pub enum Commands {
     /// Check remote Homebox server connectivity and version (/api/v1/status)
     Status,
 
+    /// Issue a raw authenticated HTTP request against any Homebox API endpoint
+    Api(ApiArgs),
+
+    /// Manage maintenance log entries (/api/v1/maintenance)
+    Maintenance(MaintenanceArgs),
+
     /// Export filtered items to JSON, CSV, or Markdown
     Export(ExportArgs),
 
@@ -972,6 +978,141 @@ pub enum EntityTypeCommands {
         #[arg(long)]
         force: bool,
     },
+}
+
+// -----------------------------------------------------------------------------
+// Raw API
+// -----------------------------------------------------------------------------
+
+#[derive(Args, Debug, Clone)]
+pub struct ApiArgs {
+    /// HTTP method (GET, POST, PUT, PATCH, DELETE, HEAD, OPTIONS)
+    pub method: String,
+
+    /// Homebox API endpoint path (e.g. groups, /maintenance, /api/v1/templates)
+    pub path: String,
+
+    /// Inline JSON request body
+    #[arg(
+        short = 'd',
+        long = "data",
+        value_name = "JSON",
+        conflicts_with = "from_json"
+    )]
+    pub data: Option<String>,
+
+    /// Read JSON request body from a file path or '-' for stdin
+    #[arg(long = "from-json", value_name = "FILE|-", conflicts_with = "data")]
+    pub from_json: Option<String>,
+
+    /// Query parameter KEY=VALUE (repeatable; appended to any inline path query)
+    #[arg(long = "query", value_name = "KEY=VALUE")]
+    pub query: Vec<String>,
+}
+
+// -----------------------------------------------------------------------------
+// Maintenance
+// -----------------------------------------------------------------------------
+
+#[derive(ValueEnum, Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum MaintenanceStatus {
+    #[default]
+    Both,
+    Completed,
+    Scheduled,
+}
+
+impl MaintenanceStatus {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Both => "both",
+            Self::Completed => "completed",
+            Self::Scheduled => "scheduled",
+        }
+    }
+}
+
+#[derive(Args, Debug, Clone)]
+pub struct MaintenanceArgs {
+    #[command(subcommand)]
+    pub command: MaintenanceCommands,
+}
+
+#[derive(Subcommand, Debug, Clone)]
+pub enum MaintenanceCommands {
+    /// List maintenance log entries (globally or for a specific entity)
+    List {
+        /// Optional entity UUID
+        entity: Option<String>,
+
+        /// Filter by maintenance status (both, completed, scheduled)
+        #[arg(long, value_enum, default_value_t = MaintenanceStatus::Both)]
+        status: MaintenanceStatus,
+    },
+    /// Create a maintenance log entry on an entity
+    Create(MaintenanceCreateArgs),
+    /// Update an existing maintenance log entry by entry ID
+    Update(MaintenanceUpdateArgs),
+    /// Delete a maintenance log entry by entry ID
+    Delete {
+        /// Maintenance entry UUID
+        entry_id: String,
+        /// Skip interactive confirmation prompt
+        #[arg(long)]
+        force: bool,
+    },
+}
+
+#[derive(Args, Debug, Clone)]
+pub struct MaintenanceCreateArgs {
+    /// Target entity UUID
+    pub entity: String,
+
+    /// Maintenance task/entry name
+    #[arg(long)]
+    pub name: String,
+
+    /// Completion date (YYYY-MM-DD or YYYY-MM)
+    #[arg(long, value_name = "YYYY-MM-DD")]
+    pub completed_date: Option<String>,
+
+    /// Scheduled date (YYYY-MM-DD or YYYY-MM)
+    #[arg(long, value_name = "YYYY-MM-DD")]
+    pub scheduled_date: Option<String>,
+
+    /// Maintenance cost (e.g. 29.99 or $29.99)
+    #[arg(long, value_name = "COST")]
+    pub cost: Option<String>,
+
+    /// Maintenance description or notes
+    #[arg(long, value_name = "TEXT")]
+    pub description: Option<String>,
+}
+
+#[derive(Args, Debug, Clone)]
+pub struct MaintenanceUpdateArgs {
+    /// Maintenance entry UUID
+    pub entry_id: String,
+
+    /// Updated maintenance task/entry name
+    #[arg(long)]
+    pub name: Option<String>,
+
+    /// Updated completion date (YYYY-MM-DD or YYYY-MM)
+    #[arg(long, value_name = "YYYY-MM-DD")]
+    pub completed_date: Option<String>,
+
+    /// Updated scheduled date (YYYY-MM-DD or YYYY-MM)
+    #[arg(long, value_name = "YYYY-MM-DD")]
+    pub scheduled_date: Option<String>,
+
+    /// Updated maintenance cost (e.g. 29.99 or $29.99)
+    #[arg(long, value_name = "COST")]
+    pub cost: Option<String>,
+
+    /// Updated maintenance description or notes
+    #[arg(long, value_name = "TEXT")]
+    pub description: Option<String>,
 }
 
 // -----------------------------------------------------------------------------
@@ -1944,6 +2085,164 @@ mod tests {
             Commands::Item(ItemArgs {
                 command: ItemCommands::Import(a),
             }) => assert_eq!(a.match_mode, MatchMode::Fuzzy),
+            other => panic!("unexpected command: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_cli_parse_api_command() {
+        let cli = Cli::try_parse_from([
+            "hbctl",
+            "--json",
+            "--select",
+            "id,name",
+            "--dry-run",
+            "api",
+            "POST",
+            "/api/v1/maintenance",
+            "--query",
+            "status=both",
+            "--query",
+            "limit=10",
+            "--data",
+            r#"{"name":"Filter"}"#,
+        ])
+        .unwrap();
+        assert!(cli.json);
+        assert!(cli.dry_run);
+        assert_eq!(cli.select, Some(vec!["id".to_string(), "name".to_string()]));
+        match cli.command {
+            Commands::Api(a) => {
+                assert_eq!(a.method, "POST");
+                assert_eq!(a.path, "/api/v1/maintenance");
+                assert_eq!(a.query, vec!["status=both", "limit=10"]);
+                assert_eq!(a.data.as_deref(), Some(r#"{"name":"Filter"}"#));
+                assert_eq!(a.from_json, None);
+            }
+            other => panic!("unexpected command: {other:?}"),
+        }
+
+        let from_stdin =
+            Cli::try_parse_from(["hbctl", "api", "PUT", "templates/t1", "--from-json", "-"])
+                .unwrap();
+        match from_stdin.command {
+            Commands::Api(a) => {
+                assert_eq!(a.method, "PUT");
+                assert_eq!(a.path, "templates/t1");
+                assert_eq!(a.from_json.as_deref(), Some("-"));
+                assert_eq!(a.data, None);
+            }
+            other => panic!("unexpected command: {other:?}"),
+        }
+
+        // `--data` and `--from-json` conflict
+        assert!(Cli::try_parse_from([
+            "hbctl",
+            "api",
+            "POST",
+            "groups",
+            "--data",
+            "{}",
+            "--from-json",
+            "body.json",
+        ])
+        .is_err());
+    }
+
+    #[test]
+    fn test_cli_parse_maintenance_commands() {
+        let list_default = Cli::try_parse_from(["hbctl", "maintenance", "list"]).unwrap();
+        match list_default.command {
+            Commands::Maintenance(MaintenanceArgs {
+                command: MaintenanceCommands::List { entity, status },
+            }) => {
+                assert_eq!(entity, None);
+                assert_eq!(status, MaintenanceStatus::Both);
+            }
+            other => panic!("unexpected command: {other:?}"),
+        }
+
+        let list_filtered = Cli::try_parse_from([
+            "hbctl",
+            "maintenance",
+            "list",
+            "ent-1",
+            "--status",
+            "scheduled",
+        ])
+        .unwrap();
+        match list_filtered.command {
+            Commands::Maintenance(MaintenanceArgs {
+                command: MaintenanceCommands::List { entity, status },
+            }) => {
+                assert_eq!(entity.as_deref(), Some("ent-1"));
+                assert_eq!(status, MaintenanceStatus::Scheduled);
+            }
+            other => panic!("unexpected command: {other:?}"),
+        }
+
+        let create = Cli::try_parse_from([
+            "hbctl",
+            "maintenance",
+            "create",
+            "ent-1",
+            "--name",
+            "Filter Swap",
+            "--completed-date",
+            "2026-11-27",
+            "--scheduled-date",
+            "2027-05-27",
+            "--cost",
+            "$29.99",
+            "--description",
+            "MERV 13",
+        ])
+        .unwrap();
+        match create.command {
+            Commands::Maintenance(MaintenanceArgs {
+                command: MaintenanceCommands::Create(a),
+            }) => {
+                assert_eq!(a.entity, "ent-1");
+                assert_eq!(a.name, "Filter Swap");
+                assert_eq!(a.completed_date.as_deref(), Some("2026-11-27"));
+                assert_eq!(a.scheduled_date.as_deref(), Some("2027-05-27"));
+                assert_eq!(a.cost.as_deref(), Some("$29.99"));
+                assert_eq!(a.description.as_deref(), Some("MERV 13"));
+            }
+            other => panic!("unexpected command: {other:?}"),
+        }
+
+        let update = Cli::try_parse_from([
+            "hbctl",
+            "maintenance",
+            "update",
+            "m-1",
+            "--name",
+            "Renamed",
+            "--cost",
+            "15.50",
+        ])
+        .unwrap();
+        match update.command {
+            Commands::Maintenance(MaintenanceArgs {
+                command: MaintenanceCommands::Update(a),
+            }) => {
+                assert_eq!(a.entry_id, "m-1");
+                assert_eq!(a.name.as_deref(), Some("Renamed"));
+                assert_eq!(a.cost.as_deref(), Some("15.50"));
+            }
+            other => panic!("unexpected command: {other:?}"),
+        }
+
+        let del =
+            Cli::try_parse_from(["hbctl", "maintenance", "delete", "m-1", "--force"]).unwrap();
+        match del.command {
+            Commands::Maintenance(MaintenanceArgs {
+                command: MaintenanceCommands::Delete { entry_id, force },
+            }) => {
+                assert_eq!(entry_id, "m-1");
+                assert!(force);
+            }
             other => panic!("unexpected command: {other:?}"),
         }
     }
