@@ -248,6 +248,18 @@ pub struct ItemListArgs {
     /// Fetch all pages
     #[arg(long)]
     pub all: bool,
+
+    /// Include archived items in results
+    #[arg(long)]
+    pub include_archived: bool,
+
+    /// Only show archived items (implies --include-archived)
+    #[arg(long)]
+    pub archived_only: bool,
+
+    /// Only show items with a warranty expiring within the next DAYS days (excludes lifetime warranties)
+    #[arg(long, value_name = "DAYS")]
+    pub warranty_expiring: Option<u32>,
 }
 
 #[derive(Args, Debug, Clone)]
@@ -309,6 +321,42 @@ pub struct ItemCreateArgs {
     /// Purchase vendor/source
     #[arg(long)]
     pub purchase_from: Option<String>,
+
+    /// Mark item as archived (true/false; bare flag means true)
+    #[arg(long, num_args = 0..=1, default_missing_value = "true")]
+    pub archived: Option<bool>,
+
+    /// Mark item as insured (true/false; bare flag means true)
+    #[arg(long, num_args = 0..=1, default_missing_value = "true")]
+    pub insured: Option<bool>,
+
+    /// Mark item as having a lifetime warranty (true/false; bare flag means true)
+    #[arg(long, num_args = 0..=1, default_missing_value = "true")]
+    pub lifetime_warranty: Option<bool>,
+
+    /// Warranty expiration date (YYYY-MM-DD or RFC3339)
+    #[arg(long, value_name = "DATE")]
+    pub warranty_expires: Option<String>,
+
+    /// Warranty details or terms
+    #[arg(long)]
+    pub warranty_details: Option<String>,
+
+    /// Date/time the item was sold (YYYY-MM-DD or RFC3339)
+    #[arg(long, value_name = "DATE")]
+    pub sold_time: Option<String>,
+
+    /// Buyer name or recipient the item was sold to
+    #[arg(long)]
+    pub sold_to: Option<String>,
+
+    /// Sale price
+    #[arg(long)]
+    pub sold_price: Option<f64>,
+
+    /// Notes about the sale
+    #[arg(long)]
+    pub sold_notes: Option<String>,
 
     /// Custom field KEY=VAL (repeatable)
     #[arg(long = "field")]
@@ -403,6 +451,42 @@ pub struct ItemUpdateArgs {
     /// Updated purchase source
     #[arg(long)]
     pub purchase_from: Option<String>,
+
+    /// Mark item as archived (true/false; bare flag means true)
+    #[arg(long, num_args = 0..=1, default_missing_value = "true")]
+    pub archived: Option<bool>,
+
+    /// Mark item as insured (true/false; bare flag means true)
+    #[arg(long, num_args = 0..=1, default_missing_value = "true")]
+    pub insured: Option<bool>,
+
+    /// Mark item as having a lifetime warranty (true/false; bare flag means true)
+    #[arg(long, num_args = 0..=1, default_missing_value = "true")]
+    pub lifetime_warranty: Option<bool>,
+
+    /// Warranty expiration date (YYYY-MM-DD or RFC3339)
+    #[arg(long, value_name = "DATE")]
+    pub warranty_expires: Option<String>,
+
+    /// Warranty details or terms
+    #[arg(long)]
+    pub warranty_details: Option<String>,
+
+    /// Date/time the item was sold (YYYY-MM-DD or RFC3339)
+    #[arg(long, value_name = "DATE")]
+    pub sold_time: Option<String>,
+
+    /// Buyer name or recipient the item was sold to
+    #[arg(long)]
+    pub sold_to: Option<String>,
+
+    /// Sale price
+    #[arg(long)]
+    pub sold_price: Option<f64>,
+
+    /// Notes about the sale
+    #[arg(long)]
+    pub sold_notes: Option<String>,
 
     /// Notes (merged into custom field 'Notes')
     #[arg(long)]
@@ -564,6 +648,42 @@ pub struct ItemUpsertArgs {
     /// Purchase source
     #[arg(long)]
     pub purchase_from: Option<String>,
+
+    /// Mark item as archived (true/false; bare flag means true)
+    #[arg(long, num_args = 0..=1, default_missing_value = "true")]
+    pub archived: Option<bool>,
+
+    /// Mark item as insured (true/false; bare flag means true)
+    #[arg(long, num_args = 0..=1, default_missing_value = "true")]
+    pub insured: Option<bool>,
+
+    /// Mark item as having a lifetime warranty (true/false; bare flag means true)
+    #[arg(long, num_args = 0..=1, default_missing_value = "true")]
+    pub lifetime_warranty: Option<bool>,
+
+    /// Warranty expiration date (YYYY-MM-DD or RFC3339)
+    #[arg(long, value_name = "DATE")]
+    pub warranty_expires: Option<String>,
+
+    /// Warranty details or terms
+    #[arg(long)]
+    pub warranty_details: Option<String>,
+
+    /// Date/time the item was sold (YYYY-MM-DD or RFC3339)
+    #[arg(long, value_name = "DATE")]
+    pub sold_time: Option<String>,
+
+    /// Buyer name or recipient the item was sold to
+    #[arg(long)]
+    pub sold_to: Option<String>,
+
+    /// Sale price
+    #[arg(long)]
+    pub sold_price: Option<f64>,
+
+    /// Notes about the sale
+    #[arg(long)]
+    pub sold_notes: Option<String>,
 
     /// Custom field KEY=VAL (repeatable)
     #[arg(long = "field")]
@@ -835,6 +955,30 @@ pub struct SearchArgs {
     /// Filter by tag name or UUID
     #[arg(long)]
     pub tag: Option<String>,
+
+    /// Filter by entity type name or UUID
+    #[arg(long = "type")]
+    pub entity_type: Option<String>,
+
+    /// Filter by parent item name, ID, or 'none' for top-level items
+    #[arg(long)]
+    pub parent: Option<String>,
+
+    /// Maximum number of matching results to return
+    #[arg(long, value_name = "N")]
+    pub limit: Option<usize>,
+
+    /// Include archived items in search results
+    #[arg(long)]
+    pub include_archived: bool,
+
+    /// Only search archived items (implies --include-archived)
+    #[arg(long)]
+    pub archived_only: bool,
+
+    /// Only include items with a warranty expiring within the next DAYS days (excludes lifetime warranties)
+    #[arg(long, value_name = "DAYS")]
+    pub warranty_expiring: Option<u32>,
 
     /// Filter by model number (exact or substring, case-insensitive)
     #[arg(long)]
@@ -1124,6 +1268,10 @@ pub enum ExportSort {
     #[default]
     Name,
     Id,
+    PurchasePrice,
+    PurchaseDate,
+    UpdatedAt,
+    AssetId,
 }
 
 #[derive(ValueEnum, Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -1148,7 +1296,7 @@ pub struct ExportArgs {
     #[arg(long = "field")]
     pub fields: Vec<String>,
 
-    /// Sort exported items by name or id
+    /// Sort exported items (name, id, purchase-price, purchase-date, updated-at, asset-id)
     #[arg(long, value_enum, default_value_t = ExportSort::Name)]
     pub sort: ExportSort,
 
@@ -2266,5 +2414,153 @@ mod tests {
         assert_eq!(MaintenanceStatus::Both.as_str(), "both");
         assert_eq!(MaintenanceStatus::Completed.as_str(), "completed");
         assert_eq!(MaintenanceStatus::Scheduled.as_str(), "scheduled");
+    }
+
+    #[test]
+    fn test_cli_parse_warranty_archived_sold_search_and_export_sort() {
+        let create = Cli::try_parse_from([
+            "hbctl",
+            "item",
+            "create",
+            "--name",
+            "Router",
+            "--archived",
+            "--insured=false",
+            "--lifetime-warranty",
+            "--warranty-expires",
+            "2028-01-01",
+            "--warranty-details",
+            "3-year",
+            "--sold-time",
+            "2026-11-01",
+            "--sold-to",
+            "Bob",
+            "--sold-price",
+            "99.5",
+            "--sold-notes",
+            "Local pickup",
+        ])
+        .unwrap();
+        match create.command {
+            Commands::Item(ItemArgs {
+                command: ItemCommands::Create(a),
+            }) => {
+                assert_eq!(a.archived, Some(true));
+                assert_eq!(a.insured, Some(false));
+                assert_eq!(a.lifetime_warranty, Some(true));
+                assert_eq!(a.warranty_expires.as_deref(), Some("2028-01-01"));
+                assert_eq!(a.warranty_details.as_deref(), Some("3-year"));
+                assert_eq!(a.sold_time.as_deref(), Some("2026-11-01"));
+                assert_eq!(a.sold_to.as_deref(), Some("Bob"));
+                assert_eq!(a.sold_price, Some(99.5));
+                assert_eq!(a.sold_notes.as_deref(), Some("Local pickup"));
+            }
+            other => panic!("unexpected command: {other:?}"),
+        }
+
+        let update = Cli::try_parse_from([
+            "hbctl",
+            "item",
+            "update",
+            "ent-1",
+            "--archived",
+            "false",
+            "--insured",
+        ])
+        .unwrap();
+        match update.command {
+            Commands::Item(ItemArgs {
+                command: ItemCommands::Update(a),
+            }) => {
+                assert_eq!(a.archived, Some(false));
+                assert_eq!(a.insured, Some(true));
+            }
+            other => panic!("unexpected command: {other:?}"),
+        }
+
+        let upsert = Cli::try_parse_from([
+            "hbctl",
+            "item",
+            "upsert",
+            "--name",
+            "NAS",
+            "--archived=true",
+            "--warranty-expires",
+            "2027-05-01",
+        ])
+        .unwrap();
+        match upsert.command {
+            Commands::Item(ItemArgs {
+                command: ItemCommands::Upsert(a),
+            }) => {
+                assert_eq!(a.archived, Some(true));
+                assert_eq!(a.warranty_expires.as_deref(), Some("2027-05-01"));
+            }
+            other => panic!("unexpected command: {other:?}"),
+        }
+
+        let list = Cli::try_parse_from([
+            "hbctl",
+            "item",
+            "list",
+            "--include-archived",
+            "--archived-only",
+            "--warranty-expiring",
+            "30",
+        ])
+        .unwrap();
+        match list.command {
+            Commands::Item(ItemArgs {
+                command: ItemCommands::List(a),
+            }) => {
+                assert!(a.include_archived);
+                assert!(a.archived_only);
+                assert_eq!(a.warranty_expiring, Some(30));
+            }
+            other => panic!("unexpected command: {other:?}"),
+        }
+
+        let search = Cli::try_parse_from([
+            "hbctl",
+            "search",
+            "drill",
+            "--parent",
+            "Garage",
+            "--type",
+            "Item",
+            "--limit",
+            "5",
+            "--include-archived",
+            "--warranty-expiring",
+            "14",
+        ])
+        .unwrap();
+        match search.command {
+            Commands::Search(a) => {
+                assert_eq!(a.query.as_deref(), Some("drill"));
+                assert_eq!(a.parent.as_deref(), Some("Garage"));
+                assert_eq!(a.entity_type.as_deref(), Some("Item"));
+                assert_eq!(a.limit, Some(5));
+                assert!(a.include_archived);
+                assert!(!a.archived_only);
+                assert_eq!(a.warranty_expiring, Some(14));
+            }
+            other => panic!("unexpected command: {other:?}"),
+        }
+
+        for (raw, expected) in [
+            ("name", ExportSort::Name),
+            ("id", ExportSort::Id),
+            ("purchase-price", ExportSort::PurchasePrice),
+            ("purchase-date", ExportSort::PurchaseDate),
+            ("updated-at", ExportSort::UpdatedAt),
+            ("asset-id", ExportSort::AssetId),
+        ] {
+            let exp = Cli::try_parse_from(["hbctl", "export", "--sort", raw]).unwrap();
+            match exp.command {
+                Commands::Export(a) => assert_eq!(a.sort, expected),
+                other => panic!("unexpected command: {other:?}"),
+            }
+        }
     }
 }

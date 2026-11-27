@@ -6484,3 +6484,378 @@ fn test_maintenance_crud_list_filters_and_dry_runs() {
         .failure()
         .stderr(predicate::str::contains("invalid cost"));
 }
+
+fn format_days_from_epoch(days: i64) -> String {
+    let z = days + 719_468;
+    let era = z.div_euclid(146_097);
+    let doe = z - era * 146_097;
+    let yoe = (doe - doe / 1460 + doe / 36524 - doe / 146_096) / 365;
+    let y = yoe + era * 400;
+    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+    let mp = (5 * doy + 2) / 153;
+    let d = doy - (153 * mp + 2) / 5 + 1;
+    let m = mp + if mp < 10 { 3 } else { -9 };
+    let year = y + i64::from(m <= 2);
+    format!("{year:04}-{m:02}-{d:02}")
+}
+
+#[test]
+fn test_warranty_insured_sold_and_archived_item_flows() {
+    if !can_execute_binary() {
+        return;
+    }
+    let mut server = Server::new();
+    let dir = tempdir().unwrap();
+
+    // 1. `item create` with warranty/insured/sold/archived triggers follow-up PUT
+    let m_post = server
+        .mock("POST", "/api/v1/entities")
+        .with_status(201)
+        .with_body(r#"{"id":"ent-w1","name":"NAS","quantity":1,"archived":false,"insured":false}"#)
+        .expect(1)
+        .create();
+    let m_put_create = server
+        .mock("PUT", "/api/v1/entities/ent-w1")
+        .match_body(Matcher::AllOf(vec![
+            Matcher::Regex(r#""archived":true"#.into()),
+            Matcher::Regex(r#""insured":true"#.into()),
+            Matcher::Regex(r#""lifetimeWarranty":false"#.into()),
+            Matcher::Regex(r#""warrantyExpires":"2028-12-31""#.into()),
+            Matcher::Regex(r#""warrantyDetails":"5yr Pro""#.into()),
+            Matcher::Regex(r#""soldTime":"2026-11-15""#.into()),
+            Matcher::Regex(r#""soldTo":"Bob""#.into()),
+            Matcher::Regex(r#""soldPrice":300\.0"#.into()),
+            Matcher::Regex(r#""soldNotes":"Sold locally""#.into()),
+        ]))
+        .with_status(200)
+        .with_body(
+            r#"{
+                "id":"ent-w1","name":"NAS","quantity":1,
+                "archived":true,"insured":true,"lifetimeWarranty":false,
+                "warrantyExpires":"2028-12-31","warrantyDetails":"5yr Pro",
+                "soldTime":"2026-11-15","soldTo":"Bob","soldPrice":300.0,"soldNotes":"Sold locally",
+                "fields":[]
+            }"#,
+        )
+        .expect(1)
+        .create();
+
+    let out_create = hbctl(&server.url())
+        .args([
+            "item",
+            "create",
+            "--name",
+            "NAS",
+            "--archived",
+            "--insured",
+            "--lifetime-warranty=false",
+            "--warranty-expires",
+            "2028-12-31",
+            "--warranty-details",
+            "5yr Pro",
+            "--sold-time",
+            "2026-11-15",
+            "--sold-to",
+            "Bob",
+            "--sold-price",
+            "300",
+            "--sold-notes",
+            "Sold locally",
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let create_txt = String::from_utf8(out_create).unwrap();
+    assert!(create_txt.contains("warrantyExpires"));
+    assert!(create_txt.contains("2028-12-31"));
+    assert!(create_txt.contains("soldTo"));
+    m_post.assert();
+    m_put_create.assert();
+
+    // 2. `item update` can flip `--archived false`
+    let m_get_upd = server
+        .mock("GET", "/api/v1/entities/ent-w1")
+        .with_status(200)
+        .with_body(r#"{"id":"ent-w1","name":"NAS","quantity":1,"archived":true,"insured":true,"fields":[]}"#)
+        .expect(1)
+        .create();
+    let m_put_upd = server
+        .mock("PUT", "/api/v1/entities/ent-w1")
+        .match_body(Matcher::AllOf(vec![
+            Matcher::Regex(r#""archived":false"#.into()),
+            Matcher::Regex(r#""insured":true"#.into()),
+        ]))
+        .with_status(200)
+        .with_body(r#"{"id":"ent-w1","name":"NAS","quantity":1,"archived":false,"insured":true,"fields":[]}"#)
+        .expect(1)
+        .create();
+    hbctl(&server.url())
+        .args(["--json", "item", "update", "ent-w1", "--archived", "false"])
+        .assert()
+        .success();
+    m_get_upd.assert();
+    m_put_upd.assert();
+
+    // 3. `item import` CSV with HB.* headers and new columns
+    let csv_path = dir.path().join("import_warranty.csv");
+    fs::write(
+        &csv_path,
+        "HB.name,HB.archived,HB.insured,HB.lifetime_warranty,HB.warranty_expires,HB.sold_to,HB.sold_price\nServer,false,true,true,2030-01-01,Carol,120.5\n",
+    )
+    .unwrap();
+    let m_post_csv = server
+        .mock("POST", "/api/v1/entities")
+        .with_status(201)
+        .with_body(r#"{"id":"ent-csv","name":"Server","quantity":1}"#)
+        .expect(1)
+        .create();
+    let m_put_csv = server
+        .mock("PUT", "/api/v1/entities/ent-csv")
+        .match_body(Matcher::AllOf(vec![
+            Matcher::Regex(r#""archived":false"#.into()),
+            Matcher::Regex(r#""insured":true"#.into()),
+            Matcher::Regex(r#""lifetimeWarranty":true"#.into()),
+            Matcher::Regex(r#""warrantyExpires":"2030-01-01""#.into()),
+            Matcher::Regex(r#""soldTo":"Carol""#.into()),
+            Matcher::Regex(r#""soldPrice":120\.5"#.into()),
+        ]))
+        .with_status(200)
+        .with_body(r#"{"id":"ent-csv","name":"Server","quantity":1,"insured":true,"lifetimeWarranty":true,"fields":[]}"#)
+        .expect(1)
+        .create();
+    hbctl(&server.url())
+        .args(["--json", "item", "import", csv_path.to_str().unwrap()])
+        .assert()
+        .success();
+    m_post_csv.assert();
+    m_put_csv.assert();
+
+    // 4. `item list --archived-only --warranty-expiring 30` sets includeArchived=true & hydrates
+    let today = hbctl::client::models::today_utc_days();
+    let soon = format_days_from_epoch(today + 10);
+    let far = format_days_from_epoch(today + 90);
+
+    let m_list_arch = server
+        .mock("GET", "/api/v1/entities")
+        .match_query(Matcher::AllOf(vec![
+            Matcher::UrlEncoded("includeArchived".into(), "true".into()),
+            Matcher::UrlEncoded("page".into(), "1".into()),
+        ]))
+        .with_status(200)
+        .with_body(
+            json!({
+                "items": [
+                    { "id": "a1", "name": "Expiring Archived", "quantity": 1, "archived": true },
+                    { "id": "a2", "name": "Far Archived", "quantity": 1, "archived": true },
+                    { "id": "a3", "name": "Active Soon", "quantity": 1, "archived": false }
+                ],
+                "page": 1,
+                "pageSize": 50,
+                "total": 3
+            })
+            .to_string(),
+        )
+        .expect(1)
+        .create();
+    let m_get_a1 = server
+        .mock("GET", "/api/v1/entities/a1")
+        .with_status(200)
+        .with_body(
+            json!({
+                "id": "a1", "name": "Expiring Archived", "quantity": 1,
+                "archived": true, "lifetimeWarranty": false,
+                "warrantyExpires": soon, "fields": []
+            })
+            .to_string(),
+        )
+        .expect(1)
+        .create();
+    let m_get_a2 = server
+        .mock("GET", "/api/v1/entities/a2")
+        .with_status(200)
+        .with_body(
+            json!({
+                "id": "a2", "name": "Far Archived", "quantity": 1,
+                "archived": true, "lifetimeWarranty": false,
+                "warrantyExpires": far, "fields": []
+            })
+            .to_string(),
+        )
+        .expect(1)
+        .create();
+
+    let out_list = hbctl(&server.url())
+        .args([
+            "--json",
+            "item",
+            "list",
+            "--archived-only",
+            "--warranty-expiring",
+            "30",
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let list_val: Value = serde_json::from_slice(&out_list).unwrap();
+    let arr = list_val.as_array().unwrap();
+    assert_eq!(arr.len(), 1);
+    assert_eq!(arr[0]["id"], "a1");
+    m_list_arch.assert();
+    m_get_a1.assert();
+    m_get_a2.assert();
+}
+
+#[test]
+fn test_search_filters_and_export_sort_modes() {
+    if !can_execute_binary() {
+        return;
+    }
+    let mut server = Server::new();
+
+    // 1. `search --type Item --parent Garage --archived-only --warranty-expiring 30 --limit 1`
+    let today = hbctl::client::models::today_utc_days();
+    let soon = format_days_from_epoch(today + 5);
+
+    let m_types = server
+        .mock("GET", "/api/v1/entity-types")
+        .with_status(200)
+        .with_body(r#"[{"id":"et-item","name":"Item","isLocation":false}]"#)
+        .expect(1)
+        .create();
+    let m_parents = server
+        .mock("GET", "/api/v1/entities")
+        .match_query(Matcher::Exact("page=1&pageSize=50".into()))
+        .with_status(200)
+        .with_body(r#"{"items":[{"id":"loc-garage","name":"Garage","quantity":1}],"page":1,"pageSize":50,"total":1}"#)
+        .expect(1)
+        .create();
+    let m_search_list = server
+        .mock("GET", "/api/v1/entities")
+        .match_query(Matcher::AllOf(vec![
+            Matcher::UrlEncoded("entityTypeId".into(), "et-item".into()),
+            Matcher::UrlEncoded("includeArchived".into(), "true".into()),
+            Matcher::UrlEncoded("page".into(), "1".into()),
+        ]))
+        .with_status(200)
+        .with_body(
+            json!({
+                "items": [
+                    { "id": "s1", "name": "Drill A", "quantity": 1, "parentId": "loc-garage", "archived": true },
+                    { "id": "s2", "name": "Drill B", "quantity": 1, "parentId": "loc-garage", "archived": true },
+                    { "id": "s3", "name": "Other Room", "quantity": 1, "parentId": "loc-attic", "archived": true }
+                ],
+                "page": 1,
+                "pageSize": 50,
+                "total": 3
+            })
+            .to_string(),
+        )
+        .expect(1)
+        .create();
+    let m_get_s1 = server
+        .mock("GET", "/api/v1/entities/s1")
+        .with_status(200)
+        .with_body(
+            json!({
+                "id": "s1", "name": "Drill A", "quantity": 1, "parentId": "loc-garage",
+                "archived": true, "warrantyExpires": soon, "fields": []
+            })
+            .to_string(),
+        )
+        .expect(1)
+        .create();
+    let m_get_s2 = server
+        .mock("GET", "/api/v1/entities/s2")
+        .with_status(200)
+        .with_body(
+            json!({
+                "id": "s2", "name": "Drill B", "quantity": 1, "parentId": "loc-garage",
+                "archived": true, "warrantyExpires": soon, "fields": []
+            })
+            .to_string(),
+        )
+        .expect(1)
+        .create();
+
+    let out_search = hbctl(&server.url())
+        .args([
+            "--json",
+            "search",
+            "--type",
+            "Item",
+            "--parent",
+            "Garage",
+            "--archived-only",
+            "--warranty-expiring",
+            "30",
+            "--limit",
+            "1",
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let search_val: Value = serde_json::from_slice(&out_search).unwrap();
+    let s_arr = search_val.as_array().unwrap();
+    assert_eq!(s_arr.len(), 1);
+    assert_eq!(s_arr[0]["id"], "s1");
+    m_types.assert();
+    m_parents.assert();
+    m_search_list.assert();
+    m_get_s1.assert();
+    m_get_s2.assert();
+
+    // 2. `export --sort purchase-price` and `--sort asset-id`
+    let m_export_list = server
+        .mock("GET", "/api/v1/entities")
+        .match_query(Matcher::UrlEncoded("page".into(), "1".into()))
+        .with_status(200)
+        .with_body(
+            json!({
+                "items": [
+                    { "id": "x1", "name": "Expensive", "quantity": 1, "purchasePrice": 199.0, "assetId": "000-010" },
+                    { "id": "x2", "name": "Cheap", "quantity": 1, "purchasePrice": 9.0, "assetId": "000-002" },
+                    { "id": "x3", "name": "NoPrice", "quantity": 1 }
+                ],
+                "page": 1,
+                "pageSize": 50,
+                "total": 3
+            })
+            .to_string(),
+        )
+        .expect(2)
+        .create();
+
+    let out_price = hbctl(&server.url())
+        .args([
+            "--quiet",
+            "export",
+            "--format",
+            "json",
+            "--sort",
+            "purchase-price",
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    assert_eq!(String::from_utf8(out_price).unwrap(), "x2\nx1\nx3\n");
+
+    let out_asset = hbctl(&server.url())
+        .args([
+            "--quiet", "export", "--format", "json", "--sort", "asset-id",
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    assert_eq!(String::from_utf8(out_asset).unwrap(), "x2\nx1\nx3\n");
+    m_export_list.assert();
+}

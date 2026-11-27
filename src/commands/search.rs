@@ -1,7 +1,7 @@
 use std::io::Write;
 
 use crate::cli::SearchArgs;
-use crate::client::models::Entity;
+use crate::client::models::{entity_warranty_expiring_within, today_utc_days, Entity};
 use crate::client::resolve::Resolver;
 use crate::client::{HomeboxClient, ListEntitiesQuery};
 use crate::commands::render_entities;
@@ -74,16 +74,47 @@ pub fn handle(
         } else {
             args.query.clone()
         },
+        include_archived: args.include_archived || args.archived_only,
         ..Default::default()
     };
     if let Some(ref tag) = args.tag {
         query.tag_ids.push(resolver.resolve_tag_id(tag, false)?);
     }
+    if let Some(ref et) = args.entity_type {
+        query.entity_type_id = Some(resolver.resolve_entity_type_id(et)?);
+    }
+    let parent_filter = match args.parent {
+        Some(ref p) => Some(resolver.resolve_parent_id(p)?),
+        None => None,
+    };
 
     let mut entities = client.list_entities(&query, true)?;
 
-    if needs_structured {
+    if let Some(ref target_parent) = parent_filter {
+        entities.retain(|e| match target_parent {
+            Some(pid) => e.parent_id.as_deref() == Some(pid.as_str()),
+            None => e
+                .parent_id
+                .as_deref()
+                .map(|s| s.trim().is_empty())
+                .unwrap_or(true),
+        });
+    }
+
+    if args.archived_only {
+        entities.retain(|e| e.archived.unwrap_or(false));
+    }
+
+    if needs_structured || args.warranty_expiring.is_some() {
         entities = client.hydrate_entity_fields(entities)?;
+    }
+
+    if let Some(days) = args.warranty_expiring {
+        let today = today_utc_days();
+        entities.retain(|e| entity_warranty_expiring_within(e, days, today));
+    }
+
+    if needs_structured {
         let or_query = if args.any { query_text } else { None };
         entities.retain(|e| {
             entity_matches_filters(
@@ -96,6 +127,10 @@ pub fn handle(
                 args.any,
             )
         });
+    }
+
+    if let Some(limit) = args.limit {
+        entities.truncate(limit);
     }
 
     render_entities(&entities, ctx, out)

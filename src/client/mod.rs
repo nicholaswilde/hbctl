@@ -220,6 +220,7 @@ pub struct ListEntitiesQuery {
     pub query: Option<String>,
     pub tag_ids: Vec<String>,
     pub entity_type_id: Option<String>,
+    pub include_archived: bool,
     pub page: Option<u32>,
     pub page_size: Option<u32>,
 }
@@ -402,6 +403,9 @@ impl HomeboxClient {
         }
         if let Some(ref et) = query.entity_type_id {
             params.push(("entityTypeId", et.clone()));
+        }
+        if query.include_archived {
+            params.push(("includeArchived", "true".to_string()));
         }
         if let Some(page) = query.page {
             params.push(("page", page.to_string()));
@@ -597,7 +601,7 @@ impl HomeboxClient {
 
         let mut created: Entity = self.handle_response(resp)?;
 
-        if !req.fields.is_empty() {
+        if req.needs_followup_put() {
             let mut merged = created.clone();
             // Ensure tagIds & purchase metadata from request aren't dropped by PUT
             if merged.tag_ids.is_empty() {
@@ -625,10 +629,39 @@ impl HomeboxClient {
             if merged.purchase_from.is_none() {
                 merged.purchase_from = req.purchase_from.clone();
             }
+            if let Some(v) = req.archived {
+                merged.archived = Some(v);
+            }
+            if let Some(v) = req.insured {
+                merged.insured = Some(v);
+            }
+            if let Some(v) = req.lifetime_warranty {
+                merged.lifetime_warranty = Some(v);
+            }
+            if let Some(ref v) = req.warranty_expires {
+                merged.warranty_expires = Some(v.clone());
+            }
+            if let Some(ref v) = req.warranty_details {
+                merged.warranty_details = Some(v.clone());
+            }
+            if let Some(ref v) = req.sold_time {
+                merged.sold_time = Some(v.clone());
+            }
+            if let Some(ref v) = req.sold_to {
+                merged.sold_to = Some(v.clone());
+            }
+            if let Some(v) = req.sold_price {
+                merged.sold_price = Some(v);
+            }
+            if let Some(ref v) = req.sold_notes {
+                merged.sold_notes = Some(v.clone());
+            }
 
-            let mut fields = merged.fields.clone().unwrap_or_default();
-            upsert_custom_fields(&mut fields, &req.fields);
-            merged.fields = Some(fields);
+            if !req.fields.is_empty() {
+                let mut fields = merged.fields.clone().unwrap_or_default();
+                upsert_custom_fields(&mut fields, &req.fields);
+                merged.fields = Some(fields);
+            }
 
             created = self.put_entity(&created.id, &merged)?;
         }

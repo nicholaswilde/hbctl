@@ -3,7 +3,7 @@ use std::io::{self, IsTerminal, Write};
 use std::path::PathBuf;
 
 use serde::Serialize;
-use serde_json::{json, Value};
+use serde_json::{json, Map, Value};
 
 use crate::cli::{
     ImportFormat, ItemArgs, ItemCommands, ItemCreateArgs, ItemDedupArgs, ItemDeleteArgs,
@@ -11,8 +11,8 @@ use crate::cli::{
     ItemUpsertArgs, MatchKey, MatchMode, OnMatchAction,
 };
 use crate::client::models::{
-    normalize_json_aliases, upsert_custom_fields, CreateEntityRequest, CustomField, Entity,
-    EntityPatch, FieldValueType,
+    entity_warranty_expiring_within, normalize_json_aliases, parse_bool_loose, today_utc_days,
+    upsert_custom_fields, CreateEntityRequest, CustomField, Entity, EntityPatch, FieldValueType,
 };
 use crate::client::resolve::Resolver;
 use crate::client::{DryRunRequest, HomeboxClient, ListEntitiesQuery};
@@ -62,6 +62,7 @@ fn handle_list(
 
     let mut query = ListEntitiesQuery {
         page_size: args.page_size,
+        include_archived: args.include_archived || args.archived_only,
         ..Default::default()
     };
 
@@ -76,7 +77,10 @@ fn handle_list(
         None => None,
     };
 
-    let fetch_all = args.all || parent_filter.is_some();
+    let fetch_all = args.all
+        || parent_filter.is_some()
+        || args.archived_only
+        || args.warranty_expiring.is_some();
     let mut entities = client.list_entities(&query, fetch_all)?;
 
     if let Some(ref target_parent) = parent_filter {
@@ -90,9 +94,21 @@ fn handle_list(
         });
     }
 
-    if let Some(ref key) = args.has_field {
+    if args.archived_only {
+        entities.retain(|e| e.archived.unwrap_or(false));
+    }
+
+    if args.has_field.is_some() || args.warranty_expiring.is_some() {
         entities = client.hydrate_entity_fields(entities)?;
+    }
+
+    if let Some(ref key) = args.has_field {
         entities.retain(|e| e.find_field(key).is_some() || e.field_value(key).is_some());
+    }
+
+    if let Some(days) = args.warranty_expiring {
+        let today = today_utc_days();
+        entities.retain(|e| entity_warranty_expiring_within(e, days, today));
     }
 
     render_entities(&entities, ctx, out)
@@ -120,8 +136,91 @@ struct ParsedItemInput {
     purchase_price: Option<f64>,
     purchase_date: Option<String>,
     purchase_from: Option<String>,
+    archived: Option<bool>,
+    insured: Option<bool>,
+    lifetime_warranty: Option<bool>,
+    warranty_expires: Option<String>,
+    warranty_details: Option<String>,
+    sold_time: Option<String>,
+    sold_to: Option<String>,
+    sold_price: Option<f64>,
+    sold_notes: Option<String>,
     fields: Vec<CustomField>,
     attachments: Vec<AttachmentTarget>,
+}
+
+struct MetaOverrides<'a> {
+    archived: Option<bool>,
+    insured: Option<bool>,
+    lifetime_warranty: Option<bool>,
+    warranty_expires: Option<&'a str>,
+    warranty_details: Option<&'a str>,
+    sold_time: Option<&'a str>,
+    sold_to: Option<&'a str>,
+    sold_price: Option<f64>,
+    sold_notes: Option<&'a str>,
+}
+
+impl ParsedItemInput {
+    fn apply_meta(&mut self, meta: MetaOverrides<'_>) {
+        if let Some(v) = meta.archived {
+            self.archived = Some(v);
+        }
+        if let Some(v) = meta.insured {
+            self.insured = Some(v);
+        }
+        if let Some(v) = meta.lifetime_warranty {
+            self.lifetime_warranty = Some(v);
+        }
+        if let Some(v) = meta.warranty_expires {
+            self.warranty_expires = Some(v.to_string());
+        }
+        if let Some(v) = meta.warranty_details {
+            self.warranty_details = Some(v.to_string());
+        }
+        if let Some(v) = meta.sold_time {
+            self.sold_time = Some(v.to_string());
+        }
+        if let Some(v) = meta.sold_to {
+            self.sold_to = Some(v.to_string());
+        }
+        if let Some(v) = meta.sold_price {
+            self.sold_price = Some(v);
+        }
+        if let Some(v) = meta.sold_notes {
+            self.sold_notes = Some(v.to_string());
+        }
+    }
+
+    fn insert_dry_run_meta(&self, obj: &mut Map<String, Value>) {
+        if let Some(v) = self.archived {
+            obj.insert("archived".to_string(), Value::Bool(v));
+        }
+        if let Some(v) = self.insured {
+            obj.insert("insured".to_string(), Value::Bool(v));
+        }
+        if let Some(v) = self.lifetime_warranty {
+            obj.insert("lifetimeWarranty".to_string(), Value::Bool(v));
+        }
+        if let Some(ref v) = self.warranty_expires {
+            obj.insert("warrantyExpires".to_string(), Value::String(v.clone()));
+        }
+        if let Some(ref v) = self.warranty_details {
+            obj.insert("warrantyDetails".to_string(), Value::String(v.clone()));
+        }
+        if let Some(ref v) = self.sold_time {
+            obj.insert("soldTime".to_string(), Value::String(v.clone()));
+        }
+        if let Some(ref v) = self.sold_to {
+            obj.insert("soldTo".to_string(), Value::String(v.clone()));
+        }
+        if let Some(v) = self.sold_price {
+            obj.insert("soldPrice".to_string(), json!(v));
+        }
+        if let Some(ref v) = self.sold_notes {
+            obj.insert("soldNotes".to_string(), Value::String(v.clone()));
+        }
+    }
 }
 
 fn merge_unique_targets(target: &mut Vec<AttachmentTarget>, extra: &[AttachmentTarget]) {
@@ -203,6 +302,18 @@ fn parse_from_json_value(mut val: Value) -> Result<ParsedItemInput> {
         .and_then(Value::as_f64);
     input.purchase_date = json_str(obj, &["purchaseDate", "purchase_date"]);
     input.purchase_from = json_str(obj, &["purchaseFrom", "purchase_from"]);
+    input.archived = json_bool(obj, &["archived"]);
+    input.insured = json_bool(obj, &["insured"]);
+    input.lifetime_warranty = json_bool(obj, &["lifetimeWarranty", "lifetime_warranty"]);
+    input.warranty_expires = json_str(obj, &["warrantyExpires", "warranty_expires"]);
+    input.warranty_details = json_str(obj, &["warrantyDetails", "warranty_details"]);
+    input.sold_time = json_str(obj, &["soldTime", "sold_time", "soldDate", "sold_date"]);
+    input.sold_to = json_str(obj, &["soldTo", "sold_to"]);
+    input.sold_price = obj
+        .get("soldPrice")
+        .or_else(|| obj.get("sold_price"))
+        .and_then(Value::as_f64);
+    input.sold_notes = json_str(obj, &["soldNotes", "sold_notes"]);
 
     if let Some(Value::Array(arr)) = obj.get("tagIds").or_else(|| obj.get("tag_ids")) {
         for v in arr {
@@ -288,6 +399,22 @@ fn json_str(obj: &serde_json::Map<String, Value>, keys: &[&str]) -> Option<Strin
     None
 }
 
+fn json_bool(obj: &serde_json::Map<String, Value>, keys: &[&str]) -> Option<bool> {
+    for key in keys {
+        if let Some(val) = obj.get(*key) {
+            if let Some(b) = val.as_bool() {
+                return Some(b);
+            }
+            if let Some(s) = val.as_str() {
+                if let Some(b) = parse_bool_loose(s.trim()) {
+                    return Some(b);
+                }
+            }
+        }
+    }
+    None
+}
+
 fn append_alias_and_cli_fields(
     target: &mut Vec<CustomField>,
     manufacturer: Option<&str>,
@@ -360,6 +487,17 @@ fn handle_create(
     if let Some(ref f) = args.purchase_from {
         parsed.purchase_from = Some(f.clone());
     }
+    parsed.apply_meta(MetaOverrides {
+        archived: args.archived,
+        insured: args.insured,
+        lifetime_warranty: args.lifetime_warranty,
+        warranty_expires: args.warranty_expires.as_deref(),
+        warranty_details: args.warranty_details.as_deref(),
+        sold_time: args.sold_time.as_deref(),
+        sold_to: args.sold_to.as_deref(),
+        sold_price: args.sold_price,
+        sold_notes: args.sold_notes.as_deref(),
+    });
     for tag in &args.tags {
         if !parsed.tags.contains(tag) {
             parsed.tags.push(tag.clone());
@@ -384,6 +522,7 @@ fn handle_create(
 
     let name = parsed
         .name
+        .clone()
         .filter(|s| !s.trim().is_empty())
         .ok_or_else(|| {
             HbctlError::InvalidInput(
@@ -395,14 +534,23 @@ fn handle_create(
         let base_url = config.require_base_url()?;
         let req_payload = CreateEntityRequest {
             name,
-            description: parsed.description,
+            description: parsed.description.clone(),
             quantity: parsed.quantity,
-            entity_type_id: parsed.entity_type,
+            entity_type_id: parsed.entity_type.clone(),
             parent_id: parsed.parent.as_deref().and_then(parse_dry_run_parent),
-            tag_ids: parsed.tags,
+            tag_ids: parsed.tags.clone(),
             purchase_price: parsed.purchase_price,
-            purchase_date: parsed.purchase_date,
-            purchase_from: parsed.purchase_from,
+            purchase_date: parsed.purchase_date.clone(),
+            purchase_from: parsed.purchase_from.clone(),
+            archived: parsed.archived,
+            insured: parsed.insured,
+            lifetime_warranty: parsed.lifetime_warranty,
+            warranty_expires: parsed.warranty_expires.clone(),
+            warranty_details: parsed.warranty_details.clone(),
+            sold_time: parsed.sold_time.clone(),
+            sold_to: parsed.sold_to.clone(),
+            sold_price: parsed.sold_price,
+            sold_notes: parsed.sold_notes.clone(),
             fields: parsed.fields.clone(),
         };
         let mut previews = vec![HomeboxClient::build_dry_run(
@@ -411,12 +559,17 @@ fn handle_create(
             "entities",
             Some(serde_json::to_value(&req_payload)?),
         )];
-        if !parsed.fields.is_empty() {
+        if req_payload.needs_followup_put() {
+            let mut put_body = Map::new();
+            if !parsed.fields.is_empty() {
+                put_body.insert("fields".to_string(), serde_json::to_value(&parsed.fields)?);
+            }
+            parsed.insert_dry_run_meta(&mut put_body);
             previews.push(HomeboxClient::build_dry_run(
                 base_url,
                 "PUT",
                 "entities/<created-id>",
-                Some(json!({ "fields": parsed.fields })),
+                Some(Value::Object(put_body)),
             ));
         }
         previews.extend(attachment_dry_run_previews(
@@ -450,6 +603,15 @@ fn handle_create(
         purchase_price: parsed.purchase_price,
         purchase_date: parsed.purchase_date,
         purchase_from: parsed.purchase_from,
+        archived: parsed.archived,
+        insured: parsed.insured,
+        lifetime_warranty: parsed.lifetime_warranty,
+        warranty_expires: parsed.warranty_expires,
+        warranty_details: parsed.warranty_details,
+        sold_time: parsed.sold_time,
+        sold_to: parsed.sold_to,
+        sold_price: parsed.sold_price,
+        sold_notes: parsed.sold_notes,
         fields: parsed.fields,
     };
 
@@ -523,6 +685,17 @@ fn handle_update(
     if let Some(ref f) = args.purchase_from {
         parsed.purchase_from = Some(f.clone());
     }
+    parsed.apply_meta(MetaOverrides {
+        archived: args.archived,
+        insured: args.insured,
+        lifetime_warranty: args.lifetime_warranty,
+        warranty_expires: args.warranty_expires.as_deref(),
+        warranty_details: args.warranty_details.as_deref(),
+        sold_time: args.sold_time.as_deref(),
+        sold_to: args.sold_to.as_deref(),
+        sold_price: args.sold_price,
+        sold_notes: args.sold_notes.as_deref(),
+    });
     for tag in &args.tags {
         if !parsed.tags.contains(tag) {
             parsed.tags.push(tag.clone());
@@ -555,6 +728,15 @@ fn handle_update(
             purchase_price: parsed.purchase_price,
             purchase_date: parsed.purchase_date,
             purchase_from: parsed.purchase_from,
+            archived: parsed.archived,
+            insured: parsed.insured,
+            lifetime_warranty: parsed.lifetime_warranty,
+            warranty_expires: parsed.warranty_expires,
+            warranty_details: parsed.warranty_details,
+            sold_time: parsed.sold_time,
+            sold_to: parsed.sold_to,
+            sold_price: parsed.sold_price,
+            sold_notes: parsed.sold_notes,
             add_tag_ids: args.add_tags.clone(),
             remove_tag_ids: args.remove_tags.clone(),
             fields: parsed.fields,
@@ -607,6 +789,15 @@ fn handle_update(
         purchase_price: parsed.purchase_price,
         purchase_date: parsed.purchase_date,
         purchase_from: parsed.purchase_from,
+        archived: parsed.archived,
+        insured: parsed.insured,
+        lifetime_warranty: parsed.lifetime_warranty,
+        warranty_expires: parsed.warranty_expires,
+        warranty_details: parsed.warranty_details,
+        sold_time: parsed.sold_time,
+        sold_to: parsed.sold_to,
+        sold_price: parsed.sold_price,
+        sold_notes: parsed.sold_notes,
         add_tag_ids,
         remove_tag_ids,
         fields: parsed.fields,
@@ -800,6 +991,17 @@ fn handle_upsert(
     if let Some(ref f) = args.purchase_from {
         parsed.purchase_from = Some(f.clone());
     }
+    parsed.apply_meta(MetaOverrides {
+        archived: args.archived,
+        insured: args.insured,
+        lifetime_warranty: args.lifetime_warranty,
+        warranty_expires: args.warranty_expires.as_deref(),
+        warranty_details: args.warranty_details.as_deref(),
+        sold_time: args.sold_time.as_deref(),
+        sold_to: args.sold_to.as_deref(),
+        sold_price: args.sold_price,
+        sold_notes: args.sold_notes.as_deref(),
+    });
     for tag in &args.tags {
         if !parsed.tags.contains(tag) {
             parsed.tags.push(tag.clone());
@@ -888,6 +1090,9 @@ fn handle_upsert(
                 obj.insert("parentId".to_string(), val);
             }
         }
+        if let Some(obj) = body.as_object_mut() {
+            parsed.insert_dry_run_meta(obj);
+        }
         let mut previews = vec![HomeboxClient::build_dry_run(
             base_url,
             "POST",
@@ -959,6 +1164,15 @@ fn handle_upsert(
                     purchase_price: parsed.purchase_price,
                     purchase_date: parsed.purchase_date,
                     purchase_from: parsed.purchase_from,
+                    archived: parsed.archived,
+                    insured: parsed.insured,
+                    lifetime_warranty: parsed.lifetime_warranty,
+                    warranty_expires: parsed.warranty_expires,
+                    warranty_details: parsed.warranty_details,
+                    sold_time: parsed.sold_time,
+                    sold_to: parsed.sold_to,
+                    sold_price: parsed.sold_price,
+                    sold_notes: parsed.sold_notes,
                     fields: parsed.fields,
                     fill_missing: args.fill_missing,
                     ..Default::default()
@@ -995,6 +1209,15 @@ fn handle_upsert(
             purchase_price: parsed.purchase_price,
             purchase_date: parsed.purchase_date,
             purchase_from: parsed.purchase_from,
+            archived: parsed.archived,
+            insured: parsed.insured,
+            lifetime_warranty: parsed.lifetime_warranty,
+            warranty_expires: parsed.warranty_expires,
+            warranty_details: parsed.warranty_details,
+            sold_time: parsed.sold_time,
+            sold_to: parsed.sold_to,
+            sold_price: parsed.sold_price,
+            sold_notes: parsed.sold_notes,
             fields: parsed.fields,
         };
         (client.create_entity(&req)?, "created", true)
@@ -1152,7 +1375,9 @@ fn parse_csv_import(raw: &str) -> Result<Vec<ParsedItemInput>> {
             if val.is_empty() {
                 continue;
             }
-            match header.to_ascii_lowercase().as_str() {
+            let normalized = header.to_ascii_lowercase();
+            let key = normalized.strip_prefix("hb.").unwrap_or(&normalized);
+            match key {
                 "name" => item.name = Some(val.to_string()),
                 "description" => item.description = Some(val.to_string()),
                 "quantity" => {
@@ -1174,7 +1399,7 @@ fn parse_csv_import(raw: &str) -> Result<Vec<ParsedItemInput>> {
                         }
                     }
                 }
-                "tags" | "tag" => {
+                "tags" | "tag" | "labels" => {
                     for t in val.split([',', ';']) {
                         let t = t.trim();
                         if !t.is_empty() {
@@ -1187,8 +1412,41 @@ fn parse_csv_import(raw: &str) -> Result<Vec<ParsedItemInput>> {
                         HbctlError::InvalidInput(format!("invalid CSV purchasePrice '{val}'"))
                     })?);
                 }
-                "purchasedate" | "purchase_date" => item.purchase_date = Some(val.to_string()),
+                "purchasedate" | "purchase_date" | "purchasetime" | "purchase_time" => {
+                    item.purchase_date = Some(val.to_string())
+                }
                 "purchasefrom" | "purchase_from" => item.purchase_from = Some(val.to_string()),
+                "archived" => {
+                    item.archived = Some(parse_bool_loose(val).ok_or_else(|| {
+                        HbctlError::InvalidInput(format!("invalid CSV archived '{val}'"))
+                    })?);
+                }
+                "insured" => {
+                    item.insured = Some(parse_bool_loose(val).ok_or_else(|| {
+                        HbctlError::InvalidInput(format!("invalid CSV insured '{val}'"))
+                    })?);
+                }
+                "lifetimewarranty" | "lifetime_warranty" => {
+                    item.lifetime_warranty = Some(parse_bool_loose(val).ok_or_else(|| {
+                        HbctlError::InvalidInput(format!("invalid CSV lifetimeWarranty '{val}'"))
+                    })?);
+                }
+                "warrantyexpires" | "warranty_expires" => {
+                    item.warranty_expires = Some(val.to_string())
+                }
+                "warrantydetails" | "warranty_details" => {
+                    item.warranty_details = Some(val.to_string())
+                }
+                "soldtime" | "sold_time" | "solddate" | "sold_date" => {
+                    item.sold_time = Some(val.to_string())
+                }
+                "soldto" | "sold_to" => item.sold_to = Some(val.to_string()),
+                "soldprice" | "sold_price" => {
+                    item.sold_price = Some(val.parse::<f64>().map_err(|_| {
+                        HbctlError::InvalidInput(format!("invalid CSV soldPrice '{val}'"))
+                    })?);
+                }
+                "soldnotes" | "sold_notes" => item.sold_notes = Some(val.to_string()),
                 "manufacturer" => {
                     let cf = CustomField::new_typed("Manufacturer", FieldValueType::Text, val)?;
                     upsert_custom_fields(&mut item.fields, &[cf]);
@@ -1275,6 +1533,9 @@ fn handle_import(
                     obj.insert("parentId".to_string(), val);
                 }
             }
+            if let Some(obj) = body.as_object_mut() {
+                rec.insert_dry_run_meta(obj);
+            }
             previews.push(HomeboxClient::build_dry_run(
                 base_url,
                 "POST",
@@ -1356,6 +1617,15 @@ fn handle_import(
                         purchase_price: rec.purchase_price,
                         purchase_date: rec.purchase_date,
                         purchase_from: rec.purchase_from,
+                        archived: rec.archived,
+                        insured: rec.insured,
+                        lifetime_warranty: rec.lifetime_warranty,
+                        warranty_expires: rec.warranty_expires,
+                        warranty_details: rec.warranty_details,
+                        sold_time: rec.sold_time,
+                        sold_to: rec.sold_to,
+                        sold_price: rec.sold_price,
+                        sold_notes: rec.sold_notes,
                         fields: rec.fields,
                         fill_missing: args.fill_missing,
                         ..Default::default()
@@ -1408,6 +1678,15 @@ fn handle_import(
             purchase_price: rec.purchase_price,
             purchase_date: rec.purchase_date,
             purchase_from: rec.purchase_from,
+            archived: rec.archived,
+            insured: rec.insured,
+            lifetime_warranty: rec.lifetime_warranty,
+            warranty_expires: rec.warranty_expires,
+            warranty_details: rec.warranty_details,
+            sold_time: rec.sold_time,
+            sold_to: rec.sold_to,
+            sold_price: rec.sold_price,
+            sold_notes: rec.sold_notes,
             fields: rec.fields,
         };
         let mut created = client.create_entity(&req)?;

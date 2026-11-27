@@ -1,4 +1,5 @@
 use std::collections::BTreeMap;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use clap::ValueEnum;
 use serde::{Deserialize, Deserializer, Serialize};
@@ -255,7 +256,7 @@ impl CustomField {
     }
 }
 
-fn parse_bool_loose(s: &str) -> Option<bool> {
+pub(crate) fn parse_bool_loose(s: &str) -> Option<bool> {
     match s.to_ascii_lowercase().as_str() {
         "true" | "1" | "yes" | "y" => Some(true),
         "false" | "0" | "no" | "n" => Some(false),
@@ -813,6 +814,70 @@ pub struct Entity {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub notes: Option<String>,
 
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub archived: Option<bool>,
+
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub insured: Option<bool>,
+
+    #[serde(
+        rename = "lifetimeWarranty",
+        alias = "lifetime_warranty",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub lifetime_warranty: Option<bool>,
+
+    #[serde(
+        rename = "warrantyExpires",
+        alias = "warranty_expires",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub warranty_expires: Option<String>,
+
+    #[serde(
+        rename = "warrantyDetails",
+        alias = "warranty_details",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub warranty_details: Option<String>,
+
+    #[serde(
+        rename = "soldTime",
+        alias = "sold_time",
+        alias = "soldDate",
+        alias = "sold_date",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub sold_time: Option<String>,
+
+    #[serde(
+        rename = "soldTo",
+        alias = "sold_to",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub sold_to: Option<String>,
+
+    #[serde(
+        rename = "soldPrice",
+        alias = "sold_price",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub sold_price: Option<f64>,
+
+    #[serde(
+        rename = "soldNotes",
+        alias = "sold_notes",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub sold_notes: Option<String>,
+
     #[serde(rename = "createdAt", default, skip_serializing_if = "Option::is_none")]
     pub created_at: Option<String>,
 
@@ -976,8 +1041,89 @@ pub struct CreateEntityRequest {
     )]
     pub purchase_from: Option<String>,
 
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub archived: Option<bool>,
+
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub insured: Option<bool>,
+
+    #[serde(
+        rename = "lifetimeWarranty",
+        alias = "lifetime_warranty",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub lifetime_warranty: Option<bool>,
+
+    #[serde(
+        rename = "warrantyExpires",
+        alias = "warranty_expires",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub warranty_expires: Option<String>,
+
+    #[serde(
+        rename = "warrantyDetails",
+        alias = "warranty_details",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub warranty_details: Option<String>,
+
+    #[serde(
+        rename = "soldTime",
+        alias = "sold_time",
+        alias = "soldDate",
+        alias = "sold_date",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub sold_time: Option<String>,
+
+    #[serde(
+        rename = "soldTo",
+        alias = "sold_to",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub sold_to: Option<String>,
+
+    #[serde(
+        rename = "soldPrice",
+        alias = "sold_price",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub sold_price: Option<f64>,
+
+    #[serde(
+        rename = "soldNotes",
+        alias = "sold_notes",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub sold_notes: Option<String>,
+
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub fields: Vec<CustomField>,
+}
+
+impl CreateEntityRequest {
+    /// True if a follow-up `PUT /api/v1/entities/{id}` is required because Homebox's
+    /// `POST /api/v1/entities` only accepts a subset of fields on initial creation.
+    pub fn needs_followup_put(&self) -> bool {
+        !self.fields.is_empty()
+            || self.archived.is_some()
+            || self.insured.is_some()
+            || self.lifetime_warranty.is_some()
+            || self.warranty_expires.is_some()
+            || self.warranty_details.is_some()
+            || self.sold_time.is_some()
+            || self.sold_to.is_some()
+            || self.sold_price.is_some()
+            || self.sold_notes.is_some()
+    }
 }
 
 /// Partial update patch applied onto an existing `Entity` via `GET -> Merge -> PUT`.
@@ -1009,6 +1155,70 @@ pub struct EntityPatch {
 
     #[serde(rename = "purchaseFrom", skip_serializing_if = "Option::is_none")]
     pub purchase_from: Option<String>,
+
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub archived: Option<bool>,
+
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub insured: Option<bool>,
+
+    #[serde(
+        rename = "lifetimeWarranty",
+        alias = "lifetime_warranty",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub lifetime_warranty: Option<bool>,
+
+    #[serde(
+        rename = "warrantyExpires",
+        alias = "warranty_expires",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub warranty_expires: Option<String>,
+
+    #[serde(
+        rename = "warrantyDetails",
+        alias = "warranty_details",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub warranty_details: Option<String>,
+
+    #[serde(
+        rename = "soldTime",
+        alias = "sold_time",
+        alias = "soldDate",
+        alias = "sold_date",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub sold_time: Option<String>,
+
+    #[serde(
+        rename = "soldTo",
+        alias = "sold_to",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub sold_to: Option<String>,
+
+    #[serde(
+        rename = "soldPrice",
+        alias = "sold_price",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub sold_price: Option<f64>,
+
+    #[serde(
+        rename = "soldNotes",
+        alias = "sold_notes",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub sold_notes: Option<String>,
 
     #[serde(default, rename = "addTagIds", skip_serializing_if = "Vec::is_empty")]
     pub add_tag_ids: Vec<String>,
@@ -1064,7 +1274,7 @@ fn is_blank_opt_str(val: Option<&str>) -> bool {
     }
 }
 
-fn is_blank_date(val: Option<&str>) -> bool {
+pub(crate) fn is_blank_date(val: Option<&str>) -> bool {
     match val {
         None => true,
         Some(s) => {
@@ -1072,6 +1282,63 @@ fn is_blank_date(val: Option<&str>) -> bool {
             trimmed.is_empty() || trimmed.starts_with("0001-01-01")
         }
     }
+}
+
+/// Parse a leading `YYYY-MM-DD` (including RFC3339 timestamps) into days since `1970-01-01`.
+/// Rejects blank strings, Go zero-dates (`0001-01-01*`), and invalid calendar dates.
+pub fn parse_ymd_days(raw: &str) -> Option<i64> {
+    let trimmed = raw.trim();
+    if is_blank_date(Some(trimmed)) || trimmed.len() < 10 {
+        return None;
+    }
+    let bytes = trimmed.as_bytes();
+    if bytes[4] != b'-' || bytes[7] != b'-' {
+        return None;
+    }
+    let year: i64 = trimmed.get(0..4)?.parse().ok()?;
+    let month: u32 = trimmed.get(5..7)?.parse().ok()?;
+    let day: u32 = trimmed.get(8..10)?.parse().ok()?;
+    if !(1..=12).contains(&month) {
+        return None;
+    }
+    let is_leap = (year % 4 == 0 && year % 100 != 0) || year % 400 == 0;
+    let max_day = match month {
+        1 | 3 | 5 | 7 | 8 | 10 | 12 => 31,
+        4 | 6 | 9 | 11 => 30,
+        2 if is_leap => 29,
+        2 => 28,
+        _ => return None,
+    };
+    if !(1..=max_day).contains(&day) {
+        return None;
+    }
+
+    let y = year - i64::from(month <= 2);
+    let era = y.div_euclid(400);
+    let yoe = y - era * 400;
+    let m_adj = i64::from(month) + if month > 2 { -3 } else { 9 };
+    let doy = (153 * m_adj + 2) / 5 + i64::from(day) - 1;
+    let doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
+    Some(era * 146_097 + doe - 719_468)
+}
+
+/// Current UTC date expressed as days since `1970-01-01`.
+pub fn today_utc_days() -> i64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| (d.as_secs() / 86_400) as i64)
+        .unwrap_or(0)
+}
+
+/// True when `entity` has a non-lifetime warranty expiring in `[today_days, today_days + days]`.
+pub fn entity_warranty_expiring_within(entity: &Entity, days: u32, today_days: i64) -> bool {
+    if entity.lifetime_warranty == Some(true) {
+        return false;
+    }
+    let Some(exp_days) = entity.warranty_expires.as_deref().and_then(parse_ymd_days) else {
+        return false;
+    };
+    exp_days >= today_days && exp_days <= today_days + i64::from(days)
 }
 
 fn is_empty_opt_price(val: Option<f64>) -> bool {
@@ -1180,6 +1447,51 @@ pub fn merge_entity_patch(existing: &Entity, patch: &EntityPatch) -> Entity {
     if let Some(ref from) = patch.purchase_from {
         if !patch.fill_missing || is_blank_opt_str(merged.purchase_from.as_deref()) {
             merged.purchase_from = Some(from.clone());
+        }
+    }
+    if let Some(v) = patch.archived {
+        if !patch.fill_missing || !merged.archived.unwrap_or(false) {
+            merged.archived = Some(v);
+        }
+    }
+    if let Some(v) = patch.insured {
+        if !patch.fill_missing || !merged.insured.unwrap_or(false) {
+            merged.insured = Some(v);
+        }
+    }
+    if let Some(v) = patch.lifetime_warranty {
+        if !patch.fill_missing || !merged.lifetime_warranty.unwrap_or(false) {
+            merged.lifetime_warranty = Some(v);
+        }
+    }
+    if let Some(ref exp) = patch.warranty_expires {
+        if !patch.fill_missing || is_blank_date(merged.warranty_expires.as_deref()) {
+            merged.warranty_expires = Some(exp.clone());
+        }
+    }
+    if let Some(ref details) = patch.warranty_details {
+        if !patch.fill_missing || is_blank_opt_str(merged.warranty_details.as_deref()) {
+            merged.warranty_details = Some(details.clone());
+        }
+    }
+    if let Some(ref st) = patch.sold_time {
+        if !patch.fill_missing || is_blank_date(merged.sold_time.as_deref()) {
+            merged.sold_time = Some(st.clone());
+        }
+    }
+    if let Some(ref to) = patch.sold_to {
+        if !patch.fill_missing || is_blank_opt_str(merged.sold_to.as_deref()) {
+            merged.sold_to = Some(to.clone());
+        }
+    }
+    if let Some(price) = patch.sold_price {
+        if !patch.fill_missing || is_empty_opt_price(merged.sold_price) {
+            merged.sold_price = Some(price);
+        }
+    }
+    if let Some(ref notes) = patch.sold_notes {
+        if !patch.fill_missing || is_blank_opt_str(merged.sold_notes.as_deref()) {
+            merged.sold_notes = Some(notes.clone());
         }
     }
 
@@ -2055,5 +2367,167 @@ mod tests {
         assert_eq!(alias_fields.len(), 2);
         assert_eq!(alias_fields[0].display_value(), "12");
         assert_eq!(alias_fields[1].display_value(), "true");
+    }
+
+    #[test]
+    fn test_warranty_insured_sold_archived_serde_and_merge() {
+        let null_raw = json!({
+            "id": "ent-null",
+            "name": "Nulls",
+            "archived": null,
+            "insured": null,
+            "lifetimeWarranty": null,
+            "warrantyExpires": null,
+            "warrantyDetails": null,
+            "soldTime": null,
+            "soldTo": null,
+            "soldPrice": null,
+            "soldNotes": null
+        });
+        let null_ent: Entity = serde_json::from_value(null_raw).unwrap();
+        assert_eq!(null_ent.archived, None);
+        assert_eq!(null_ent.insured, None);
+        assert_eq!(null_ent.lifetime_warranty, None);
+        assert_eq!(null_ent.warranty_expires, None);
+        assert_eq!(null_ent.sold_time, None);
+        assert_eq!(null_ent.sold_price, None);
+
+        let snake_raw = json!({
+            "id": "ent-snake",
+            "name": "Camera",
+            "archived": true,
+            "insured": true,
+            "lifetime_warranty": false,
+            "warranty_expires": "2028-06-01T00:00:00Z",
+            "warranty_details": "3yr AppleCare",
+            "soldDate": "2026-10-01",
+            "sold_to": "Alice",
+            "sold_price": 450.5,
+            "sold_notes": "Cash"
+        });
+        let snake_ent: Entity = serde_json::from_value(snake_raw).unwrap();
+        assert_eq!(snake_ent.archived, Some(true));
+        assert_eq!(snake_ent.insured, Some(true));
+        assert_eq!(snake_ent.lifetime_warranty, Some(false));
+        assert_eq!(
+            snake_ent.warranty_expires.as_deref(),
+            Some("2028-06-01T00:00:00Z")
+        );
+        assert_eq!(snake_ent.warranty_details.as_deref(), Some("3yr AppleCare"));
+        assert_eq!(snake_ent.sold_time.as_deref(), Some("2026-10-01"));
+        assert_eq!(snake_ent.sold_to.as_deref(), Some("Alice"));
+        assert_eq!(snake_ent.sold_price, Some(450.5));
+        assert_eq!(snake_ent.sold_notes.as_deref(), Some("Cash"));
+
+        // fill_missing preserves populated values (including `true` bools) and fills blanks/false
+        let existing = Entity {
+            id: "ent-1".into(),
+            name: "Laptop".into(),
+            archived: Some(true),
+            insured: Some(false),
+            lifetime_warranty: Some(false),
+            warranty_expires: Some("2029-01-01".into()),
+            warranty_details: Some("Existing".into()),
+            sold_time: Some("0001-01-01T00:00:00Z".into()),
+            sold_to: Some("   ".into()),
+            sold_price: Some(0.0),
+            sold_notes: None,
+            ..Default::default()
+        };
+        let fill_patch = EntityPatch {
+            archived: Some(false),
+            insured: Some(true),
+            lifetime_warranty: Some(true),
+            warranty_expires: Some("2030-01-01".into()),
+            warranty_details: Some("New".into()),
+            sold_time: Some("2026-11-20".into()),
+            sold_to: Some("Bob".into()),
+            sold_price: Some(900.0),
+            sold_notes: Some("Shipped".into()),
+            fill_missing: true,
+            ..Default::default()
+        };
+        let filled = merge_entity_patch(&existing, &fill_patch);
+        assert_eq!(filled.archived, Some(true)); // preserved true
+        assert_eq!(filled.insured, Some(true)); // filled false -> true
+        assert_eq!(filled.lifetime_warranty, Some(true)); // filled false -> true
+        assert_eq!(filled.warranty_expires.as_deref(), Some("2029-01-01"));
+        assert_eq!(filled.warranty_details.as_deref(), Some("Existing"));
+        assert_eq!(filled.sold_time.as_deref(), Some("2026-11-20"));
+        assert_eq!(filled.sold_to.as_deref(), Some("Bob"));
+        assert_eq!(filled.sold_price, Some(900.0));
+        assert_eq!(filled.sold_notes.as_deref(), Some("Shipped"));
+
+        // Normal merge (fill_missing = false) overwrites true -> false
+        let overwrite_patch = EntityPatch {
+            archived: Some(false),
+            warranty_details: Some("Updated".into()),
+            ..Default::default()
+        };
+        let overwritten = merge_entity_patch(&existing, &overwrite_patch);
+        assert_eq!(overwritten.archived, Some(false));
+        assert_eq!(overwritten.warranty_details.as_deref(), Some("Updated"));
+
+        let req_meta = CreateEntityRequest {
+            name: "Test".into(),
+            insured: Some(true),
+            ..Default::default()
+        };
+        assert!(req_meta.needs_followup_put());
+        let req_plain = CreateEntityRequest {
+            name: "Plain".into(),
+            ..Default::default()
+        };
+        assert!(!req_plain.needs_followup_put());
+    }
+
+    #[test]
+    fn test_parse_ymd_days_and_warranty_expiring_within() {
+        assert_eq!(parse_ymd_days("1970-01-01"), Some(0));
+        assert_eq!(parse_ymd_days("1970-01-02T12:34:56Z"), Some(1));
+        assert!(parse_ymd_days("2024-02-29").is_some()); // leap year
+        assert_eq!(parse_ymd_days("2023-02-29"), None); // non-leap year
+        assert_eq!(parse_ymd_days("0001-01-01T00:00:00Z"), None);
+        assert_eq!(parse_ymd_days("   "), None);
+        assert_eq!(parse_ymd_days("2026-13-01"), None);
+        assert_eq!(parse_ymd_days("bad-date"), None);
+
+        let today = parse_ymd_days("2026-06-01").unwrap();
+        let make = |exp: Option<&str>, lifetime: Option<bool>| Entity {
+            id: "e".into(),
+            name: "E".into(),
+            warranty_expires: exp.map(ToOwned::to_owned),
+            lifetime_warranty: lifetime,
+            ..Default::default()
+        };
+
+        // Boundary: today (0 days) and today + 30 days
+        assert!(entity_warranty_expiring_within(
+            &make(Some("2026-06-01"), None),
+            30,
+            today
+        ));
+        assert!(entity_warranty_expiring_within(
+            &make(Some("2026-07-01T00:00:00Z"), Some(false)),
+            30,
+            today
+        ));
+        // Already expired or beyond window excluded
+        assert!(!entity_warranty_expiring_within(
+            &make(Some("2026-05-31"), None),
+            30,
+            today
+        ));
+        assert!(!entity_warranty_expiring_within(
+            &make(Some("2026-07-02"), None),
+            30,
+            today
+        ));
+        // Lifetime warranty excluded even if warranty_expires is in range
+        assert!(!entity_warranty_expiring_within(
+            &make(Some("2026-06-15"), Some(true)),
+            30,
+            today
+        ));
     }
 }

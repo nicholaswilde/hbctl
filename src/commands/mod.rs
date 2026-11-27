@@ -14,7 +14,7 @@ use std::fs;
 use std::io::{self, Read, Write};
 
 use crate::cli::{Cli, Commands};
-use crate::client::models::Entity;
+use crate::client::models::{is_blank_date, Entity};
 use crate::config::{AppConfig, OutputFormat};
 use crate::error::{HbctlError, Result};
 use crate::output::{
@@ -162,6 +162,51 @@ pub fn render_entity(entity: &Entity, ctx: &OutputContext, out: &mut dyn Write) 
     }
     if let Some(ref from) = entity.purchase_from {
         rows.push(vec!["purchaseFrom".to_string(), from.clone()]);
+    }
+    if entity.archived == Some(true) {
+        rows.push(vec!["archived".to_string(), "true".to_string()]);
+    }
+    if entity.insured == Some(true) {
+        rows.push(vec!["insured".to_string(), "true".to_string()]);
+    }
+    if entity.lifetime_warranty == Some(true) {
+        rows.push(vec!["lifetimeWarranty".to_string(), "true".to_string()]);
+    }
+    if !is_blank_date(entity.warranty_expires.as_deref()) {
+        if let Some(ref exp) = entity.warranty_expires {
+            rows.push(vec!["warrantyExpires".to_string(), exp.clone()]);
+        }
+    }
+    if let Some(ref details) = entity.warranty_details {
+        if !details.trim().is_empty() {
+            rows.push(vec!["warrantyDetails".to_string(), details.clone()]);
+        }
+    }
+    if !is_blank_date(entity.sold_time.as_deref()) {
+        if let Some(ref st) = entity.sold_time {
+            rows.push(vec!["soldTime".to_string(), st.clone()]);
+        }
+    }
+    if let Some(ref to) = entity.sold_to {
+        if !to.trim().is_empty() {
+            rows.push(vec!["soldTo".to_string(), to.clone()]);
+        }
+    }
+    let has_sold_context = entity
+        .sold_to
+        .as_deref()
+        .map(|s| !s.trim().is_empty())
+        .unwrap_or(false)
+        || !is_blank_date(entity.sold_time.as_deref());
+    if let Some(price) = entity.sold_price {
+        if price != 0.0 || has_sold_context {
+            rows.push(vec!["soldPrice".to_string(), format!("{price:.2}")]);
+        }
+    }
+    if let Some(ref notes) = entity.sold_notes {
+        if !notes.trim().is_empty() {
+            rows.push(vec!["soldNotes".to_string(), notes.clone()]);
+        }
     }
     for field in entity.fields_slice() {
         rows.push(vec![format!("field:{}", field.name), field.display_value()]);

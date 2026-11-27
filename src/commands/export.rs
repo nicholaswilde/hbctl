@@ -3,7 +3,7 @@ use std::io::Write;
 use serde_json::{Map, Value};
 
 use crate::cli::{ExportArgs, ExportFormat, ExportSort};
-use crate::client::models::Entity;
+use crate::client::models::{is_blank_date, Entity};
 use crate::client::resolve::Resolver;
 use crate::client::{HomeboxClient, ListEntitiesQuery};
 use crate::config::AppConfig;
@@ -112,6 +112,8 @@ fn is_summary_builtin_column(key: &str) -> bool {
             | "created_at"
             | "updatedat"
             | "updated_at"
+            | "archived"
+            | "insured"
             | "attachments"
     )
 }
@@ -182,6 +184,35 @@ fn extract_column_value(entity: &Entity, key: &str) -> Option<String> {
             .as_deref()
             .filter(|s| !s.trim().is_empty())
             .map(ToOwned::to_owned),
+        "archived" => entity.archived.map(|b| b.to_string()),
+        "insured" => entity.insured.map(|b| b.to_string()),
+        "lifetimewarranty" | "lifetime_warranty" => entity.lifetime_warranty.map(|b| b.to_string()),
+        "warrantyexpires" | "warranty_expires" => entity
+            .warranty_expires
+            .as_deref()
+            .filter(|s| !is_blank_date(Some(s)))
+            .map(|s| s.trim().to_string()),
+        "warrantydetails" | "warranty_details" => entity
+            .warranty_details
+            .as_deref()
+            .filter(|s| !s.trim().is_empty())
+            .map(ToOwned::to_owned),
+        "soldtime" | "sold_time" | "solddate" | "sold_date" => entity
+            .sold_time
+            .as_deref()
+            .filter(|s| !is_blank_date(Some(s)))
+            .map(|s| s.trim().to_string()),
+        "soldto" | "sold_to" => entity
+            .sold_to
+            .as_deref()
+            .filter(|s| !s.trim().is_empty())
+            .map(ToOwned::to_owned),
+        "soldprice" | "sold_price" => entity.sold_price.map(|p| format!("{p:.2}")),
+        "soldnotes" | "sold_notes" => entity
+            .sold_notes
+            .as_deref()
+            .filter(|s| !s.trim().is_empty())
+            .map(ToOwned::to_owned),
         "attachments" => Some(entity.attachments.len().to_string()),
         _ => entity.field_value(trimmed).filter(|v| !v.trim().is_empty()),
     }
@@ -220,15 +251,7 @@ pub fn handle(
         });
     }
 
-    match args.sort {
-        ExportSort::Name => entities.sort_by(|a, b| {
-            a.name
-                .to_ascii_lowercase()
-                .cmp(&b.name.to_ascii_lowercase())
-                .then_with(|| a.id.cmp(&b.id))
-        }),
-        ExportSort::Id => entities.sort_by(|a, b| a.id.cmp(&b.id)),
-    }
+    sort_entities(&mut entities, args.sort);
 
     if ctx.quiet {
         let ids: Vec<String> = entities.iter().map(|e| e.id.clone()).collect();
@@ -296,6 +319,85 @@ pub fn handle(
         ExportFormat::Markdown => {
             write_markdown_table_with_options(&headers, &rows, &export_opts, out)
         }
+    }
+}
+
+fn cmp_name_then_id(a: &Entity, b: &Entity) -> std::cmp::Ordering {
+    a.name
+        .to_ascii_lowercase()
+        .cmp(&b.name.to_ascii_lowercase())
+        .then_with(|| a.id.cmp(&b.id))
+}
+
+fn cmp_opt_str_missing_last(
+    a_val: Option<&str>,
+    b_val: Option<&str>,
+    a: &Entity,
+    b: &Entity,
+) -> std::cmp::Ordering {
+    match (a_val, b_val) {
+        (Some(av), Some(bv)) => av.cmp(bv).then_with(|| cmp_name_then_id(a, b)),
+        (Some(_), None) => std::cmp::Ordering::Less,
+        (None, Some(_)) => std::cmp::Ordering::Greater,
+        (None, None) => cmp_name_then_id(a, b),
+    }
+}
+
+fn sort_entities(entities: &mut [Entity], sort: ExportSort) {
+    match sort {
+        ExportSort::Name => entities.sort_by(cmp_name_then_id),
+        ExportSort::Id => entities.sort_by(|a, b| a.id.cmp(&b.id)),
+        ExportSort::PurchasePrice => entities.sort_by(|a, b| {
+            let ap = a.purchase_price.filter(|p| p.is_finite());
+            let bp = b.purchase_price.filter(|p| p.is_finite());
+            match (ap, bp) {
+                (Some(av), Some(bv)) => av.total_cmp(&bv).then_with(|| cmp_name_then_id(a, b)),
+                (Some(_), None) => std::cmp::Ordering::Less,
+                (None, Some(_)) => std::cmp::Ordering::Greater,
+                (None, None) => cmp_name_then_id(a, b),
+            }
+        }),
+        ExportSort::PurchaseDate => entities.sort_by(|a, b| {
+            let ad = a
+                .purchase_date
+                .as_deref()
+                .map(str::trim)
+                .filter(|s| !is_blank_date(Some(s)));
+            let bd = b
+                .purchase_date
+                .as_deref()
+                .map(str::trim)
+                .filter(|s| !is_blank_date(Some(s)));
+            cmp_opt_str_missing_last(ad, bd, a, b)
+        }),
+        ExportSort::UpdatedAt => entities.sort_by(|a, b| {
+            let au = a
+                .updated_at
+                .as_deref()
+                .map(str::trim)
+                .filter(|s| !is_blank_date(Some(s)));
+            let bu = b
+                .updated_at
+                .as_deref()
+                .map(str::trim)
+                .filter(|s| !is_blank_date(Some(s)));
+            cmp_opt_str_missing_last(au, bu, a, b)
+        }),
+        ExportSort::AssetId => entities.sort_by(|a, b| {
+            let aa = a
+                .asset_id
+                .as_deref()
+                .map(str::trim)
+                .filter(|s| !s.is_empty())
+                .map(str::to_ascii_lowercase);
+            let ba = b
+                .asset_id
+                .as_deref()
+                .map(str::trim)
+                .filter(|s| !s.is_empty())
+                .map(str::to_ascii_lowercase);
+            cmp_opt_str_missing_last(aa.as_deref(), ba.as_deref(), a, b)
+        }),
     }
 }
 
@@ -412,5 +514,119 @@ mod tests {
         );
         assert_eq!(extract_column_value(&ent, "Notes"), None);
         assert_eq!(extract_column_value(&ent, "Missing"), None);
+    }
+
+    #[test]
+    fn test_export_sort_modes_and_warranty_sold_columns() {
+        assert!(is_summary_builtin_column("archived"));
+        assert!(is_summary_builtin_column("insured"));
+        assert!(!is_summary_builtin_column("warrantyExpires"));
+        assert!(!is_summary_builtin_column("soldPrice"));
+
+        let mut e1 = Entity {
+            id: "e-1".into(),
+            name: "Beta".into(),
+            asset_id: Some("000-020".into()),
+            purchase_price: Some(50.0),
+            purchase_date: Some("2025-05-01".into()),
+            updated_at: Some("2026-02-01T10:00:00Z".into()),
+            archived: Some(true),
+            insured: Some(false),
+            lifetime_warranty: Some(false),
+            warranty_expires: Some("2028-01-01".into()),
+            warranty_details: Some("Parts".into()),
+            sold_time: Some("2026-09-01".into()),
+            sold_to: Some("Dana".into()),
+            sold_price: Some(35.0),
+            sold_notes: Some("Used".into()),
+            ..Default::default()
+        };
+        let e2 = Entity {
+            id: "e-2".into(),
+            name: "Alpha".into(),
+            asset_id: Some("000-005".into()),
+            purchase_price: Some(12.5),
+            purchase_date: Some("2024-01-15".into()),
+            updated_at: Some("2026-03-01T10:00:00Z".into()),
+            ..Default::default()
+        };
+        let e3 = Entity {
+            id: "e-3".into(),
+            name: "Gamma".into(),
+            purchase_date: Some("0001-01-01T00:00:00Z".into()),
+            updated_at: None,
+            asset_id: Some("   ".into()),
+            purchase_price: None,
+            ..Default::default()
+        };
+        let mut e4 = Entity {
+            id: "e-4".into(),
+            name: "Aardvark".into(),
+            ..Default::default()
+        };
+
+        assert_eq!(
+            extract_column_value(&e1, "archived").as_deref(),
+            Some("true")
+        );
+        assert_eq!(
+            extract_column_value(&e1, "insured").as_deref(),
+            Some("false")
+        );
+        assert_eq!(
+            extract_column_value(&e1, "lifetimeWarranty").as_deref(),
+            Some("false")
+        );
+        assert_eq!(
+            extract_column_value(&e1, "warrantyExpires").as_deref(),
+            Some("2028-01-01")
+        );
+        assert_eq!(
+            extract_column_value(&e1, "warrantyDetails").as_deref(),
+            Some("Parts")
+        );
+        assert_eq!(
+            extract_column_value(&e1, "soldTime").as_deref(),
+            Some("2026-09-01")
+        );
+        assert_eq!(extract_column_value(&e1, "soldTo").as_deref(), Some("Dana"));
+        assert_eq!(
+            extract_column_value(&e1, "soldPrice").as_deref(),
+            Some("35.00")
+        );
+        assert_eq!(
+            extract_column_value(&e1, "soldNotes").as_deref(),
+            Some("Used")
+        );
+        assert_eq!(extract_column_value(&e3, "warrantyExpires"), None);
+
+        // PurchasePrice: e2 (12.5), e1 (50.0), then missing e4 (Aardvark) before e3 (Gamma)
+        let mut list = vec![e1.clone(), e2.clone(), e3.clone(), e4.clone()];
+        sort_entities(&mut list, ExportSort::PurchasePrice);
+        let ids: Vec<&str> = list.iter().map(|e| e.id.as_str()).collect();
+        assert_eq!(ids, vec!["e-2", "e-1", "e-4", "e-3"]);
+
+        // PurchaseDate: e2 (2024-01-15), e1 (2025-05-01), then missing/zero-date e4 before e3
+        sort_entities(&mut list, ExportSort::PurchaseDate);
+        let ids: Vec<&str> = list.iter().map(|e| e.id.as_str()).collect();
+        assert_eq!(ids, vec!["e-2", "e-1", "e-4", "e-3"]);
+
+        // UpdatedAt: e1 (2026-02-01), e2 (2026-03-01), then missing e4 before e3
+        sort_entities(&mut list, ExportSort::UpdatedAt);
+        let ids: Vec<&str> = list.iter().map(|e| e.id.as_str()).collect();
+        assert_eq!(ids, vec!["e-1", "e-2", "e-4", "e-3"]);
+
+        // AssetId: e2 (000-005), e1 (000-020), then blank/missing e4 before e3
+        sort_entities(&mut list, ExportSort::AssetId);
+        let ids: Vec<&str> = list.iter().map(|e| e.id.as_str()).collect();
+        assert_eq!(ids, vec!["e-2", "e-1", "e-4", "e-3"]);
+
+        // Name tie-breaking
+        e1.purchase_price = Some(f64::NAN);
+        e4.purchase_price = Some(10.0);
+        let mut nan_list = vec![e1, e4];
+        sort_entities(&mut nan_list, ExportSort::PurchasePrice);
+        assert_eq!(nan_list[0].id, "e-4");
+        assert_eq!(nan_list[1].id, "e-1");
     }
 }
