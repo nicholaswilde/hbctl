@@ -316,9 +316,21 @@ pub struct ItemCreateArgs {
     #[arg(long)]
     pub from_json: Option<String>,
 
-    /// Local file path(s) to attach after creating the item (repeatable)
-    #[arg(long = "attach", value_name = "FILE")]
-    pub attach: Vec<PathBuf>,
+    /// Local file path(s) to attach after creating the item (`FILE` or `FILE=REMOTE_NAME`, repeatable)
+    #[arg(long = "attach", value_name = "FILE[=NAME]")]
+    pub attach: Vec<String>,
+
+    /// Remote HTTP(S) URL(s) to download and attach (`URL` or `URL=REMOTE_NAME`, repeatable)
+    #[arg(long = "attach-url", value_name = "URL[=NAME]")]
+    pub attach_url: Vec<String>,
+
+    /// Treat attachment failures as non-fatal warnings and include `attachmentErrors` in JSON output
+    #[arg(long = "attach-best-effort")]
+    pub attach_best_effort: bool,
+
+    /// Automatically resize/compress oversized images before upload
+    #[arg(long)]
+    pub optimize: bool,
 
     /// Allow attaching images larger than 500KB
     #[arg(long)]
@@ -457,6 +469,42 @@ impl fmt::Display for MatchKey {
     }
 }
 
+#[derive(ValueEnum, Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum MatchMode {
+    #[default]
+    Exact,
+    Contains,
+    Fuzzy,
+}
+
+impl fmt::Display for MatchMode {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Exact => f.write_str("exact"),
+            Self::Contains => f.write_str("contains"),
+            Self::Fuzzy => f.write_str("fuzzy"),
+        }
+    }
+}
+
+#[derive(ValueEnum, Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum OnMatchAction {
+    #[default]
+    Update,
+    Skip,
+    AttachOnly,
+}
+
+impl fmt::Display for OnMatchAction {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Update => f.write_str("update"),
+            Self::Skip => f.write_str("skip"),
+            Self::AttachOnly => f.write_str("attach-only"),
+        }
+    }
+}
+
 #[derive(Args, Debug, Clone)]
 pub struct ItemUpsertArgs {
     /// Item name to match or create (required unless supplied via --from-json)
@@ -531,9 +579,29 @@ pub struct ItemUpsertArgs {
     #[arg(long = "match-by", value_name = "KEY", value_delimiter = ',')]
     pub match_by: Vec<MatchKey>,
 
-    /// Local file path(s) to attach after upserting the item (repeatable)
-    #[arg(long = "attach", value_name = "FILE")]
-    pub attach: Vec<PathBuf>,
+    /// Matching strategy for --match-by keys (exact, contains, fuzzy)
+    #[arg(long = "match-mode", value_enum, default_value_t = MatchMode::Exact)]
+    pub match_mode: MatchMode,
+
+    /// Action to take when an existing item matches (update, skip, attach-only)
+    #[arg(long = "on-match", value_enum, default_value_t = OnMatchAction::Update)]
+    pub on_match: OnMatchAction,
+
+    /// Local file path(s) to attach after upserting the item (`FILE` or `FILE=REMOTE_NAME`, repeatable)
+    #[arg(long = "attach", value_name = "FILE[=NAME]")]
+    pub attach: Vec<String>,
+
+    /// Remote HTTP(S) URL(s) to download and attach (`URL` or `URL=REMOTE_NAME`, repeatable)
+    #[arg(long = "attach-url", value_name = "URL[=NAME]")]
+    pub attach_url: Vec<String>,
+
+    /// Treat attachment failures as non-fatal warnings and include `attachmentErrors` in JSON output
+    #[arg(long = "attach-best-effort")]
+    pub attach_best_effort: bool,
+
+    /// Automatically resize/compress oversized images before upload
+    #[arg(long)]
+    pub optimize: bool,
 
     /// Allow attaching images larger than 500KB
     #[arg(long)]
@@ -581,13 +649,21 @@ pub struct ItemImportArgs {
     #[arg(long = "match-by", value_name = "KEY", value_delimiter = ',')]
     pub match_by: Vec<MatchKey>,
 
+    /// Matching strategy for --match-by keys (exact, contains, fuzzy)
+    #[arg(long = "match-mode", value_enum, default_value_t = MatchMode::Exact)]
+    pub match_mode: MatchMode,
+
     /// Default parent item/location name, ID, or 'none' for imported records without one
     #[arg(long)]
     pub parent: Option<String>,
 
-    /// Local file path(s) to attach to each imported item (repeatable)
-    #[arg(long = "attach", value_name = "FILE")]
-    pub attach: Vec<PathBuf>,
+    /// Local file path(s) to attach to each imported item (`FILE` or `FILE=REMOTE_NAME`, repeatable)
+    #[arg(long = "attach", value_name = "FILE[=NAME]")]
+    pub attach: Vec<String>,
+
+    /// Automatically resize/compress oversized images before upload
+    #[arg(long)]
+    pub optimize: bool,
 
     /// Allow attaching images larger than 500KB
     #[arg(long)]
@@ -657,8 +733,12 @@ pub struct AttachmentUploadArgs {
     pub item_id: String,
 
     /// Local file path(s) to upload (or '-' for stdin when combined with --name)
-    #[arg(required = true)]
+    #[arg(required_unless_present = "attach_url")]
     pub files: Vec<PathBuf>,
+
+    /// Remote HTTP(S) URL(s) to download and attach (`URL` or `URL=REMOTE_NAME`, repeatable)
+    #[arg(long = "attach-url", value_name = "URL[=NAME]")]
+    pub attach_url: Vec<String>,
 
     /// Override remote filename/title (for single-file or stdin '-' uploads)
     #[arg(long)]
@@ -671,6 +751,10 @@ pub struct AttachmentUploadArgs {
     /// Delete and re-upload files that already exist on the item
     #[arg(long, conflicts_with = "skip_existing")]
     pub overwrite: bool,
+
+    /// Automatically resize/compress oversized images before upload
+    #[arg(long)]
+    pub optimize: bool,
 
     /// Allow uploading images larger than 500KB
     #[arg(long)]
@@ -761,6 +845,10 @@ pub struct SearchArgs {
     /// Filter by custom field existence (KEY) or substring value (KEY=VAL), case-insensitive (repeatable)
     #[arg(long = "field", value_name = "KEY[=VAL]")]
     pub fields: Vec<String>,
+
+    /// Match items satisfying ANY provided filter (OR) instead of ALL filters (AND)
+    #[arg(long)]
+    pub any: bool,
 }
 
 // -----------------------------------------------------------------------------
@@ -1304,6 +1392,7 @@ mod tests {
         .unwrap();
         match cli.command {
             Commands::Search(a) => {
+                assert!(!a.any);
                 assert_eq!(a.query.as_deref(), Some("meter"));
                 assert_eq!(a.tag.as_deref(), Some("electronics"));
                 assert_eq!(a.manufacturer.as_deref(), Some("Fluke"));
@@ -1313,6 +1402,25 @@ mod tests {
                     a.fields,
                     vec!["ASIN".to_string(), "Order Number=112-99".to_string()]
                 );
+            }
+            other => panic!("unexpected command: {other:?}"),
+        }
+
+        let any_cli = Cli::try_parse_from([
+            "hbctl",
+            "search",
+            "--any",
+            "--model",
+            "ABC",
+            "--field",
+            "Notes=B001",
+        ])
+        .unwrap();
+        match any_cli.command {
+            Commands::Search(a) => {
+                assert!(a.any);
+                assert_eq!(a.model.as_deref(), Some("ABC"));
+                assert_eq!(a.fields, vec!["Notes=B001".to_string()]);
             }
             other => panic!("unexpected command: {other:?}"),
         }
@@ -1454,7 +1562,11 @@ mod tests {
             "--attach",
             "photo.jpg",
             "--attach",
-            "manual.pdf",
+            "/tmp/manual_compressed.pdf=Manual.pdf",
+            "--attach-url",
+            "https://example.com/spec.pdf=Spec.pdf",
+            "--attach-best-effort",
+            "--optimize",
             "--force",
         ])
         .unwrap();
@@ -1464,8 +1576,17 @@ mod tests {
             }) => {
                 assert_eq!(
                     a.attach,
-                    vec![PathBuf::from("photo.jpg"), PathBuf::from("manual.pdf")]
+                    vec![
+                        "photo.jpg".to_string(),
+                        "/tmp/manual_compressed.pdf=Manual.pdf".to_string()
+                    ]
                 );
+                assert_eq!(
+                    a.attach_url,
+                    vec!["https://example.com/spec.pdf=Spec.pdf".to_string()]
+                );
+                assert!(a.attach_best_effort);
+                assert!(a.optimize);
                 assert!(a.force);
             }
             other => panic!("unexpected command: {other:?}"),
@@ -1478,7 +1599,11 @@ mod tests {
             "--name",
             "Board",
             "--attach",
-            "photo.jpg",
+            "photo.jpg=Main.jpg",
+            "--attach-url",
+            "https://example.com/pic.png",
+            "--attach-best-effort",
+            "--optimize",
             "--force",
         ])
         .unwrap();
@@ -1486,7 +1611,13 @@ mod tests {
             Commands::Item(ItemArgs {
                 command: ItemCommands::Upsert(a),
             }) => {
-                assert_eq!(a.attach, vec![PathBuf::from("photo.jpg")]);
+                assert_eq!(a.attach, vec!["photo.jpg=Main.jpg".to_string()]);
+                assert_eq!(
+                    a.attach_url,
+                    vec!["https://example.com/pic.png".to_string()]
+                );
+                assert!(a.attach_best_effort);
+                assert!(a.optimize);
                 assert!(a.force);
             }
             other => panic!("unexpected command: {other:?}"),
@@ -1498,7 +1629,8 @@ mod tests {
             "import",
             "items.json",
             "--attach",
-            "invoice.pdf",
+            "invoice.pdf=Receipt.pdf",
+            "--optimize",
             "--force",
         ])
         .unwrap();
@@ -1506,11 +1638,36 @@ mod tests {
             Commands::Item(ItemArgs {
                 command: ItemCommands::Import(a),
             }) => {
-                assert_eq!(a.attach, vec![PathBuf::from("invoice.pdf")]);
+                assert_eq!(a.attach, vec!["invoice.pdf=Receipt.pdf".to_string()]);
+                assert!(a.optimize);
                 assert!(a.force);
             }
             other => panic!("unexpected command: {other:?}"),
         }
+
+        let upload_url_cli = Cli::try_parse_from([
+            "hbctl",
+            "attachment",
+            "upload",
+            "ent-1",
+            "--attach-url",
+            "https://example.com/a.jpg=Item.jpg",
+        ])
+        .unwrap();
+        match upload_url_cli.command {
+            Commands::Attachment(AttachmentArgs {
+                command: AttachmentCommands::Upload(a),
+            }) => {
+                assert!(a.files.is_empty());
+                assert_eq!(
+                    a.attach_url,
+                    vec!["https://example.com/a.jpg=Item.jpg".to_string()]
+                );
+            }
+            other => panic!("unexpected command: {other:?}"),
+        }
+
+        assert!(Cli::try_parse_from(["hbctl", "attachment", "upload", "ent-1"]).is_err());
 
         let upload_cli = Cli::try_parse_from([
             "hbctl",
@@ -1520,6 +1677,7 @@ mod tests {
             "-",
             "--name",
             "receipt.pdf",
+            "--optimize",
         ])
         .unwrap();
         match upload_cli.command {
@@ -1529,6 +1687,7 @@ mod tests {
                 assert_eq!(a.item_id, "ent-1");
                 assert_eq!(a.files, vec![PathBuf::from("-")]);
                 assert_eq!(a.name.as_deref(), Some("receipt.pdf"));
+                assert!(a.optimize);
             }
             other => panic!("unexpected command: {other:?}"),
         }
@@ -1713,5 +1872,79 @@ mod tests {
 
         let after = Cli::try_parse_from(["hbctl", "auth", "status", "-P", "homelab"]).unwrap();
         assert_eq!(after.profile.as_deref(), Some("homelab"));
+    }
+
+    #[test]
+    fn test_cli_parse_match_mode_and_on_match() {
+        let default_upsert =
+            Cli::try_parse_from(["hbctl", "item", "upsert", "--name", "Lock"]).unwrap();
+        match default_upsert.command {
+            Commands::Item(ItemArgs {
+                command: ItemCommands::Upsert(a),
+            }) => {
+                assert_eq!(a.match_mode, MatchMode::Exact);
+                assert_eq!(a.on_match, OnMatchAction::Update);
+            }
+            other => panic!("unexpected command: {other:?}"),
+        }
+
+        for (mode_arg, mode_val) in [
+            ("exact", MatchMode::Exact),
+            ("contains", MatchMode::Contains),
+            ("fuzzy", MatchMode::Fuzzy),
+        ] {
+            for (action_arg, action_val) in [
+                ("update", OnMatchAction::Update),
+                ("skip", OnMatchAction::Skip),
+                ("attach-only", OnMatchAction::AttachOnly),
+            ] {
+                let parsed = Cli::try_parse_from([
+                    "hbctl",
+                    "item",
+                    "upsert",
+                    "--name",
+                    "Lock",
+                    "--match-mode",
+                    mode_arg,
+                    "--on-match",
+                    action_arg,
+                ])
+                .unwrap();
+                match parsed.command {
+                    Commands::Item(ItemArgs {
+                        command: ItemCommands::Upsert(a),
+                    }) => {
+                        assert_eq!(a.match_mode, mode_val);
+                        assert_eq!(a.on_match, action_val);
+                    }
+                    other => panic!("unexpected command: {other:?}"),
+                }
+            }
+        }
+
+        let import_default =
+            Cli::try_parse_from(["hbctl", "item", "import", "items.json"]).unwrap();
+        match import_default.command {
+            Commands::Item(ItemArgs {
+                command: ItemCommands::Import(a),
+            }) => assert_eq!(a.match_mode, MatchMode::Exact),
+            other => panic!("unexpected command: {other:?}"),
+        }
+
+        let import_fuzzy = Cli::try_parse_from([
+            "hbctl",
+            "item",
+            "import",
+            "items.json",
+            "--match-mode",
+            "fuzzy",
+        ])
+        .unwrap();
+        match import_fuzzy.command {
+            Commands::Item(ItemArgs {
+                command: ItemCommands::Import(a),
+            }) => assert_eq!(a.match_mode, MatchMode::Fuzzy),
+            other => panic!("unexpected command: {other:?}"),
+        }
     }
 }

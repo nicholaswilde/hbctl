@@ -32,6 +32,16 @@
 # HTTP request timeout in seconds for streaming attachment downloads (default: 120).
 # download_timeout_secs = 120
 
+# Automatically resize/compress oversized images (> max_image_kb) before upload (default: false).
+# CLI: --optimize
+# auto_optimize = true
+
+# Maximum image upload size in KB before guard/optimization triggers (default: 500).
+# max_image_kb = 500
+
+# Maximum width/height in pixels when optimizing oversized images (default: 1920).
+# max_image_dimension = 1920
+
 # =============================================================================
 # Named Multi-Instance Profiles
 # =============================================================================

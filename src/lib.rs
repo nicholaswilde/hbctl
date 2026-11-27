@@ -5,6 +5,7 @@ pub mod commands;
 pub mod config;
 pub mod dedup;
 pub mod error;
+pub mod image_opt;
 pub mod output;
 pub mod update;
 

@@ -145,7 +145,7 @@ impl CustomField {
                 extra: BTreeMap::new(),
             }),
             FieldValueType::Number => {
-                let num: f64 = trimmed.parse().map_err(|_| {
+                let num = parse_number_tolerant(trimmed).ok_or_else(|| {
                     HbctlError::InvalidInput(format!(
                         "invalid number '{raw_value}' for field '{name}'"
                     ))
@@ -247,6 +247,70 @@ fn parse_bool_loose(s: &str) -> Option<bool> {
         "false" | "0" | "no" | "n" => Some(false),
         _ => None,
     }
+}
+
+/// Parse a numeric custom field value, tolerating leading currency symbols (`$`, `€`, `£`)
+/// and common trailing unit suffixes (`g`, `kg`, `oz`, `lb`, `V`, `mA`, `%`, etc.).
+pub fn parse_number_tolerant(raw: &str) -> Option<f64> {
+    let trimmed = raw.trim();
+    if trimmed.is_empty() {
+        return None;
+    }
+
+    if let Ok(num) = trimmed.parse::<f64>() {
+        if num.is_finite() {
+            return Some(if num == 0.0 { 0.0 } else { num });
+        }
+        return None;
+    }
+
+    if let Some(rest) = trimmed
+        .strip_prefix('$')
+        .or_else(|| trimmed.strip_prefix('€'))
+        .or_else(|| trimmed.strip_prefix('£'))
+    {
+        let after_sym = rest.trim();
+        if after_sym.is_empty() || after_sym.starts_with(['+', '-']) {
+            return None;
+        }
+        let num: f64 = after_sym.parse().ok()?;
+        if num.is_finite() && num >= 0.0 {
+            return Some(if num == 0.0 { 0.0 } else { num });
+        }
+        return None;
+    }
+
+    let mut split_idx = trimmed.len();
+    for (idx, ch) in trimmed.char_indices().rev() {
+        if ch.is_ascii_alphabetic() || ch == '%' {
+            split_idx = idx;
+        } else {
+            break;
+        }
+    }
+
+    if split_idx == 0 || split_idx == trimmed.len() {
+        return None;
+    }
+
+    let num_part = trimmed[..split_idx].trim();
+    let unit_part = &trimmed[split_idx..];
+    if num_part.is_empty() {
+        return None;
+    }
+
+    let allow_negative = match unit_part.to_ascii_lowercase().as_str() {
+        "g" | "gram" | "grams" | "kg" | "mg" | "oz" | "lb" | "lbs" | "mm" | "cm" | "m" | "in"
+        | "ft" | "ml" | "l" | "w" | "kw" | "hz" | "khz" | "mhz" | "ohm" | "mah" | "wh" => false,
+        "v" | "mv" | "a" | "ma" | "%" => true,
+        _ => return None,
+    };
+
+    let num: f64 = num_part.parse().ok()?;
+    if !num.is_finite() || (!allow_negative && num < 0.0) {
+        return None;
+    }
+    Some(if num == 0.0 { 0.0 } else { num })
 }
 
 /// Homebox auth login / refresh response (`/api/v1/users/login`, `/api/v1/users/refresh`).
@@ -1101,6 +1165,46 @@ mod tests {
         let serialized = serde_json::to_string(&whole).unwrap();
         assert!(serialized.contains("\"numberValue\":38"));
         assert!(!serialized.contains("\"numberValue\":38.0"));
+
+        // Unit-tolerant numeric parsing
+        assert_eq!(parse_number_tolerant("250"), Some(250.0));
+        assert_eq!(parse_number_tolerant("-10"), Some(-10.0));
+        assert_eq!(parse_number_tolerant("250g"), Some(250.0));
+        assert_eq!(parse_number_tolerant("250 G"), Some(250.0));
+        assert_eq!(parse_number_tolerant("490 grams"), Some(490.0));
+        assert_eq!(parse_number_tolerant("2.5kg"), Some(2.5));
+        assert_eq!(parse_number_tolerant("16oz"), Some(16.0));
+        assert_eq!(parse_number_tolerant("5.2 lb"), Some(5.2));
+        assert_eq!(parse_number_tolerant("5.2 lbs"), Some(5.2));
+        assert_eq!(parse_number_tolerant("3.3V"), Some(3.3));
+        assert_eq!(parse_number_tolerant("-3.3V"), Some(-3.3));
+        assert_eq!(parse_number_tolerant("500mA"), Some(500.0));
+        assert_eq!(parse_number_tolerant("100W"), Some(100.0));
+        assert_eq!(parse_number_tolerant("50%"), Some(50.0));
+        assert_eq!(parse_number_tolerant("$19.99"), Some(19.99));
+        assert_eq!(parse_number_tolerant("$ 19.99"), Some(19.99));
+        assert_eq!(parse_number_tolerant("€12.50"), Some(12.5));
+        assert_eq!(parse_number_tolerant("£9.99"), Some(9.99));
+
+        let tare =
+            CustomField::new_typed("Tare Weight (g)", FieldValueType::Number, "250g").unwrap();
+        assert_eq!(tare.number_value, Some(250.0));
+        assert_eq!(tare.display_value(), "250");
+
+        for invalid in [
+            "invalid", "", "   ", "g", "$", "250abc", "$250g", "250 g kg", "-250g", "-10kg",
+            "$-5.00", "-$5.00", "NaN", "inf", "-inf",
+        ] {
+            assert_eq!(
+                parse_number_tolerant(invalid),
+                None,
+                "expected '{invalid}' to fail"
+            );
+            assert!(
+                CustomField::new_typed("Test", FieldValueType::Number, invalid).is_err(),
+                "expected CustomField::new_typed('{invalid}') to fail"
+            );
+        }
 
         // Empty Homebox v0.27+ text field with zero-valued numberValue/booleanValue returns ""
         let empty_text: CustomField = serde_json::from_value(json!({

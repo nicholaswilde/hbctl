@@ -41,7 +41,7 @@ pub enum HbctlError {
     InvalidInput(String),
 
     #[error(
-        "image '{path}' is {size_bytes} bytes (exceeds {max_bytes} byte limit); pass --force to upload anyway"
+        "image '{path}' is {size_bytes} bytes (exceeds {max_bytes} byte limit); pass --optimize to resize/compress or --force to upload anyway"
     )]
     ImageTooLarge {
         path: String,

@@ -8,7 +8,7 @@ use serde_json::{json, Value};
 use crate::cli::{
     ImportFormat, ItemArgs, ItemCommands, ItemCreateArgs, ItemDedupArgs, ItemDeleteArgs,
     ItemGetArgs, ItemImportArgs, ItemListArgs, ItemMoveArgs, ItemTreeArgs, ItemUpdateArgs,
-    ItemUpsertArgs, MatchKey,
+    ItemUpsertArgs, MatchKey, MatchMode, OnMatchAction,
 };
 use crate::client::models::{
     normalize_json_aliases, upsert_custom_fields, CreateEntityRequest, CustomField, Entity,
@@ -17,12 +17,14 @@ use crate::client::models::{
 use crate::client::resolve::Resolver;
 use crate::client::{DryRunRequest, HomeboxClient, ListEntitiesQuery};
 use crate::commands::attachment::{
-    attach_files_to_item, build_attachment_dry_run, validate_local_attachment_paths,
+    attach_targets_to_item, build_target_dry_run, parse_local_attachment_spec,
+    parse_url_attachment_spec, validate_attachment_targets, AttachmentTarget,
 };
 use crate::commands::{read_file_or_stdin, render_entities, render_entity};
 use crate::config::{AppConfig, OutputFormat};
 use crate::dedup;
 use crate::error::{HbctlError, Result};
+use crate::image_opt::ImageOptOptions;
 use crate::output::{
     write_compact_json, write_dry_run, write_quiet_ids, write_table_or_plain, OutputContext,
 };
@@ -119,31 +121,39 @@ struct ParsedItemInput {
     purchase_date: Option<String>,
     purchase_from: Option<String>,
     fields: Vec<CustomField>,
-    attachments: Vec<PathBuf>,
+    attachments: Vec<AttachmentTarget>,
 }
 
-fn merge_unique_paths(target: &mut Vec<PathBuf>, extra: &[PathBuf]) {
-    for p in extra {
-        if !p.as_os_str().is_empty() && !target.contains(p) {
-            target.push(p.clone());
+fn merge_unique_targets(target: &mut Vec<AttachmentTarget>, extra: &[AttachmentTarget]) {
+    for item in extra {
+        if !target.contains(item) {
+            target.push(item.clone());
         }
     }
+}
+
+fn parse_attach_targets(
+    local_specs: &[String],
+    url_specs: &[String],
+) -> Result<Vec<AttachmentTarget>> {
+    let mut targets = Vec::with_capacity(local_specs.len() + url_specs.len());
+    for raw in local_specs {
+        targets.push(parse_local_attachment_spec(raw)?);
+    }
+    for raw in url_specs {
+        targets.push(parse_url_attachment_spec(raw)?);
+    }
+    Ok(targets)
 }
 
 fn attachment_dry_run_previews(
     base_url: &str,
     item_id: &str,
-    paths: &[PathBuf],
+    targets: &[AttachmentTarget],
 ) -> Vec<DryRunRequest> {
-    paths
+    targets
         .iter()
-        .map(|p| {
-            let basename = p
-                .file_name()
-                .and_then(|n| n.to_str())
-                .unwrap_or("attachment");
-            build_attachment_dry_run(base_url, item_id, basename, &p.display().to_string())
-        })
+        .map(|t| build_target_dry_run(base_url, item_id, t))
         .collect()
 }
 
@@ -226,7 +236,7 @@ fn parse_from_json_value(mut val: Value) -> Result<ParsedItemInput> {
         Some(Value::String(s)) => {
             let t = s.trim();
             if !t.is_empty() {
-                input.attachments.push(PathBuf::from(t));
+                input.attachments.push(parse_local_attachment_spec(t)?);
             }
         }
         Some(Value::Array(arr)) => {
@@ -234,7 +244,7 @@ fn parse_from_json_value(mut val: Value) -> Result<ParsedItemInput> {
                 if let Some(s) = v.as_str() {
                     let t = s.trim();
                     if !t.is_empty() {
-                        input.attachments.push(PathBuf::from(t));
+                        input.attachments.push(parse_local_attachment_spec(t)?);
                     }
                 } else if let Some(a_obj) = v.as_object() {
                     if let Some(s) = a_obj
@@ -244,7 +254,20 @@ fn parse_from_json_value(mut val: Value) -> Result<ParsedItemInput> {
                     {
                         let t = s.trim();
                         if !t.is_empty() {
-                            input.attachments.push(PathBuf::from(t));
+                            let remote_name = a_obj
+                                .get("name")
+                                .and_then(Value::as_str)
+                                .map(str::trim)
+                                .filter(|n| !n.is_empty())
+                                .map(ToOwned::to_owned);
+                            if remote_name.is_some() {
+                                input.attachments.push(AttachmentTarget::Local {
+                                    path: PathBuf::from(t),
+                                    remote_name,
+                                });
+                            } else {
+                                input.attachments.push(parse_local_attachment_spec(t)?);
+                            }
                         }
                     }
                 }
@@ -352,8 +375,12 @@ fn handle_create(
         &args.fields,
         args.field_type,
     )?;
-    merge_unique_paths(&mut parsed.attachments, &args.attach);
-    validate_local_attachment_paths(&parsed.attachments, args.force, err)?;
+    let att_opts = ImageOptOptions::from_config(config, args.optimize, args.force);
+    let cli_targets = parse_attach_targets(&args.attach, &args.attach_url)?;
+    merge_unique_targets(&mut parsed.attachments, &cli_targets);
+    if !args.attach_best_effort {
+        validate_attachment_targets(&parsed.attachments, att_opts, err)?;
+    }
 
     let name = parsed
         .name
@@ -427,16 +454,33 @@ fn handle_create(
     };
 
     let mut created = client.create_entity(&req)?;
-    if !parsed.attachments.is_empty() {
-        let uploaded = attach_files_to_item(
+    let attachment_errors = if !parsed.attachments.is_empty() {
+        let (uploaded, errors) = attach_targets_to_item(
             &client,
             &created.id,
             &created.attachments,
             &parsed.attachments,
+            att_opts,
+            args.attach_best_effort,
             err,
         )?;
         created.attachments.extend(uploaded);
+        errors
+    } else {
+        Vec::new()
+    };
+
+    if !attachment_errors.is_empty() && !ctx.quiet && ctx.format == OutputFormat::Json {
+        let mut val = serde_json::to_value(&created)?;
+        if let Some(obj) = val.as_object_mut() {
+            obj.insert(
+                "attachmentErrors".to_string(),
+                serde_json::to_value(&attachment_errors)?,
+            );
+        }
+        return write_compact_json(&val, ctx.select.as_deref(), out);
     }
+
     render_entity(&created, ctx, out)
 }
 
@@ -656,20 +700,61 @@ fn entity_match_value(entity: &Entity, key: &MatchKey) -> Option<String> {
     }
 }
 
+pub const DEFAULT_FUZZY_MATCH_THRESHOLD: f64 = 0.8;
+
 fn find_matching_entity_index(
     candidates: &[Entity],
     input: &ParsedItemInput,
     match_keys: &[MatchKey],
+    mode: MatchMode,
 ) -> Option<usize> {
     for key in match_keys {
         let Some(needle) = input_match_value(input, key) else {
             continue;
         };
+        // Exact normalized match always takes precedence over partial/fuzzy hits.
         if let Some(idx) = candidates
             .iter()
             .position(|e| entity_match_value(e, key).as_deref() == Some(needle.as_str()))
         {
             return Some(idx);
+        }
+        match mode {
+            MatchMode::Exact => {}
+            MatchMode::Contains => {
+                if let Some(idx) = candidates.iter().position(|e| {
+                    entity_match_value(e, key)
+                        .as_deref()
+                        .is_some_and(|h| h.contains(needle.as_str()))
+                }) {
+                    return Some(idx);
+                }
+            }
+            MatchMode::Fuzzy => {
+                let needle_tokens = dedup::normalize_tokens(&needle);
+                if needle_tokens.is_empty() {
+                    continue;
+                }
+                let mut best: Option<(usize, f64)> = None;
+                for (idx, entity) in candidates.iter().enumerate() {
+                    let Some(haystack) = entity_match_value(entity, key) else {
+                        continue;
+                    };
+                    let cand_tokens = dedup::normalize_tokens(&haystack);
+                    if cand_tokens.is_empty() {
+                        continue;
+                    }
+                    let sim = dedup::jaccard_similarity(&needle_tokens, &cand_tokens);
+                    if sim >= DEFAULT_FUZZY_MATCH_THRESHOLD
+                        && best.is_none_or(|(_, best_sim)| sim > best_sim)
+                    {
+                        best = Some((idx, sim));
+                    }
+                }
+                if let Some((idx, _)) = best {
+                    return Some(idx);
+                }
+            }
         }
     }
     None
@@ -732,8 +817,12 @@ fn handle_upsert(
     )?;
 
     let match_keys = effective_match_keys(&args.match_by);
-    merge_unique_paths(&mut parsed.attachments, &args.attach);
-    validate_local_attachment_paths(&parsed.attachments, args.force, err)?;
+    let att_opts = ImageOptOptions::from_config(config, args.optimize, args.force);
+    let cli_targets = parse_attach_targets(&args.attach, &args.attach_url)?;
+    merge_unique_targets(&mut parsed.attachments, &cli_targets);
+    if !args.attach_best_effort {
+        validate_attachment_targets(&parsed.attachments, att_opts, err)?;
+    }
     let has_name = parsed
         .name
         .as_deref()
@@ -750,14 +839,35 @@ fn handle_upsert(
 
     if dry_run {
         let base_url = config.require_base_url()?;
+        let dry_action = match args.on_match {
+            OnMatchAction::Update => "upsert",
+            OnMatchAction::Skip => "skip",
+            OnMatchAction::AttachOnly => "attach-only",
+        };
         let mut body = json!({
-            "action": "upsert",
+            "action": dry_action,
             "name": parsed.name,
             "description": parsed.description,
             "quantity": parsed.quantity,
             "tags": parsed.tags,
             "fields": parsed.fields,
         });
+        if args.on_match != OnMatchAction::Update {
+            if let Some(obj) = body.as_object_mut() {
+                obj.insert(
+                    "onMatch".to_string(),
+                    Value::String(args.on_match.to_string()),
+                );
+            }
+        }
+        if args.match_mode != MatchMode::Exact {
+            if let Some(obj) = body.as_object_mut() {
+                obj.insert(
+                    "matchMode".to_string(),
+                    Value::String(args.match_mode.to_string()),
+                );
+            }
+        }
         if args.fill_missing {
             if let Some(obj) = body.as_object_mut() {
                 obj.insert("fillMissing".to_string(), Value::Bool(true));
@@ -784,30 +894,24 @@ fn handle_upsert(
             "entities",
             Some(body),
         )];
-        previews.extend(attachment_dry_run_previews(
-            base_url,
-            "<item-id>",
-            &parsed.attachments,
-        ));
+        if args.on_match != OnMatchAction::Skip {
+            previews.extend(attachment_dry_run_previews(
+                base_url,
+                "<item-id>",
+                &parsed.attachments,
+            ));
+        }
         return write_dry_run(&previews, ctx, out);
     }
 
     let client = HomeboxClient::from_config(config)?;
     let mut resolver = Resolver::new(&client);
 
-    let tag_ids = resolver.resolve_tag_ids(&parsed.tags, true)?;
-    let entity_type_id = match parsed.entity_type {
-        Some(ref et) => Some(resolver.resolve_entity_type_id(et)?),
-        None => None,
-    };
-    let parent_patch = match parsed.parent {
-        Some(ref p) => Some(resolver.resolve_parent_id(p)?),
-        None => None,
-    };
-
     let candidates = if match_keys_need_hydration(&match_keys) {
         let list = client.list_entities(&ListEntitiesQuery::default(), true)?;
         client.hydrate_entity_fields(list)?
+    } else if args.match_mode != MatchMode::Exact {
+        client.list_entities(&ListEntitiesQuery::default(), true)?
     } else {
         let query = ListEntitiesQuery {
             query: parsed.name.clone(),
@@ -816,30 +920,62 @@ fn handle_upsert(
         client.list_entities(&query, true)?
     };
 
-    let (mut result, action) = if let Some(idx) =
-        find_matching_entity_index(&candidates, &parsed, &match_keys)
-    {
+    let matched_idx =
+        find_matching_entity_index(&candidates, &parsed, &match_keys, args.match_mode);
+
+    let (mut result, action, should_attach) = if let Some(idx) = matched_idx {
         let found = &candidates[idx];
-        let patch = EntityPatch {
-            name: None,
-            description: parsed.description,
-            quantity: parsed.quantity,
-            entity_type_id,
-            parent_id: parent_patch,
-            tag_ids: if tag_ids.is_empty() {
-                None
-            } else {
-                Some(tag_ids)
-            },
-            purchase_price: parsed.purchase_price,
-            purchase_date: parsed.purchase_date,
-            purchase_from: parsed.purchase_from,
-            fields: parsed.fields,
-            fill_missing: args.fill_missing,
-            ..Default::default()
-        };
-        (client.update_entity(&found.id, &patch)?, "updated")
+        match args.on_match {
+            OnMatchAction::Skip => (found.clone(), "skipped", false),
+            OnMatchAction::AttachOnly => {
+                if parsed.attachments.is_empty() {
+                    (found.clone(), "attached", false)
+                } else {
+                    let fresh = client.get_entity(&found.id)?;
+                    (fresh, "attached", true)
+                }
+            }
+            OnMatchAction::Update => {
+                let tag_ids = resolver.resolve_tag_ids(&parsed.tags, true)?;
+                let entity_type_id = match parsed.entity_type {
+                    Some(ref et) => Some(resolver.resolve_entity_type_id(et)?),
+                    None => None,
+                };
+                let parent_patch = match parsed.parent {
+                    Some(ref p) => Some(resolver.resolve_parent_id(p)?),
+                    None => None,
+                };
+                let patch = EntityPatch {
+                    name: None,
+                    description: parsed.description,
+                    quantity: parsed.quantity,
+                    entity_type_id,
+                    parent_id: parent_patch,
+                    tag_ids: if tag_ids.is_empty() {
+                        None
+                    } else {
+                        Some(tag_ids)
+                    },
+                    purchase_price: parsed.purchase_price,
+                    purchase_date: parsed.purchase_date,
+                    purchase_from: parsed.purchase_from,
+                    fields: parsed.fields,
+                    fill_missing: args.fill_missing,
+                    ..Default::default()
+                };
+                (client.update_entity(&found.id, &patch)?, "updated", true)
+            }
+        }
     } else {
+        let tag_ids = resolver.resolve_tag_ids(&parsed.tags, true)?;
+        let entity_type_id = match parsed.entity_type {
+            Some(ref et) => Some(resolver.resolve_entity_type_id(et)?),
+            None => None,
+        };
+        let parent_patch = match parsed.parent {
+            Some(ref p) => Some(resolver.resolve_parent_id(p)?),
+            None => None,
+        };
         let name = parsed
                 .name
                 .filter(|s| !s.trim().is_empty())
@@ -861,19 +997,24 @@ fn handle_upsert(
             purchase_from: parsed.purchase_from,
             fields: parsed.fields,
         };
-        (client.create_entity(&req)?, "created")
+        (client.create_entity(&req)?, "created", true)
     };
 
-    if !parsed.attachments.is_empty() {
-        let uploaded = attach_files_to_item(
+    let attachment_errors = if should_attach && !parsed.attachments.is_empty() {
+        let (uploaded, errors) = attach_targets_to_item(
             &client,
             &result.id,
             &result.attachments,
             &parsed.attachments,
+            att_opts,
+            args.attach_best_effort,
             err,
         )?;
         result.attachments.extend(uploaded);
-    }
+        errors
+    } else {
+        Vec::new()
+    };
 
     writeln!(err, "{action} item '{}' ({})", result.name, result.id)?;
 
@@ -881,6 +1022,12 @@ fn handle_upsert(
         let mut val = serde_json::to_value(&result)?;
         if let Some(obj) = val.as_object_mut() {
             obj.insert("action".to_string(), Value::String(action.to_string()));
+            if !attachment_errors.is_empty() {
+                obj.insert(
+                    "attachmentErrors".to_string(),
+                    serde_json::to_value(&attachment_errors)?,
+                );
+            }
         }
         return write_compact_json(&val, ctx.select.as_deref(), out);
     }
@@ -1023,7 +1170,7 @@ fn parse_csv_import(raw: &str) -> Result<Vec<ParsedItemInput>> {
                     for p in val.split([',', ';']) {
                         let p = p.trim();
                         if !p.is_empty() {
-                            item.attachments.push(PathBuf::from(p));
+                            item.attachments.push(parse_local_attachment_spec(p)?);
                         }
                     }
                 }
@@ -1080,12 +1227,14 @@ fn handle_import(
     let records = parse_import_records(&args.file, args.format)?;
     let match_keys = effective_match_keys(&args.match_by);
 
-    let mut all_attachments: Vec<PathBuf> = Vec::new();
+    let att_opts = ImageOptOptions::from_config(config, args.optimize, args.force);
+    let cli_attachments = parse_attach_targets(&args.attach, &[])?;
+    let mut all_attachments: Vec<AttachmentTarget> = Vec::new();
     for rec in &records {
-        merge_unique_paths(&mut all_attachments, &rec.attachments);
+        merge_unique_targets(&mut all_attachments, &rec.attachments);
     }
-    merge_unique_paths(&mut all_attachments, &args.attach);
-    validate_local_attachment_paths(&all_attachments, args.force, err)?;
+    merge_unique_targets(&mut all_attachments, &cli_attachments);
+    validate_attachment_targets(&all_attachments, att_opts, err)?;
 
     if dry_run {
         let base_url = config.require_base_url()?;
@@ -1109,6 +1258,14 @@ fn handle_import(
                     obj.insert("matchBy".to_string(), json!(keys));
                 }
             }
+            if args.match_mode != MatchMode::Exact {
+                if let Some(obj) = body.as_object_mut() {
+                    obj.insert(
+                        "matchMode".to_string(),
+                        Value::String(args.match_mode.to_string()),
+                    );
+                }
+            }
             if let Some(p) = rec.parent.as_ref().or(args.parent.as_ref()) {
                 if let Some(obj) = body.as_object_mut() {
                     let val = match parse_dry_run_parent(p) {
@@ -1125,7 +1282,7 @@ fn handle_import(
                 Some(body),
             ));
             let mut rec_attachments = rec.attachments.clone();
-            merge_unique_paths(&mut rec_attachments, &args.attach);
+            merge_unique_targets(&mut rec_attachments, &cli_attachments);
             previews.extend(attachment_dry_run_previews(
                 base_url,
                 "<item-id>",
@@ -1158,10 +1315,12 @@ fn handle_import(
 
     for rec in records {
         let mut rec_attachments = rec.attachments.clone();
-        merge_unique_paths(&mut rec_attachments, &args.attach);
+        merge_unique_targets(&mut rec_attachments, &cli_attachments);
 
         if args.skip_existing || args.update_existing {
-            if let Some(idx) = find_matching_entity_index(&existing_entities, &rec, &match_keys) {
+            if let Some(idx) =
+                find_matching_entity_index(&existing_entities, &rec, &match_keys, args.match_mode)
+            {
                 if args.skip_existing {
                     let existing = &existing_entities[idx];
                     writeln!(
@@ -1203,11 +1362,13 @@ fn handle_import(
                     };
                     let mut updated = client.update_entity(&existing_entities[idx].id, &patch)?;
                     if !rec_attachments.is_empty() {
-                        let uploaded = attach_files_to_item(
+                        let (uploaded, _) = attach_targets_to_item(
                             &client,
                             &updated.id,
                             &updated.attachments,
                             &rec_attachments,
+                            att_opts,
+                            false,
                             err,
                         )?;
                         updated.attachments.extend(uploaded);
@@ -1251,11 +1412,13 @@ fn handle_import(
         };
         let mut created = client.create_entity(&req)?;
         if !rec_attachments.is_empty() {
-            let uploaded = attach_files_to_item(
+            let (uploaded, _) = attach_targets_to_item(
                 &client,
                 &created.id,
                 &created.attachments,
                 &rec_attachments,
+                att_opts,
+                false,
                 err,
             )?;
             created.attachments.extend(uploaded);
@@ -1754,7 +1917,7 @@ mod tests {
         };
         let keys = vec![MatchKey::Serial, MatchKey::Model, MatchKey::Name];
         assert_eq!(
-            find_matching_entity_index(&candidates, &input_serial, &keys),
+            find_matching_entity_index(&candidates, &input_serial, &keys, MatchMode::Exact),
             Some(2)
         );
 
@@ -1769,7 +1932,7 @@ mod tests {
             ..Default::default()
         };
         assert_eq!(
-            find_matching_entity_index(&candidates, &input_model, &keys),
+            find_matching_entity_index(&candidates, &input_model, &keys, MatchMode::Exact),
             Some(1)
         );
 
@@ -1782,7 +1945,7 @@ mod tests {
             ..Default::default()
         };
         assert_eq!(
-            find_matching_entity_index(&candidates, &input_name, &keys),
+            find_matching_entity_index(&candidates, &input_name, &keys, MatchMode::Exact),
             Some(0)
         );
 
@@ -1795,7 +1958,8 @@ mod tests {
             find_matching_entity_index(
                 &candidates,
                 &input_blank_sku,
-                &[MatchKey::Field("SKU".into())]
+                &[MatchKey::Field("SKU".into())],
+                MatchMode::Exact
             ),
             None
         );
@@ -1805,8 +1969,149 @@ mod tests {
             ..Default::default()
         };
         assert_eq!(
-            find_matching_entity_index(&candidates, &input_sku, &[MatchKey::Field("SKU".into())]),
+            find_matching_entity_index(
+                &candidates,
+                &input_sku,
+                &[MatchKey::Field("SKU".into())],
+                MatchMode::Exact
+            ),
             Some(1)
+        );
+    }
+
+    #[test]
+    fn test_find_matching_entity_index_contains_and_fuzzy() {
+        let candidates = vec![
+            sample_entity(
+                "ent-lock-full",
+                "Schlage Encode Plus Deadbolt",
+                vec![
+                    CustomField::new_typed("Model Number", FieldValueType::Text, "BE499WB CAM 716")
+                        .unwrap(),
+                    CustomField::new_typed(
+                        "Notes",
+                        FieldValueType::Text,
+                        "Purchased on Amazon (ASIN: B08XYZ1234) front door",
+                    )
+                    .unwrap(),
+                ],
+            ),
+            sample_entity(
+                "ent-lock-exact",
+                "Schlage Lock",
+                vec![
+                    CustomField::new_typed("Model Number", FieldValueType::Text, "BE499WB")
+                        .unwrap(),
+                ],
+            ),
+            sample_entity("ent-bme", "BME280 Breakout Board", vec![]),
+            sample_entity("ent-other", "BME280 Pressure Temperature Humidity", vec![]),
+        ];
+
+        // Exact mode does NOT match substring
+        let partial_model = ParsedItemInput {
+            fields: vec![
+                CustomField::new_typed("Model Number", FieldValueType::Text, "cam 716").unwrap(),
+            ],
+            ..Default::default()
+        };
+        assert_eq!(
+            find_matching_entity_index(
+                &candidates,
+                &partial_model,
+                &[MatchKey::Model],
+                MatchMode::Exact
+            ),
+            None
+        );
+        // Contains mode matches case-insensitive substring
+        assert_eq!(
+            find_matching_entity_index(
+                &candidates,
+                &partial_model,
+                &[MatchKey::Model],
+                MatchMode::Contains
+            ),
+            Some(0)
+        );
+
+        // Exact hit wins over earlier substring hit in Contains mode
+        let exact_model = ParsedItemInput {
+            fields: vec![
+                CustomField::new_typed("Model Number", FieldValueType::Text, "be499wb").unwrap(),
+            ],
+            ..Default::default()
+        };
+        assert_eq!(
+            find_matching_entity_index(
+                &candidates,
+                &exact_model,
+                &[MatchKey::Model],
+                MatchMode::Contains
+            ),
+            Some(1)
+        );
+
+        // Contains mode matches ASIN inside custom field Notes
+        let asin_notes = ParsedItemInput {
+            fields: vec![
+                CustomField::new_typed("Notes", FieldValueType::Text, "b08xyz1234").unwrap(),
+            ],
+            ..Default::default()
+        };
+        assert_eq!(
+            find_matching_entity_index(
+                &candidates,
+                &asin_notes,
+                &[MatchKey::Field("Notes".into())],
+                MatchMode::Contains
+            ),
+            Some(0)
+        );
+
+        // Fuzzy mode matches via dedup::normalize_tokens + Jaccard similarity (>= 0.8)
+        let fuzzy_bme = ParsedItemInput {
+            name: Some("BME280 Sensor Module v2.1".into()),
+            ..Default::default()
+        };
+        assert_eq!(
+            find_matching_entity_index(
+                &candidates,
+                &fuzzy_bme,
+                &[MatchKey::Name],
+                MatchMode::Fuzzy
+            ),
+            Some(2)
+        );
+
+        // Below threshold returns None
+        let unrelated = ParsedItemInput {
+            name: Some("Fluke 87V Multimeter".into()),
+            ..Default::default()
+        };
+        assert_eq!(
+            find_matching_entity_index(
+                &candidates,
+                &unrelated,
+                &[MatchKey::Name],
+                MatchMode::Fuzzy
+            ),
+            None
+        );
+
+        // Stop-word-only input produces empty token set -> no false match
+        let stop_words_only = ParsedItemInput {
+            name: Some("Sensor Module Board".into()),
+            ..Default::default()
+        };
+        assert_eq!(
+            find_matching_entity_index(
+                &candidates,
+                &stop_words_only,
+                &[MatchKey::Name],
+                MatchMode::Fuzzy
+            ),
+            None
         );
     }
 

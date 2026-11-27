@@ -13,15 +13,16 @@ use crate::cli::{
 use crate::client::models::{Attachment, Entity};
 use crate::client::resolve::Resolver;
 use crate::client::{DryRunRequest, HomeboxClient, ListEntitiesQuery};
-use crate::config::{AppConfig, OutputFormat};
+use crate::config::{AppConfig, OutputFormat, DEFAULT_MAX_IMAGE_KB};
 use crate::error::{HbctlError, Result};
+use crate::image_opt::{optimize_attachment_bytes, ImageOptOptions, PreparedImageBytes};
 use crate::output::{
     write_compact_json, write_dry_run, write_quiet_ids, write_selected_table, write_table_or_plain,
     OutputContext,
 };
 
 /// Maximum image size allowed without `--force` (500 KB).
-pub const MAX_IMAGE_SIZE_BYTES: u64 = 500 * 1024;
+pub const MAX_IMAGE_SIZE_BYTES: u64 = DEFAULT_MAX_IMAGE_KB * 1024;
 
 pub fn handle(
     args: &AttachmentArgs,
@@ -47,9 +48,66 @@ struct UploadResult {
     id: Option<String>,
 }
 
+/// Normalized attachment input from `--attach` or `--attach-url`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum AttachmentTarget {
+    Local {
+        path: PathBuf,
+        remote_name: Option<String>,
+    },
+    Url {
+        url: String,
+        remote_name: Option<String>,
+    },
+}
+
+impl AttachmentTarget {
+    pub fn source_label(&self) -> String {
+        match self {
+            Self::Local { path, .. } => path.display().to_string(),
+            Self::Url { url, .. } => url.clone(),
+        }
+    }
+
+    pub fn explicit_name(&self) -> Option<&str> {
+        match self {
+            Self::Local { remote_name, .. } | Self::Url { remote_name, .. } => {
+                remote_name.as_deref()
+            }
+        }
+    }
+
+    pub fn effective_preview_name(&self) -> String {
+        match self {
+            Self::Local { path, remote_name } => remote_name.clone().unwrap_or_else(|| {
+                path.file_name()
+                    .and_then(|n| n.to_str())
+                    .unwrap_or("attachment")
+                    .to_string()
+            }),
+            Self::Url { url, remote_name } => remote_name
+                .clone()
+                .unwrap_or_else(|| derive_url_filename(url, None, None)),
+        }
+    }
+}
+
+/// Non-fatal per-attachment failure recorded when `--attach-best-effort` is enabled.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct AttachmentError {
+    pub source: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+    pub error: String,
+}
+
 enum UploadSource {
     File(PathBuf),
     Stdin(Option<Vec<u8>>),
+    Url {
+        url: String,
+        explicit_name: Option<String>,
+    },
 }
 
 struct PreparedUpload {
@@ -66,51 +124,326 @@ pub fn check_image_size_guard(
     force: bool,
     err: &mut dyn Write,
 ) -> Result<()> {
+    check_image_size_guard_with_opts(
+        display_path,
+        remote_name,
+        size_bytes,
+        ImageOptOptions {
+            optimize: false,
+            force,
+            max_bytes: MAX_IMAGE_SIZE_BYTES,
+            max_dimension: crate::config::DEFAULT_MAX_IMAGE_DIMENSION,
+        },
+        err,
+    )
+}
+
+/// Enforce the configured image size guard unless `--force` or `--optimize` (`auto_optimize`) is enabled.
+pub fn check_image_size_guard_with_opts(
+    display_path: &str,
+    remote_name: &str,
+    size_bytes: u64,
+    opts: ImageOptOptions,
+    err: &mut dyn Write,
+) -> Result<()> {
     let mime = mime_guess::from_path(remote_name).first_or_octet_stream();
-    if mime.type_() == "image" && size_bytes > MAX_IMAGE_SIZE_BYTES {
-        if force {
+    if mime.type_() == "image" && size_bytes > opts.max_bytes {
+        if opts.force {
             writeln!(
                 err,
                 "warning: uploading oversized image '{}' ({} bytes > {} bytes) due to --force",
-                display_path, size_bytes, MAX_IMAGE_SIZE_BYTES
+                display_path, size_bytes, opts.max_bytes
             )?;
-        } else {
+        } else if !opts.optimize {
             return Err(HbctlError::ImageTooLarge {
                 path: display_path.to_string(),
                 size_bytes,
-                max_bytes: MAX_IMAGE_SIZE_BYTES,
+                max_bytes: opts.max_bytes,
             });
         }
     }
     Ok(())
 }
 
-/// Validate local attachment paths and enforce the >500KB image size guard before mutating items.
-pub fn validate_local_attachment_paths(
-    paths: &[PathBuf],
-    force: bool,
+fn prepare_upload_bytes(
+    display_path: &str,
+    remote_name: &str,
+    bytes: Vec<u8>,
+    opts: ImageOptOptions,
     err: &mut dyn Write,
-) -> Result<()> {
-    for path in paths {
-        let meta = fs::metadata(path).map_err(|e| {
-            HbctlError::InvalidInput(format!("cannot read file '{}': {e}", path.display()))
-        })?;
-        let basename = path
-            .file_name()
-            .and_then(|n| n.to_str())
-            .filter(|s| !s.trim().is_empty())
-            .ok_or_else(|| {
-                HbctlError::InvalidInput(format!("invalid file path '{}'", path.display()))
-            })?;
-        check_image_size_guard(
-            &path.display().to_string(),
-            basename,
-            meta.len(),
-            force,
+) -> Result<PreparedImageBytes> {
+    let prepared = optimize_attachment_bytes(display_path, remote_name, bytes, opts)?;
+    if prepared.optimized {
+        let dims = match (prepared.original_dimensions, prepared.final_dimensions) {
+            (Some((ow, oh)), Some((fw, fh))) => format!(" ({ow}x{oh} -> {fw}x{fh})"),
+            _ => String::new(),
+        };
+        let rename = if prepared.remote_name != remote_name {
+            format!(" as '{}'", prepared.remote_name)
+        } else {
+            String::new()
+        };
+        writeln!(
             err,
+            "optimized image '{}'{} from {} to {} bytes{}",
+            display_path,
+            rename,
+            prepared.original_bytes,
+            prepared.bytes.len(),
+            dims
         )?;
     }
+    Ok(prepared)
+}
+
+/// Parse a `--attach <FILE>[=<REMOTE_NAME>]` specification.
+pub fn parse_local_attachment_spec(raw: &str) -> Result<AttachmentTarget> {
+    let trimmed = raw.trim();
+    if trimmed.is_empty() {
+        return Err(HbctlError::InvalidInput(
+            "attachment path cannot be empty".to_string(),
+        ));
+    }
+    if Path::new(trimmed).exists() {
+        return Ok(AttachmentTarget::Local {
+            path: PathBuf::from(trimmed),
+            remote_name: None,
+        });
+    }
+    if let Some((left, right)) = trimmed.rsplit_once('=') {
+        if right.contains(['/', '\\']) && !Path::new(left).exists() {
+            return Ok(AttachmentTarget::Local {
+                path: PathBuf::from(trimmed),
+                remote_name: None,
+            });
+        }
+        if left.trim().is_empty() {
+            return Err(HbctlError::InvalidInput(format!(
+                "invalid attachment spec '{trimmed}': missing file path before '='"
+            )));
+        }
+        let remote_name = validate_custom_name(right)?;
+        return Ok(AttachmentTarget::Local {
+            path: PathBuf::from(left),
+            remote_name: Some(remote_name),
+        });
+    }
+    Ok(AttachmentTarget::Local {
+        path: PathBuf::from(trimmed),
+        remote_name: None,
+    })
+}
+
+/// Parse a `--attach-url <URL>[=<REMOTE_NAME>]` specification safely around query parameters.
+pub fn parse_url_attachment_spec(raw: &str) -> Result<AttachmentTarget> {
+    let trimmed = raw.trim();
+    if trimmed.is_empty() {
+        return Err(HbctlError::InvalidInput(
+            "attachment URL cannot be empty".to_string(),
+        ));
+    }
+
+    let (url_part, name_part) = split_url_and_optional_name(trimmed);
+    let parsed = url::Url::parse(url_part).map_err(|e| {
+        HbctlError::InvalidInput(format!("invalid attachment URL '{url_part}': {e}"))
+    })?;
+    if !matches!(parsed.scheme(), "http" | "https") || parsed.host_str().is_none() {
+        return Err(HbctlError::InvalidInput(format!(
+            "invalid attachment URL '{url_part}': expected http(s) URL with host"
+        )));
+    }
+
+    let remote_name = match name_part {
+        Some(name_raw) => Some(validate_custom_name(name_raw)?),
+        None => None,
+    };
+
+    Ok(AttachmentTarget::Url {
+        url: url_part.to_string(),
+        remote_name,
+    })
+}
+
+fn split_url_and_optional_name(raw: &str) -> (&str, Option<&str>) {
+    let before_frag = raw.split('#').next().unwrap_or(raw);
+    if !before_frag.contains('?') {
+        if let Some((left, right)) = raw.rsplit_once('=') {
+            return (left, Some(right));
+        }
+        return (raw, None);
+    }
+
+    let query_start = before_frag.find('?').expect("checked contains('?')");
+    let query_and_rest = &raw[query_start + 1..];
+    let last_segment = query_and_rest.rsplit('&').next().unwrap_or(query_and_rest);
+    if last_segment.matches('=').count() >= 2 {
+        if let Some((left, right)) = raw.rsplit_once('=') {
+            return (left, Some(right));
+        }
+    }
+    (raw, None)
+}
+
+fn percent_decode(input: &str) -> String {
+    let bytes = input.as_bytes();
+    let mut out = Vec::with_capacity(bytes.len());
+    let mut i = 0;
+    while i < bytes.len() {
+        if bytes[i] == b'%' && i + 2 < bytes.len() {
+            if let Ok(hex) = std::str::from_utf8(&bytes[i + 1..i + 3]) {
+                if let Ok(val) = u8::from_str_radix(hex, 16) {
+                    out.push(val);
+                    i += 3;
+                    continue;
+                }
+            }
+        }
+        out.push(bytes[i]);
+        i += 1;
+    }
+    String::from_utf8_lossy(&out).into_owned()
+}
+
+fn extension_for_mime(mime: &str) -> Option<&'static str> {
+    let clean = mime.split(';').next().unwrap_or(mime).trim();
+    if clean.eq_ignore_ascii_case("image/jpeg") || clean.eq_ignore_ascii_case("image/jpg") {
+        Some("jpg")
+    } else if clean.eq_ignore_ascii_case("image/png") {
+        Some("png")
+    } else if clean.eq_ignore_ascii_case("image/webp") {
+        Some("webp")
+    } else if clean.eq_ignore_ascii_case("image/gif") {
+        Some("gif")
+    } else if clean.eq_ignore_ascii_case("application/pdf") {
+        Some("pdf")
+    } else if clean.eq_ignore_ascii_case("text/plain") {
+        Some("txt")
+    } else {
+        mime_guess::get_mime_extensions_str(clean).and_then(|exts| exts.first().copied())
+    }
+}
+
+fn sanitize_filename_candidate(raw: &str) -> Option<String> {
+    let decoded = percent_decode(raw.trim().trim_matches(['"', '\'']));
+    let leaf = Path::new(&decoded)
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or(&decoded)
+        .replace(['/', '\\'], "_")
+        .trim()
+        .to_string();
+    if leaf.is_empty() || leaf == "." || leaf == ".." {
+        None
+    } else {
+        Some(leaf)
+    }
+}
+
+fn parse_content_disposition_filename(header: &str) -> Option<String> {
+    let mut fallback = None;
+    for part in header.split(';') {
+        let trimmed = part.trim();
+        if let Some((key, val)) = trimmed.split_once('=') {
+            let key_lower = key.trim().to_ascii_lowercase();
+            if key_lower == "filename*" {
+                let raw_val = val.trim().trim_matches('"');
+                let encoded = match raw_val.splitn(3, '\'').nth(2) {
+                    Some(rest) => rest,
+                    None => raw_val,
+                };
+                if let Some(clean) = sanitize_filename_candidate(encoded) {
+                    return Some(clean);
+                }
+            } else if key_lower == "filename" {
+                fallback = sanitize_filename_candidate(val);
+            }
+        }
+    }
+    fallback
+}
+
+/// Derive a clean filename for a remote URL using `Content-Disposition`, URL path, and `Content-Type`.
+pub fn derive_url_filename(
+    url_str: &str,
+    content_disposition: Option<&str>,
+    content_type: Option<&str>,
+) -> String {
+    if let Some(cd) = content_disposition {
+        if let Some(name) = parse_content_disposition_filename(cd) {
+            return name;
+        }
+    }
+
+    if let Ok(parsed) = url::Url::parse(url_str) {
+        if let Some(segment) = parsed
+            .path_segments()
+            .and_then(|mut segs| segs.rfind(|s| !s.trim().is_empty()))
+        {
+            if let Some(mut name) = sanitize_filename_candidate(segment) {
+                let has_ext = Path::new(&name)
+                    .extension()
+                    .and_then(|e| e.to_str())
+                    .is_some_and(|e| !e.is_empty());
+                if !has_ext {
+                    if let Some(ext) = content_type.and_then(extension_for_mime) {
+                        name = format!("{name}.{ext}");
+                    }
+                }
+                return name;
+            }
+        }
+    }
+
+    if let Some(ext) = content_type.and_then(extension_for_mime) {
+        format!("attachment.{ext}")
+    } else {
+        "attachment.bin".to_string()
+    }
+}
+
+/// Validate attachment targets before mutating items (local file readability and image size guard).
+pub fn validate_attachment_targets(
+    targets: &[AttachmentTarget],
+    opts: ImageOptOptions,
+    err: &mut dyn Write,
+) -> Result<()> {
+    for target in targets {
+        if let AttachmentTarget::Local { path, remote_name } = target {
+            let meta = fs::metadata(path).map_err(|e| {
+                HbctlError::InvalidInput(format!("cannot read file '{}': {e}", path.display()))
+            })?;
+            let basename = path
+                .file_name()
+                .and_then(|n| n.to_str())
+                .filter(|s| !s.trim().is_empty())
+                .ok_or_else(|| {
+                    HbctlError::InvalidInput(format!("invalid file path '{}'", path.display()))
+                })?;
+            let effective_name = remote_name.as_deref().unwrap_or(basename);
+            check_image_size_guard_with_opts(
+                &path.display().to_string(),
+                effective_name,
+                meta.len(),
+                opts,
+                err,
+            )?;
+        }
+    }
     Ok(())
+}
+
+/// Build a redacted dry-run preview for uploading an `AttachmentTarget` to `item_id`.
+pub fn build_target_dry_run(
+    base_url: &str,
+    item_id: &str,
+    target: &AttachmentTarget,
+) -> DryRunRequest {
+    build_attachment_dry_run(
+        base_url,
+        item_id,
+        &target.effective_preview_name(),
+        &target.source_label(),
+    )
 }
 
 /// Build a redacted dry-run preview for uploading an attachment to `item_id`.
@@ -133,41 +466,133 @@ pub fn build_attachment_dry_run(
     )
 }
 
-/// Attach local files to an item idempotently, skipping attachments that already exist by name.
-pub fn attach_files_to_item(
+fn attach_single_target(
     client: &HomeboxClient,
     item_id: &str,
-    existing_attachments: &[Attachment],
-    files: &[PathBuf],
+    known: &mut Vec<Attachment>,
+    target: &AttachmentTarget,
+    opts: ImageOptOptions,
     err: &mut dyn Write,
-) -> Result<Vec<Attachment>> {
-    let mut known: Vec<Attachment> = existing_attachments.to_vec();
-    let mut uploaded_all = Vec::new();
+) -> Result<Option<Attachment>> {
+    let (display_source, effective_name, raw_bytes) = match target {
+        AttachmentTarget::Local { path, remote_name } => {
+            let meta = fs::metadata(path).map_err(|e| {
+                HbctlError::InvalidInput(format!("cannot read file '{}': {e}", path.display()))
+            })?;
+            let basename = path
+                .file_name()
+                .and_then(|n| n.to_str())
+                .filter(|s| !s.trim().is_empty())
+                .ok_or_else(|| {
+                    HbctlError::InvalidInput(format!("invalid file path '{}'", path.display()))
+                })?
+                .to_string();
+            let effective = remote_name.clone().unwrap_or(basename);
+            if let Some(prev) = known.iter().find(|a| a.matches_filename(&effective)) {
+                writeln!(
+                    err,
+                    "skipping existing attachment '{}' (id: {})",
+                    effective, prev.id
+                )?;
+                return Ok(None);
+            }
+            let display = path.display().to_string();
+            check_image_size_guard_with_opts(&display, &effective, meta.len(), opts, err)?;
+            let bytes = fs::read(path)?;
+            (display, effective, bytes)
+        }
+        AttachmentTarget::Url { url, remote_name } => {
+            if let Some(ref explicit) = remote_name {
+                if let Some(prev) = known.iter().find(|a| a.matches_filename(explicit)) {
+                    writeln!(
+                        err,
+                        "skipping existing attachment '{}' (id: {})",
+                        explicit, prev.id
+                    )?;
+                    return Ok(None);
+                }
+            }
+            let fetched = client.fetch_remote_url(url)?;
+            let effective = remote_name.clone().unwrap_or_else(|| {
+                derive_url_filename(
+                    &fetched.final_url,
+                    fetched.content_disposition.as_deref(),
+                    fetched.content_type.as_deref(),
+                )
+            });
+            if let Some(prev) = known.iter().find(|a| a.matches_filename(&effective)) {
+                writeln!(
+                    err,
+                    "skipping existing attachment '{}' (id: {})",
+                    effective, prev.id
+                )?;
+                return Ok(None);
+            }
+            check_image_size_guard_with_opts(
+                url,
+                &effective,
+                fetched.bytes.len() as u64,
+                opts,
+                err,
+            )?;
+            (url.clone(), effective, fetched.bytes)
+        }
+    };
 
-    for path in files {
-        let basename = path
-            .file_name()
-            .and_then(|n| n.to_str())
-            .ok_or_else(|| {
-                HbctlError::InvalidInput(format!("invalid file path '{}'", path.display()))
-            })?
-            .to_string();
-
-        if let Some(prev) = known.iter().find(|a| a.matches_filename(&basename)) {
+    let prepared = prepare_upload_bytes(&display_source, &effective_name, raw_bytes, opts, err)?;
+    if prepared.remote_name != effective_name {
+        if let Some(prev) = known
+            .iter()
+            .find(|a| a.matches_filename(&prepared.remote_name))
+        {
             writeln!(
                 err,
                 "skipping existing attachment '{}' (id: {})",
-                basename, prev.id
+                prepared.remote_name, prev.id
             )?;
-            continue;
+            return Ok(None);
         }
-
-        let uploaded = client.upload_attachment(item_id, path)?;
-        known.push(uploaded.clone());
-        uploaded_all.push(uploaded);
     }
 
-    Ok(uploaded_all)
+    let uploaded =
+        client.upload_attachment_bytes(item_id, &prepared.remote_name, prepared.bytes)?;
+    known.push(uploaded.clone());
+    Ok(Some(uploaded))
+}
+
+/// Attach local files or remote URLs to an item idempotently, optionally capturing per-attachment failures when `best_effort` is true.
+pub fn attach_targets_to_item(
+    client: &HomeboxClient,
+    item_id: &str,
+    existing_attachments: &[Attachment],
+    targets: &[AttachmentTarget],
+    opts: ImageOptOptions,
+    best_effort: bool,
+    err: &mut dyn Write,
+) -> Result<(Vec<Attachment>, Vec<AttachmentError>)> {
+    let mut known: Vec<Attachment> = existing_attachments.to_vec();
+    let mut uploaded_all = Vec::new();
+    let mut errors = Vec::new();
+
+    for target in targets {
+        match attach_single_target(client, item_id, &mut known, target, opts, err) {
+            Ok(Some(uploaded)) => uploaded_all.push(uploaded),
+            Ok(None) => {}
+            Err(e) if best_effort => {
+                let source = target.source_label();
+                let msg = e.to_string();
+                writeln!(err, "warning: failed to attach '{source}': {msg}")?;
+                errors.push(AttachmentError {
+                    source,
+                    name: target.explicit_name().map(ToOwned::to_owned),
+                    error: msg,
+                });
+            }
+            Err(e) => return Err(e),
+        }
+    }
+
+    Ok((uploaded_all, errors))
 }
 
 fn validate_custom_name(raw: &str) -> Result<String> {
@@ -193,11 +618,28 @@ fn handle_upload(
     out: &mut dyn Write,
     err: &mut dyn Write,
 ) -> Result<()> {
+    let parsed_urls: Vec<(String, Option<String>)> = args
+        .attach_url
+        .iter()
+        .map(|raw| match parse_url_attachment_spec(raw)? {
+            AttachmentTarget::Url { url, remote_name } => Ok((url, remote_name)),
+            AttachmentTarget::Local { .. } => unreachable!("parse_url_attachment_spec returns Url"),
+        })
+        .collect::<Result<Vec<_>>>()?;
+
+    let total_sources = args.files.len() + parsed_urls.len();
+    if total_sources == 0 {
+        return Err(HbctlError::InvalidInput(
+            "specify at least one file or --attach-url".to_string(),
+        ));
+    }
+
     let custom_name = match args.name {
         Some(ref raw) => {
-            if args.files.len() > 1 {
+            if total_sources > 1 {
                 return Err(HbctlError::InvalidInput(
-                    "--name can only be used when uploading a single file or stdin".to_string(),
+                    "--name can only be used when uploading a single file, URL, or stdin"
+                        .to_string(),
                 ));
             }
             Some(validate_custom_name(raw)?)
@@ -206,13 +648,14 @@ fn handle_upload(
     };
 
     let has_stdin = args.files.iter().any(|p| p.as_os_str() == "-");
-    if has_stdin && args.files.len() > 1 {
+    if has_stdin && total_sources > 1 {
         return Err(HbctlError::InvalidInput(
-            "'-' (stdin) cannot be combined with multiple file arguments".to_string(),
+            "'-' (stdin) cannot be combined with multiple file or URL arguments".to_string(),
         ));
     }
 
-    let mut prepared: Vec<PreparedUpload> = Vec::with_capacity(args.files.len());
+    let opts = ImageOptOptions::from_config(config, args.optimize, args.force);
+    let mut prepared: Vec<PreparedUpload> = Vec::with_capacity(total_sources);
     for path in &args.files {
         if path.as_os_str() == "-" {
             let remote_name = custom_name.clone().ok_or_else(|| {
@@ -225,7 +668,7 @@ fn handle_upload(
             } else {
                 let mut buf = Vec::new();
                 io::stdin().read_to_end(&mut buf)?;
-                check_image_size_guard("-", &remote_name, buf.len() as u64, args.force, err)?;
+                check_image_size_guard_with_opts("-", &remote_name, buf.len() as u64, opts, err)?;
                 Some(buf)
             };
             prepared.push(PreparedUpload {
@@ -245,11 +688,11 @@ fn handle_upload(
                 })?
                 .to_string();
             let remote_name = custom_name.clone().unwrap_or(basename);
-            check_image_size_guard(
+            check_image_size_guard_with_opts(
                 &path.display().to_string(),
                 &remote_name,
                 meta.len(),
-                args.force,
+                opts,
                 err,
             )?;
             prepared.push(PreparedUpload {
@@ -258,6 +701,18 @@ fn handle_upload(
                 source: UploadSource::File(path.clone()),
             });
         }
+    }
+
+    for (url, url_name) in parsed_urls {
+        let explicit_name = custom_name.clone().or(url_name);
+        let preview_name = explicit_name
+            .clone()
+            .unwrap_or_else(|| derive_url_filename(&url, None, None));
+        prepared.push(PreparedUpload {
+            remote_name: preview_name,
+            source_label: url.clone(),
+            source: UploadSource::Url { url, explicit_name },
+        });
     }
 
     if dry_run {
@@ -278,47 +733,159 @@ fn handle_upload(
 
     let client = HomeboxClient::from_config(config)?;
     let existing_entity = client.get_entity(&args.item_id)?;
-    let existing_attachments = existing_entity.attachments;
+    let mut existing_attachments = existing_entity.attachments;
 
     let mut results = Vec::new();
     let mut uploaded_ids = Vec::new();
 
     for item in prepared {
-        let existing = existing_attachments
-            .iter()
-            .find(|a| a.matches_filename(&item.remote_name));
+        let (orig_remote_name, raw_bytes) = match item.source {
+            UploadSource::File(ref path) => {
+                if let Some(prev) = existing_attachments
+                    .iter()
+                    .find(|a| a.matches_filename(&item.remote_name))
+                {
+                    if !args.overwrite {
+                        writeln!(
+                            err,
+                            "skipping existing attachment '{}' (id: {})",
+                            item.remote_name, prev.id
+                        )?;
+                        results.push(UploadResult {
+                            file: item.remote_name,
+                            status: "skipped".to_string(),
+                            id: Some(prev.id.clone()),
+                        });
+                        continue;
+                    }
+                }
+                (item.remote_name.clone(), fs::read(path)?)
+            }
+            UploadSource::Stdin(Some(bytes)) => {
+                if let Some(prev) = existing_attachments
+                    .iter()
+                    .find(|a| a.matches_filename(&item.remote_name))
+                {
+                    if !args.overwrite {
+                        writeln!(
+                            err,
+                            "skipping existing attachment '{}' (id: {})",
+                            item.remote_name, prev.id
+                        )?;
+                        results.push(UploadResult {
+                            file: item.remote_name,
+                            status: "skipped".to_string(),
+                            id: Some(prev.id.clone()),
+                        });
+                        continue;
+                    }
+                }
+                (item.remote_name.clone(), bytes)
+            }
+            UploadSource::Stdin(None) => unreachable!("live stdin upload always buffers bytes"),
+            UploadSource::Url { url, explicit_name } => {
+                if let Some(ref name) = explicit_name {
+                    if let Some(prev) = existing_attachments
+                        .iter()
+                        .find(|a| a.matches_filename(name))
+                    {
+                        if !args.overwrite {
+                            writeln!(
+                                err,
+                                "skipping existing attachment '{}' (id: {})",
+                                name, prev.id
+                            )?;
+                            results.push(UploadResult {
+                                file: name.clone(),
+                                status: "skipped".to_string(),
+                                id: Some(prev.id.clone()),
+                            });
+                            continue;
+                        }
+                    }
+                }
+                let fetched = client.fetch_remote_url(&url)?;
+                let resolved_name = explicit_name.unwrap_or_else(|| {
+                    derive_url_filename(
+                        &fetched.final_url,
+                        fetched.content_disposition.as_deref(),
+                        fetched.content_type.as_deref(),
+                    )
+                });
+                if let Some(prev) = existing_attachments
+                    .iter()
+                    .find(|a| a.matches_filename(&resolved_name))
+                {
+                    if !args.overwrite {
+                        writeln!(
+                            err,
+                            "skipping existing attachment '{}' (id: {})",
+                            resolved_name, prev.id
+                        )?;
+                        results.push(UploadResult {
+                            file: resolved_name,
+                            status: "skipped".to_string(),
+                            id: Some(prev.id.clone()),
+                        });
+                        continue;
+                    }
+                }
+                check_image_size_guard_with_opts(
+                    &url,
+                    &resolved_name,
+                    fetched.bytes.len() as u64,
+                    opts,
+                    err,
+                )?;
+                (resolved_name, fetched.bytes)
+            }
+        };
 
-        if let Some(prev) = existing {
-            if args.overwrite {
-                client.delete_attachment(&args.item_id, &prev.id)?;
-            } else {
-                // Default idempotent behavior (--skip-existing)
+        let orig_existing_id = existing_attachments
+            .iter()
+            .find(|a| a.matches_filename(&orig_remote_name))
+            .map(|a| a.id.clone());
+
+        let prepared_img =
+            prepare_upload_bytes(&item.source_label, &orig_remote_name, raw_bytes, opts, err)?;
+
+        let final_existing_id = existing_attachments
+            .iter()
+            .find(|a| a.matches_filename(&prepared_img.remote_name))
+            .map(|a| a.id.clone());
+
+        if let Some(ref prev_id) = final_existing_id {
+            if !args.overwrite {
                 writeln!(
                     err,
                     "skipping existing attachment '{}' (id: {})",
-                    item.remote_name, prev.id
+                    prepared_img.remote_name, prev_id
                 )?;
                 results.push(UploadResult {
-                    file: item.remote_name,
+                    file: prepared_img.remote_name,
                     status: "skipped".to_string(),
-                    id: Some(prev.id.clone()),
+                    id: Some(prev_id.clone()),
                 });
                 continue;
             }
+            client.delete_attachment(&args.item_id, prev_id)?;
+            existing_attachments.retain(|a| a.id != *prev_id);
+        } else if let Some(ref prev_id) = orig_existing_id {
+            if args.overwrite {
+                client.delete_attachment(&args.item_id, prev_id)?;
+                existing_attachments.retain(|a| a.id != *prev_id);
+            }
         }
 
-        let uploaded = match item.source {
-            UploadSource::File(ref path) => {
-                client.upload_attachment_as(&args.item_id, path, Some(&item.remote_name))?
-            }
-            UploadSource::Stdin(Some(bytes)) => {
-                client.upload_attachment_bytes(&args.item_id, &item.remote_name, bytes)?
-            }
-            UploadSource::Stdin(None) => unreachable!("live stdin upload always buffers bytes"),
-        };
+        let uploaded = client.upload_attachment_bytes(
+            &args.item_id,
+            &prepared_img.remote_name,
+            prepared_img.bytes,
+        )?;
+        existing_attachments.push(uploaded.clone());
         uploaded_ids.push(uploaded.id.clone());
         results.push(UploadResult {
-            file: item.remote_name,
+            file: prepared_img.remote_name,
             status: "uploaded".to_string(),
             id: Some(uploaded.id),
         });
@@ -996,5 +1563,139 @@ mod tests {
         assert_eq!(resolved[2], out_dir.join("dryer_ent-3_manual.pdf"));
         // Non-colliding filename keeps its original name
         assert_eq!(resolved[3], out_dir.join("wiring.png"));
+    }
+
+    #[test]
+    fn test_parse_local_attachment_spec_variants() {
+        // Basic path without rename
+        assert_eq!(
+            parse_local_attachment_spec("/tmp/manual.pdf").unwrap(),
+            AttachmentTarget::Local {
+                path: PathBuf::from("/tmp/manual.pdf"),
+                remote_name: None,
+            }
+        );
+
+        // Path with remote rename
+        assert_eq!(
+            parse_local_attachment_spec("/tmp/foo_compressed.pdf=LG_Manual.pdf").unwrap(),
+            AttachmentTarget::Local {
+                path: PathBuf::from("/tmp/foo_compressed.pdf"),
+                remote_name: Some("LG_Manual.pdf".to_string()),
+            }
+        );
+
+        // Existing literal file containing '=' is preserved untouched
+        let dir = tempfile::tempdir().unwrap();
+        let eq_file = dir.path().join("a=b.pdf");
+        std::fs::write(&eq_file, b"%PDF-1.4").unwrap();
+        assert_eq!(
+            parse_local_attachment_spec(eq_file.to_str().unwrap()).unwrap(),
+            AttachmentTarget::Local {
+                path: eq_file,
+                remote_name: None,
+            }
+        );
+
+        // '=' in parent dir when right side has path separators is preserved
+        assert_eq!(
+            parse_local_attachment_spec("/dir=1/manual.pdf").unwrap(),
+            AttachmentTarget::Local {
+                path: PathBuf::from("/dir=1/manual.pdf"),
+                remote_name: None,
+            }
+        );
+
+        // Empty or invalid remote name fails
+        assert!(parse_local_attachment_spec("/tmp/a.pdf=").is_err());
+        assert!(parse_local_attachment_spec("=a.pdf").is_err());
+        assert!(parse_local_attachment_spec("  ").is_err());
+    }
+
+    #[test]
+    fn test_parse_url_attachment_spec_and_query_params() {
+        assert_eq!(
+            parse_url_attachment_spec("https://example.com/images/photo.jpg").unwrap(),
+            AttachmentTarget::Url {
+                url: "https://example.com/images/photo.jpg".to_string(),
+                remote_name: None,
+            }
+        );
+
+        assert_eq!(
+            parse_url_attachment_spec("https://example.com/dl?id=123&fmt=jpg").unwrap(),
+            AttachmentTarget::Url {
+                url: "https://example.com/dl?id=123&fmt=jpg".to_string(),
+                remote_name: None,
+            }
+        );
+
+        assert_eq!(
+            parse_url_attachment_spec("https://example.com/dl?id=123&fmt=jpg=Product.jpg").unwrap(),
+            AttachmentTarget::Url {
+                url: "https://example.com/dl?id=123&fmt=jpg".to_string(),
+                remote_name: Some("Product.jpg".to_string()),
+            }
+        );
+
+        assert_eq!(
+            parse_url_attachment_spec("https://example.com/manual.pdf=LG_Manual.pdf").unwrap(),
+            AttachmentTarget::Url {
+                url: "https://example.com/manual.pdf".to_string(),
+                remote_name: Some("LG_Manual.pdf".to_string()),
+            }
+        );
+
+        assert!(parse_url_attachment_spec("ftp://example.com/file.pdf").is_err());
+        assert!(parse_url_attachment_spec("https://example.com/a.pdf=bad/name.pdf").is_err());
+    }
+
+    #[test]
+    fn test_derive_url_filename_priority() {
+        // 1. Content-Disposition filename* takes priority over filename and URL path
+        assert_eq!(
+            derive_url_filename(
+                "https://cdn.example.com/blob/1234",
+                Some("attachment; filename=\"fallback.pdf\"; filename*=UTF-8''User%20Manual.pdf"),
+                Some("application/pdf"),
+            ),
+            "User Manual.pdf"
+        );
+
+        // 2. Quoted Content-Disposition filename
+        assert_eq!(
+            derive_url_filename(
+                "https://cdn.example.com/blob/1234",
+                Some("inline; filename=\"datasheet.pdf\""),
+                Some("application/pdf"),
+            ),
+            "datasheet.pdf"
+        );
+
+        // 3. URL path segment with extension
+        assert_eq!(
+            derive_url_filename(
+                "https://cdn.example.com/assets/Product%20Photo.webp?v=2",
+                None,
+                Some("image/webp"),
+            ),
+            "Product Photo.webp"
+        );
+
+        // 4. Extensionless URL segment gains extension from Content-Type
+        assert_eq!(
+            derive_url_filename("https://cdn.example.com/image/42", None, Some("image/jpeg"),),
+            "42.jpg"
+        );
+
+        // 5. Root URL falls back to attachment.<ext> or attachment.bin
+        assert_eq!(
+            derive_url_filename("https://cdn.example.com/", None, Some("application/pdf")),
+            "attachment.pdf"
+        );
+        assert_eq!(
+            derive_url_filename("https://cdn.example.com/", None, None),
+            "attachment.bin"
+        );
     }
 }

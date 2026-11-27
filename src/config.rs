@@ -13,6 +13,9 @@ use crate::error::{HbctlError, Result};
 pub const DEFAULT_TIMEOUT_SECS: u64 = 30;
 pub const DEFAULT_DOWNLOAD_TIMEOUT_SECS: u64 = 120;
 pub const DEFAULT_HOMEBOX_PORT: u16 = 7745;
+pub const DEFAULT_AUTO_OPTIMIZE: bool = false;
+pub const DEFAULT_MAX_IMAGE_KB: u64 = 500;
+pub const DEFAULT_MAX_IMAGE_DIMENSION: u32 = 1920;
 
 /// Output rendering mode for CLI commands.
 #[derive(ValueEnum, Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -89,6 +92,12 @@ pub struct ProfileConfig {
     pub expires_at: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub credential_backend: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub auto_optimize: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub max_image_kb: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub max_image_dimension: Option<u32>,
 }
 
 /// On-disk TOML configuration representation (`.hbctl.toml` or `~/.config/hbctl/config.toml`).
@@ -112,6 +121,12 @@ pub struct ConfigFile {
     pub expires_at: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub credential_backend: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub auto_optimize: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub max_image_kb: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub max_image_dimension: Option<u32>,
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub profiles: BTreeMap<String, ProfileConfig>,
 }
@@ -179,6 +194,9 @@ pub struct AppConfig {
     pub output: OutputFormat,
     pub timeout_secs: u64,
     pub download_timeout_secs: u64,
+    pub auto_optimize: bool,
+    pub max_image_kb: u64,
+    pub max_image_dimension: u32,
 }
 
 impl AppConfig {
@@ -352,6 +370,21 @@ impl AppConfig {
             }
         }
 
+        let max_image_kb = merged.max_image_kb.unwrap_or(DEFAULT_MAX_IMAGE_KB);
+        if max_image_kb == 0 {
+            return Err(HbctlError::Config(
+                "max_image_kb must be greater than 0".to_string(),
+            ));
+        }
+        let max_image_dimension = merged
+            .max_image_dimension
+            .unwrap_or(DEFAULT_MAX_IMAGE_DIMENSION);
+        if max_image_dimension == 0 {
+            return Err(HbctlError::Config(
+                "max_image_dimension must be greater than 0".to_string(),
+            ));
+        }
+
         Ok(Self {
             profile: active_profile,
             base_url,
@@ -366,7 +399,14 @@ impl AppConfig {
             download_timeout_secs: merged
                 .download_timeout_secs
                 .unwrap_or(DEFAULT_DOWNLOAD_TIMEOUT_SECS),
+            auto_optimize: merged.auto_optimize.unwrap_or(DEFAULT_AUTO_OPTIMIZE),
+            max_image_kb,
+            max_image_dimension,
         })
+    }
+
+    pub fn max_image_bytes(&self) -> u64 {
+        self.max_image_kb.saturating_mul(1024)
     }
 
     pub fn require_base_url(&self) -> Result<&str> {
@@ -387,6 +427,15 @@ fn apply_shared_defaults(target: &mut ConfigFile, layer: &ConfigFile) {
     }
     if layer.download_timeout_secs.is_some() {
         target.download_timeout_secs = layer.download_timeout_secs;
+    }
+    if layer.auto_optimize.is_some() {
+        target.auto_optimize = layer.auto_optimize;
+    }
+    if layer.max_image_kb.is_some() {
+        target.max_image_kb = layer.max_image_kb;
+    }
+    if layer.max_image_dimension.is_some() {
+        target.max_image_dimension = layer.max_image_dimension;
     }
 }
 
@@ -417,6 +466,9 @@ fn apply_config_file(
                     token_type: file.token_type,
                     expires_at: file.expires_at,
                     credential_backend: file.credential_backend,
+                    auto_optimize: None,
+                    max_image_kb: None,
+                    max_image_dimension: None,
                 })
             } else {
                 None
@@ -431,6 +483,9 @@ fn apply_config_file(
             token_type: file.token_type,
             expires_at: file.expires_at,
             credential_backend: file.credential_backend,
+            auto_optimize: None,
+            max_image_kb: None,
+            max_image_dimension: None,
         }),
     };
 
@@ -471,6 +526,15 @@ fn apply_profile_layer(
     }
     if layer.credential_backend.is_some() {
         target.credential_backend = layer.credential_backend;
+    }
+    if layer.auto_optimize.is_some() {
+        target.auto_optimize = layer.auto_optimize;
+    }
+    if layer.max_image_kb.is_some() {
+        target.max_image_kb = layer.max_image_kb;
+    }
+    if layer.max_image_dimension.is_some() {
+        target.max_image_dimension = layer.max_image_dimension;
     }
 }
 
@@ -954,6 +1018,99 @@ url = "http://legacy.local:7745"
             &empty_dir,
             Some(&user_cfg),
             Some(&creds),
+        )
+        .is_err());
+    }
+
+    #[test]
+    fn test_image_optimization_config_defaults_layering_and_validation() {
+        let dir = tempdir().unwrap();
+        let empty_dir = dir.path().join("empty");
+        fs::create_dir_all(&empty_dir).unwrap();
+
+        // 1. Defaults when unset
+        let cfg = AppConfig::resolve(
+            &CliConfigOverrides::default(),
+            &HashMap::new(),
+            &empty_dir,
+            None,
+        )
+        .unwrap();
+        assert!(!cfg.auto_optimize);
+        assert_eq!(cfg.max_image_kb, 500);
+        assert_eq!(cfg.max_image_bytes(), 500 * 1024);
+        assert_eq!(cfg.max_image_dimension, 1920);
+
+        // 2. Top-level user config + local config + profile layering
+        let user_cfg = dir.path().join("user.toml");
+        fs::write(
+            &user_cfg,
+            r#"
+auto_optimize = true
+max_image_kb = 400
+max_image_dimension = 1600
+
+[profiles.tight]
+url = "http://tight.local:7745"
+max_image_kb = 250
+"#,
+        )
+        .unwrap();
+
+        let project_dir = dir.path().join("project");
+        fs::create_dir_all(&project_dir).unwrap();
+        fs::write(
+            project_dir.join(".hbctl.toml"),
+            r#"
+max_image_dimension = 1280
+"#,
+        )
+        .unwrap();
+
+        let cfg_local = AppConfig::resolve(
+            &CliConfigOverrides::default(),
+            &HashMap::new(),
+            &project_dir,
+            Some(&user_cfg),
+        )
+        .unwrap();
+        assert!(cfg_local.auto_optimize);
+        assert_eq!(cfg_local.max_image_kb, 400);
+        assert_eq!(cfg_local.max_image_dimension, 1280);
+
+        let cfg_profile = AppConfig::resolve(
+            &CliConfigOverrides {
+                profile: Some("tight".into()),
+                ..Default::default()
+            },
+            &HashMap::new(),
+            &empty_dir,
+            Some(&user_cfg),
+        )
+        .unwrap();
+        assert!(cfg_profile.auto_optimize);
+        assert_eq!(cfg_profile.max_image_kb, 250);
+        assert_eq!(cfg_profile.max_image_bytes(), 250 * 1024);
+        assert_eq!(cfg_profile.max_image_dimension, 1600);
+
+        // 3. Reject zero values for max_image_kb and max_image_dimension
+        let zero_kb = dir.path().join("zero_kb.toml");
+        fs::write(&zero_kb, "max_image_kb = 0\n").unwrap();
+        assert!(AppConfig::resolve(
+            &CliConfigOverrides::default(),
+            &HashMap::new(),
+            &empty_dir,
+            Some(&zero_kb),
+        )
+        .is_err());
+
+        let zero_dim = dir.path().join("zero_dim.toml");
+        fs::write(&zero_dim, "max_image_dimension = 0\n").unwrap();
+        assert!(AppConfig::resolve(
+            &CliConfigOverrides::default(),
+            &HashMap::new(),
+            &empty_dir,
+            Some(&zero_dim),
         )
         .is_err());
     }

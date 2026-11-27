@@ -4419,3 +4419,1485 @@ fn test_multi_instance_profiles_auth_and_isolation() {
     m_st_refresh.assert();
     m_legacy.assert();
 }
+
+fn make_oversized_image(
+    width: u32,
+    height: u32,
+    fmt: image::ImageFormat,
+    with_alpha: bool,
+) -> Vec<u8> {
+    let mut buf = Vec::new();
+    let mut state: u64 = 0x9E37_79B9_7F4A_7C15;
+    if with_alpha {
+        let mut img = image::RgbaImage::new(width, height);
+        for (x, y, px) in img.enumerate_pixels_mut() {
+            state ^= state << 13;
+            state ^= state >> 7;
+            state ^= state << 17;
+            let r = ((state ^ (x as u64 * 17)) & 0xFF) as u8;
+            let g = (((state >> 8) ^ (y as u64 * 31)) & 0xFF) as u8;
+            let b = (((state >> 16) ^ ((x + y) as u64 * 13)) & 0xFF) as u8;
+            let a = if (x + y) % 10 == 0 { 128 } else { 255 };
+            *px = image::Rgba([r, g, b, a]);
+        }
+        image::DynamicImage::ImageRgba8(img)
+            .write_to(&mut std::io::Cursor::new(&mut buf), fmt)
+            .unwrap();
+    } else {
+        let mut img = image::RgbImage::new(width, height);
+        for (x, y, px) in img.enumerate_pixels_mut() {
+            state ^= state << 13;
+            state ^= state >> 7;
+            state ^= state << 17;
+            let r = ((state ^ (x as u64 * 17)) & 0xFF) as u8;
+            let g = (((state >> 8) ^ (y as u64 * 31)) & 0xFF) as u8;
+            let b = (((state >> 16) ^ ((x + y) as u64 * 13)) & 0xFF) as u8;
+            *px = image::Rgb([r, g, b]);
+        }
+        image::DynamicImage::ImageRgb8(img)
+            .write_to(&mut std::io::Cursor::new(&mut buf), fmt)
+            .unwrap();
+    }
+    buf
+}
+
+#[test]
+fn test_attachment_and_item_image_optimization_and_config_defaults() {
+    if !can_execute_binary() {
+        return;
+    }
+    let mut server = Server::new();
+    let tmp = tempdir().unwrap();
+
+    // Generate genuinely >500KB JPEG, RGBA PNG, and WebP fixtures + a >500KB PDF
+    let big_jpg_bytes = make_oversized_image(2000, 1500, image::ImageFormat::Jpeg, false);
+    assert!(big_jpg_bytes.len() > 500 * 1024);
+    let big_jpg = tmp.path().join("photo.jpg");
+    fs::write(&big_jpg, &big_jpg_bytes).unwrap();
+
+    // Smaller-dimension (>500KB) JPEG for fast item create/upsert/import/config subcommand checks
+    let item_jpg_bytes = make_oversized_image(950, 750, image::ImageFormat::Jpeg, false);
+    assert!(item_jpg_bytes.len() > 500 * 1024);
+    let item_jpg = tmp.path().join("item_photo.jpg");
+    fs::write(&item_jpg, &item_jpg_bytes).unwrap();
+
+    let big_png_bytes = make_oversized_image(700, 500, image::ImageFormat::Png, true);
+    assert!(big_png_bytes.len() > 500 * 1024);
+    let big_png = tmp.path().join("alpha.png");
+    fs::write(&big_png, &big_png_bytes).unwrap();
+
+    let big_webp_bytes = make_oversized_image(700, 500, image::ImageFormat::WebP, false);
+    assert!(big_webp_bytes.len() > 500 * 1024);
+    let big_webp = tmp.path().join("scan.webp");
+    fs::write(&big_webp, &big_webp_bytes).unwrap();
+
+    let big_pdf_bytes = vec![b'%'; 540 * 1024];
+    let big_pdf = tmp.path().join("manual.pdf");
+    fs::write(&big_pdf, &big_pdf_bytes).unwrap();
+
+    // 1. attachment upload --optimize handles JPEG, PNG (->JPEG fallback), WebP (<500KB), and untouched PDF (>500KB)
+    let get_ent1 = server
+        .mock("GET", "/api/v1/entities/ent-1")
+        .with_status(200)
+        .with_body(r#"{"id":"ent-1","name":"Camera","quantity":1,"attachments":[]}"#)
+        .expect(3)
+        .create();
+
+    let post_opt_jpg = server
+        .mock("POST", "/api/v1/entities/ent-1/attachments")
+        .match_request(|req| {
+            req.body()
+                .map(|b| {
+                    b.len() <= 500 * 1024 + 1024
+                        && String::from_utf8_lossy(b).contains("filename=\"photo.jpg\"")
+                })
+                .unwrap_or(false)
+        })
+        .with_status(201)
+        .with_body(r#"{"id":"att-jpg","title":"photo.jpg","mimeType":"image/jpeg"}"#)
+        .expect(1)
+        .create();
+
+    let post_opt_png_as_jpg = server
+        .mock("POST", "/api/v1/entities/ent-1/attachments")
+        .match_request(|req| {
+            req.body()
+                .map(|b| {
+                    b.len() <= 500 * 1024 + 1024
+                        && String::from_utf8_lossy(b).contains("filename=\"alpha.jpg\"")
+                })
+                .unwrap_or(false)
+        })
+        .with_status(201)
+        .with_body(r#"{"id":"att-png","title":"alpha.jpg","mimeType":"image/jpeg"}"#)
+        .expect(1)
+        .create();
+
+    let post_opt_webp = server
+        .mock("POST", "/api/v1/entities/ent-1/attachments")
+        .match_request(|req| {
+            req.body()
+                .map(|b| {
+                    b.len() <= 500 * 1024 + 1024
+                        && (String::from_utf8_lossy(b).contains("filename=\"scan.webp\"")
+                            || String::from_utf8_lossy(b).contains("filename=\"scan.jpg\""))
+                })
+                .unwrap_or(false)
+        })
+        .with_status(201)
+        .with_body(r#"{"id":"att-webp","title":"scan.jpg","mimeType":"image/jpeg"}"#)
+        .expect(1)
+        .create();
+
+    let post_untouched_pdf = server
+        .mock("POST", "/api/v1/entities/ent-1/attachments")
+        .match_request(|req| {
+            req.body()
+                .map(|b| {
+                    b.len() >= 540 * 1024
+                        && String::from_utf8_lossy(b).contains("filename=\"manual.pdf\"")
+                })
+                .unwrap_or(false)
+        })
+        .with_status(201)
+        .with_body(r#"{"id":"att-pdf","title":"manual.pdf","mimeType":"application/pdf"}"#)
+        .expect(1)
+        .create();
+
+    let out_opt = hbctl(&server.url())
+        .args([
+            "--json",
+            "attachment",
+            "upload",
+            "ent-1",
+            big_jpg.to_str().unwrap(),
+            big_png.to_str().unwrap(),
+            big_webp.to_str().unwrap(),
+            big_pdf.to_str().unwrap(),
+            "--optimize",
+        ])
+        .assert()
+        .success()
+        .stderr(predicate::str::contains("optimized image"))
+        .get_output()
+        .stdout
+        .clone();
+
+    let parsed_opt: Value = serde_json::from_slice(&out_opt).unwrap();
+    assert_eq!(parsed_opt[0]["file"], "photo.jpg");
+    assert_eq!(parsed_opt[0]["status"], "uploaded");
+    assert_eq!(parsed_opt[1]["file"], "alpha.jpg");
+    assert_eq!(parsed_opt[1]["status"], "uploaded");
+    assert_eq!(parsed_opt[3]["file"], "manual.pdf");
+    assert_eq!(parsed_opt[3]["status"], "uploaded");
+
+    // Source files on disk remain completely untouched
+    assert_eq!(fs::read(&big_jpg).unwrap(), big_jpg_bytes);
+    assert_eq!(fs::read(&big_png).unwrap(), big_png_bytes);
+    assert_eq!(fs::read(&big_webp).unwrap(), big_webp_bytes);
+    assert_eq!(fs::read(&big_pdf).unwrap(), big_pdf_bytes);
+
+    // 2. --optimize --force bypasses optimization and uploads original oversized bytes
+    let post_forced_jpg = server
+        .mock("POST", "/api/v1/entities/ent-1/attachments")
+        .match_request(move |req| {
+            req.body()
+                .map(|b| {
+                    b.len() >= 500 * 1024
+                        && String::from_utf8_lossy(b).contains("filename=\"photo.jpg\"")
+                })
+                .unwrap_or(false)
+        })
+        .with_status(201)
+        .with_body(r#"{"id":"att-force","title":"photo.jpg","mimeType":"image/jpeg"}"#)
+        .expect(1)
+        .create();
+
+    hbctl(&server.url())
+        .args([
+            "--json",
+            "attachment",
+            "upload",
+            "ent-1",
+            big_jpg.to_str().unwrap(),
+            "--optimize",
+            "--force",
+        ])
+        .assert()
+        .success()
+        .stderr(predicate::str::contains("due to --force"));
+
+    // 3. --optimize --dry-run succeeds without network requests or mutating files
+    let dry_out = hbctl("http://127.0.0.1:1")
+        .args([
+            "--json",
+            "attachment",
+            "upload",
+            "ent-1",
+            big_jpg.to_str().unwrap(),
+            "--optimize",
+            "--dry-run",
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let dry_json: Value = serde_json::from_slice(&dry_out).unwrap();
+    assert_eq!(dry_json[0]["method"], "POST");
+    assert_eq!(dry_json[0]["body"]["name"], "photo.jpg");
+
+    // 4. Config file auto_optimize = true works without --optimize CLI flag
+    let cfg_path = tmp.path().join("auto_opt.toml");
+    fs::write(
+        &cfg_path,
+        format!(
+            "url = \"{}\"\napi_key = \"hb_cfg_key\"\nauto_optimize = true\nmax_image_kb = 200\nmax_image_dimension = 1000\n",
+            server.url()
+        ),
+    )
+    .unwrap();
+
+    let post_cfg_jpg = server
+        .mock("POST", "/api/v1/entities/ent-1/attachments")
+        .match_request(|req| {
+            req.body()
+                .map(|b| {
+                    b.len() <= 200 * 1024 + 1024
+                        && String::from_utf8_lossy(b).contains("filename=\"item_photo.jpg\"")
+                })
+                .unwrap_or(false)
+        })
+        .with_status(201)
+        .with_body(r#"{"id":"att-cfg","title":"item_photo.jpg","mimeType":"image/jpeg"}"#)
+        .expect(1)
+        .create();
+
+    let mut cfg_cmd = Command::new(env!("CARGO_BIN_EXE_hbctl"));
+    for var in [
+        "HBCTL_URL",
+        "HBCTL_API_KEY",
+        "HBCTL_OUTPUT",
+        "HBCTL_CONFIG",
+        "HBCTL_PROFILE",
+        "HOMEBOX_URL",
+        "HOMEBOX_IP",
+        "HOMEBOX_API_KEY",
+    ] {
+        cfg_cmd.env_remove(var);
+    }
+    cfg_cmd
+        .env("XDG_CONFIG_HOME", tmp.path().join("empty_xdg"))
+        .args([
+            "-C",
+            cfg_path.to_str().unwrap(),
+            "--json",
+            "attachment",
+            "upload",
+            "ent-1",
+            item_jpg.to_str().unwrap(),
+        ])
+        .assert()
+        .success()
+        .stderr(predicate::str::contains("optimized image"));
+
+    // 5. item create / upsert / import --attach --optimize
+    let post_create = server
+        .mock("POST", "/api/v1/entities")
+        .with_status(201)
+        .with_body(r#"{"id":"ent-created","name":"CreatedItem","quantity":1,"attachments":[]}"#)
+        .expect(2) // create + import
+        .create();
+
+    let post_created_att = server
+        .mock("POST", "/api/v1/entities/ent-created/attachments")
+        .match_request(|req| {
+            req.body()
+                .map(|b| b.len() <= 500 * 1024 + 1024)
+                .unwrap_or(false)
+        })
+        .with_status(201)
+        .with_body(r#"{"id":"att-item-1","title":"item_photo.jpg","mimeType":"image/jpeg"}"#)
+        .expect(2)
+        .create();
+
+    hbctl(&server.url())
+        .args([
+            "--json",
+            "item",
+            "create",
+            "--name",
+            "CreatedItem",
+            "--attach",
+            item_jpg.to_str().unwrap(),
+            "--optimize",
+        ])
+        .assert()
+        .success()
+        .stderr(predicate::str::contains("optimized image"));
+
+    let list_upsert = server
+        .mock("GET", "/api/v1/entities")
+        .match_query(Matcher::Any)
+        .with_status(200)
+        .with_body(
+            r#"{"items":[{"id":"ent-up","name":"UpsertItem","quantity":1,"attachments":[]}]}"#,
+        )
+        .expect(1)
+        .create();
+    let get_up = server
+        .mock("GET", "/api/v1/entities/ent-up")
+        .with_status(200)
+        .with_body(r#"{"id":"ent-up","name":"UpsertItem","quantity":1,"attachments":[]}"#)
+        .expect(1)
+        .create();
+    let put_up = server
+        .mock("PUT", "/api/v1/entities/ent-up")
+        .with_status(200)
+        .with_body(r#"{"id":"ent-up","name":"UpsertItem","quantity":1,"attachments":[]}"#)
+        .expect(1)
+        .create();
+    let post_up_att = server
+        .mock("POST", "/api/v1/entities/ent-up/attachments")
+        .match_request(|req| {
+            req.body()
+                .map(|b| b.len() <= 500 * 1024 + 1024)
+                .unwrap_or(false)
+        })
+        .with_status(201)
+        .with_body(r#"{"id":"att-up-1","title":"item_photo.jpg","mimeType":"image/jpeg"}"#)
+        .expect(1)
+        .create();
+
+    hbctl(&server.url())
+        .args([
+            "--json",
+            "item",
+            "upsert",
+            "--name",
+            "UpsertItem",
+            "--attach",
+            item_jpg.to_str().unwrap(),
+            "--optimize",
+        ])
+        .assert()
+        .success()
+        .stderr(predicate::str::contains("optimized image"));
+
+    let import_json = tmp.path().join("import.json");
+    fs::write(&import_json, r#"[{"name":"CreatedItem","quantity":1}]"#).unwrap();
+    hbctl(&server.url())
+        .args([
+            "--json",
+            "item",
+            "import",
+            import_json.to_str().unwrap(),
+            "--attach",
+            item_jpg.to_str().unwrap(),
+            "--optimize",
+        ])
+        .assert()
+        .success()
+        .stderr(predicate::str::contains("optimized image"));
+
+    assert_eq!(fs::read(&big_jpg).unwrap(), big_jpg_bytes);
+    assert_eq!(fs::read(&item_jpg).unwrap(), item_jpg_bytes);
+
+    get_ent1.assert();
+    post_opt_jpg.assert();
+    post_opt_png_as_jpg.assert();
+    post_opt_webp.assert();
+    post_untouched_pdf.assert();
+    post_forced_jpg.assert();
+    post_cfg_jpg.assert();
+    post_create.assert();
+    post_created_att.assert();
+    list_upsert.assert();
+    get_up.assert();
+    put_up.assert();
+    post_up_att.assert();
+}
+
+#[test]
+fn test_item_upsert_and_import_match_mode_and_on_match() {
+    if !can_execute_binary() {
+        return;
+    }
+    let mut server = Server::new();
+    let tmp = tempdir().unwrap();
+
+    let manual_pdf = tmp.path().join("manual.pdf");
+    fs::write(&manual_pdf, b"%PDF-1.4\nuser manual\n").unwrap();
+
+    // 1. --match-by model --match-mode contains --on-match skip --attach manual.pdf
+    //    Matches "BE499WB CAM 716" via substring "BE499WB"; zero PUTs, zero attachment POSTs.
+    let list_1 = server
+        .mock("GET", "/api/v1/entities")
+        .match_query(Matcher::Any)
+        .with_status(200)
+        .with_body(
+            json!([
+                { "id": "ent-lock", "name": "Schlage Encode Plus", "quantity": 1 }
+            ])
+            .to_string(),
+        )
+        .expect(1)
+        .create();
+    let get_lock_1 = server
+        .mock("GET", "/api/v1/entities/ent-lock")
+        .with_status(200)
+        .with_body(
+            json!({
+                "id": "ent-lock",
+                "name": "Schlage Encode Plus",
+                "quantity": 1,
+                "fields": [
+                    { "id": "f1", "name": "Model Number", "type": "text", "value": "BE499WB CAM 716", "textValue": "BE499WB CAM 716" },
+                    { "id": "f2", "name": "Notes", "type": "text", "value": "Amazon ASIN: B08XYZ1234", "textValue": "Amazon ASIN: B08XYZ1234" }
+                ],
+                "attachments": []
+            })
+            .to_string(),
+        )
+        .expect(1)
+        .create();
+
+    let out_skip = hbctl(&server.url())
+        .args([
+            "--json",
+            "item",
+            "upsert",
+            "--name",
+            "Ignored Name",
+            "--model",
+            "BE499WB",
+            "--match-by",
+            "model",
+            "--match-mode",
+            "contains",
+            "--on-match",
+            "skip",
+            "--attach",
+            manual_pdf.to_str().unwrap(),
+        ])
+        .assert()
+        .success()
+        .stderr(predicate::str::contains(
+            "skipped item 'Schlage Encode Plus' (ent-lock)",
+        ))
+        .get_output()
+        .stdout
+        .clone();
+    let skip_val: Value = serde_json::from_slice(&out_skip).unwrap();
+    assert_eq!(skip_val["id"], "ent-lock");
+    assert_eq!(skip_val["action"], "skipped");
+    list_1.assert();
+    get_lock_1.assert();
+
+    // 2. --field Notes=B08XYZ1234 --match-by field:Notes --match-mode contains --attach manual.pdf --on-match attach-only
+    //    Matches ASIN inside Notes, preserves fields (no PUT), uploads manual.pdf, returns "action": "attached".
+    let list_2 = server
+        .mock("GET", "/api/v1/entities")
+        .match_query(Matcher::Any)
+        .with_status(200)
+        .with_body(
+            json!([
+                { "id": "ent-lock", "name": "Schlage Encode Plus", "quantity": 1 }
+            ])
+            .to_string(),
+        )
+        .expect(1)
+        .create();
+    // 1x hydrate + 1x fresh fetch before attaching
+    let get_lock_2 = server
+        .mock("GET", "/api/v1/entities/ent-lock")
+        .with_status(200)
+        .with_body(
+            json!({
+                "id": "ent-lock",
+                "name": "Schlage Encode Plus",
+                "quantity": 1,
+                "fields": [
+                    { "id": "f2", "name": "Notes", "type": "text", "value": "Amazon ASIN: B08XYZ1234", "textValue": "Amazon ASIN: B08XYZ1234" }
+                ],
+                "attachments": []
+            })
+            .to_string(),
+        )
+        .expect(2)
+        .create();
+    let post_att_2 = server
+        .mock("POST", "/api/v1/entities/ent-lock/attachments")
+        .match_body(Matcher::Regex("filename=\"manual\\.pdf\"".to_string()))
+        .with_status(201)
+        .with_body(
+            json!({"id": "att-manual-1", "title": "manual.pdf", "mimeType": "application/pdf"})
+                .to_string(),
+        )
+        .expect(1)
+        .create();
+
+    let out_attach = hbctl(&server.url())
+        .args([
+            "--json",
+            "item",
+            "upsert",
+            "--field",
+            "Notes=B08XYZ1234",
+            "--match-by",
+            "field:Notes",
+            "--match-mode",
+            "contains",
+            "--attach",
+            manual_pdf.to_str().unwrap(),
+            "--on-match",
+            "attach-only",
+        ])
+        .assert()
+        .success()
+        .stderr(predicate::str::contains(
+            "attached item 'Schlage Encode Plus' (ent-lock)",
+        ))
+        .get_output()
+        .stdout
+        .clone();
+    let attach_val: Value = serde_json::from_slice(&out_attach).unwrap();
+    assert_eq!(attach_val["id"], "ent-lock");
+    assert_eq!(attach_val["action"], "attached");
+    assert_eq!(attach_val["attachments"][0]["id"], "att-manual-1");
+    list_2.assert();
+    get_lock_2.assert();
+    post_att_2.assert();
+
+    // 3. --name "BME280 Sensor Module v2.1" --match-mode fuzzy --on-match skip
+    //    Fetches full list without ?q= filter and fuzzy-matches "BME280 Breakout Board".
+    let list_3 = server
+        .mock("GET", "/api/v1/entities")
+        .match_query(Matcher::Any)
+        .match_request(|req| !req.path_and_query().contains("q="))
+        .with_status(200)
+        .with_body(
+            json!([
+                { "id": "ent-bme", "name": "BME280 Breakout Board", "quantity": 2 }
+            ])
+            .to_string(),
+        )
+        .expect(1)
+        .create();
+
+    let out_fuzzy_skip = hbctl(&server.url())
+        .args([
+            "--json",
+            "item",
+            "upsert",
+            "--name",
+            "BME280 Sensor Module v2.1",
+            "--match-mode",
+            "fuzzy",
+            "--on-match",
+            "skip",
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let fuzzy_skip_val: Value = serde_json::from_slice(&out_fuzzy_skip).unwrap();
+    assert_eq!(fuzzy_skip_val["id"], "ent-bme");
+    assert_eq!(fuzzy_skip_val["action"], "skipped");
+    list_3.assert();
+
+    // 4. --name "Unique New Item" --match-mode fuzzy --on-match skip -> creates item when unmatched
+    let list_4 = server
+        .mock("GET", "/api/v1/entities")
+        .match_query(Matcher::Any)
+        .match_request(|req| !req.path_and_query().contains("q="))
+        .with_status(200)
+        .with_body(
+            json!([
+                { "id": "ent-bme", "name": "BME280 Breakout Board", "quantity": 2 }
+            ])
+            .to_string(),
+        )
+        .expect(1)
+        .create();
+    let post_4 = server
+        .mock("POST", "/api/v1/entities")
+        .match_body(Matcher::Regex(r#""name":"Unique New Item""#.to_string()))
+        .with_status(201)
+        .with_body(
+            json!({"id": "ent-unique", "name": "Unique New Item", "quantity": 1}).to_string(),
+        )
+        .expect(1)
+        .create();
+
+    let out_fuzzy_create = hbctl(&server.url())
+        .args([
+            "--json",
+            "item",
+            "upsert",
+            "--name",
+            "Unique New Item",
+            "--match-mode",
+            "fuzzy",
+            "--on-match",
+            "skip",
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let fuzzy_create_val: Value = serde_json::from_slice(&out_fuzzy_create).unwrap();
+    assert_eq!(fuzzy_create_val["id"], "ent-unique");
+    assert_eq!(fuzzy_create_val["action"], "created");
+    list_4.assert();
+    post_4.assert();
+
+    // 5. --dry-run previews for --on-match skip and --on-match attach-only
+    let dry_skip_out = hbctl("http://127.0.0.1:1")
+        .args([
+            "--json",
+            "item",
+            "upsert",
+            "--name",
+            "Preview Lock",
+            "--match-mode",
+            "contains",
+            "--on-match",
+            "skip",
+            "--attach",
+            manual_pdf.to_str().unwrap(),
+            "--dry-run",
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let dry_skip: Value = serde_json::from_slice(&dry_skip_out).unwrap();
+    let dry_skip_arr = dry_skip.as_array().unwrap();
+    assert_eq!(dry_skip_arr.len(), 1);
+    assert_eq!(dry_skip_arr[0]["body"]["action"], "skip");
+    assert_eq!(dry_skip_arr[0]["body"]["onMatch"], "skip");
+    assert_eq!(dry_skip_arr[0]["body"]["matchMode"], "contains");
+
+    let dry_attach_out = hbctl("http://127.0.0.1:1")
+        .args([
+            "--json",
+            "item",
+            "upsert",
+            "--name",
+            "Preview Lock",
+            "--on-match",
+            "attach-only",
+            "--attach",
+            manual_pdf.to_str().unwrap(),
+            "--dry-run",
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let dry_attach: Value = serde_json::from_slice(&dry_attach_out).unwrap();
+    let dry_attach_arr = dry_attach.as_array().unwrap();
+    assert_eq!(dry_attach_arr.len(), 2);
+    assert_eq!(dry_attach_arr[0]["body"]["action"], "attach-only");
+    assert_eq!(dry_attach_arr[0]["body"]["onMatch"], "attach-only");
+    assert_eq!(dry_attach_arr[1]["method"], "POST");
+
+    // 6. item import with --match-mode contains / fuzzy + --dry-run
+    let import_contains_file = tmp.path().join("import_contains.json");
+    fs::write(
+        &import_contains_file,
+        json!([{"name": "Lock Update", "modelNumber": "BE499WB", "quantity": 4}]).to_string(),
+    )
+    .unwrap();
+
+    let dry_import_out = hbctl("http://127.0.0.1:1")
+        .args([
+            "--json",
+            "item",
+            "import",
+            import_contains_file.to_str().unwrap(),
+            "--update-existing",
+            "--match-by",
+            "model",
+            "--match-mode",
+            "contains",
+            "--dry-run",
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let dry_import: Value = serde_json::from_slice(&dry_import_out).unwrap();
+    assert_eq!(dry_import[0]["body"]["matchMode"], "contains");
+
+    let list_imp_1 = server
+        .mock("GET", "/api/v1/entities")
+        .match_query(Matcher::Any)
+        .with_status(200)
+        .with_body(
+            json!([
+                { "id": "ent-lock", "name": "Schlage Encode Plus", "quantity": 1 }
+            ])
+            .to_string(),
+        )
+        .expect(1)
+        .create();
+    // 1x hydrate + 1x update_entity GET
+    let get_imp_1 = server
+        .mock("GET", "/api/v1/entities/ent-lock")
+        .with_status(200)
+        .with_body(
+            json!({
+                "id": "ent-lock",
+                "name": "Schlage Encode Plus",
+                "quantity": 1,
+                "fields": [
+                    { "id": "f1", "name": "Model Number", "type": "text", "value": "BE499WB CAM 716", "textValue": "BE499WB CAM 716" }
+                ]
+            })
+            .to_string(),
+        )
+        .expect(2)
+        .create();
+    let put_imp_1 = server
+        .mock("PUT", "/api/v1/entities/ent-lock")
+        .match_body(Matcher::Regex(r#""quantity":4"#.to_string()))
+        .with_status(200)
+        .with_body(
+            json!({"id": "ent-lock", "name": "Schlage Encode Plus", "quantity": 4}).to_string(),
+        )
+        .expect(1)
+        .create();
+
+    let out_imp_contains = hbctl(&server.url())
+        .args([
+            "--json",
+            "item",
+            "import",
+            import_contains_file.to_str().unwrap(),
+            "--update-existing",
+            "--match-by",
+            "model",
+            "--match-mode",
+            "contains",
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let imp_contains_val: Value = serde_json::from_slice(&out_imp_contains).unwrap();
+    assert_eq!(imp_contains_val["updated"], 1);
+    list_imp_1.assert();
+    get_imp_1.assert();
+    put_imp_1.assert();
+
+    let import_fuzzy_file = tmp.path().join("import_fuzzy.json");
+    fs::write(
+        &import_fuzzy_file,
+        json!([{"name": "BME280 Sensor Module v2.1", "quantity": 1}]).to_string(),
+    )
+    .unwrap();
+    let list_imp_2 = server
+        .mock("GET", "/api/v1/entities")
+        .match_query(Matcher::Any)
+        .with_status(200)
+        .with_body(
+            json!([
+                { "id": "ent-bme", "name": "BME280 Breakout Board", "quantity": 2 }
+            ])
+            .to_string(),
+        )
+        .expect(1)
+        .create();
+    let out_imp_fuzzy = hbctl(&server.url())
+        .args([
+            "--json",
+            "item",
+            "import",
+            import_fuzzy_file.to_str().unwrap(),
+            "--skip-existing",
+            "--match-mode",
+            "fuzzy",
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let imp_fuzzy_val: Value = serde_json::from_slice(&out_imp_fuzzy).unwrap();
+    assert_eq!(imp_fuzzy_val["skipped"], 1);
+    list_imp_2.assert();
+}
+
+#[test]
+fn test_attach_rename_attach_url_and_best_effort() {
+    if !can_execute_binary() {
+        return;
+    }
+    let mut server = Server::new();
+    let mut ext_server = Server::new();
+    let tmp = tempdir().unwrap();
+
+    let compressed_pdf = tmp.path().join("foo_compressed.pdf");
+    fs::write(&compressed_pdf, b"%PDF-1.4\ncompressed manual\n").unwrap();
+
+    let good_pdf = tmp.path().join("good.pdf");
+    fs::write(&good_pdf, b"%PDF-1.4\ngood file\n").unwrap();
+
+    let missing_pdf = tmp.path().join("does_not_exist.pdf");
+
+    // 1. item create --attach <file>=LG_Manual.pdf
+    let post_create_1 = server
+        .mock("POST", "/api/v1/entities")
+        .with_status(201)
+        .with_body(r#"{"id":"ent-r1","name":"Washer","quantity":1,"attachments":[]}"#)
+        .expect(1)
+        .create();
+    let post_att_r1 = server
+        .mock("POST", "/api/v1/entities/ent-r1/attachments")
+        .match_body(Matcher::AllOf(vec![
+            Matcher::Regex("filename=\"LG_Manual\\.pdf\"".to_string()),
+            Matcher::Regex("compressed manual".to_string()),
+        ]))
+        .with_status(201)
+        .with_body(r#"{"id":"att-r1","title":"LG_Manual.pdf","mimeType":"application/pdf"}"#)
+        .expect(1)
+        .create();
+
+    let rename_spec = format!("{}=LG_Manual.pdf", compressed_pdf.display());
+    let create_out = hbctl(&server.url())
+        .args([
+            "--json",
+            "item",
+            "create",
+            "--name",
+            "Washer",
+            "--attach",
+            &rename_spec,
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let create_val: Value = serde_json::from_slice(&create_out).unwrap();
+    assert_eq!(create_val["attachments"][0]["title"], "LG_Manual.pdf");
+    assert!(create_val.get("attachmentErrors").is_none());
+    post_create_1.assert();
+    post_att_r1.assert();
+
+    // 2. item upsert --attach <file>=LG_Manual.pdf (--dry-run + live)
+    let dry_upsert_out = hbctl("http://127.0.0.1:1")
+        .args([
+            "--json",
+            "item",
+            "upsert",
+            "--name",
+            "Dryer",
+            "--attach",
+            &rename_spec,
+            "--dry-run",
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let dry_upsert_val: Value = serde_json::from_slice(&dry_upsert_out).unwrap();
+    assert_eq!(dry_upsert_val[1]["body"]["name"], "LG_Manual.pdf");
+
+    let list_up_2 = server
+        .mock("GET", "/api/v1/entities")
+        .match_query(Matcher::Any)
+        .with_status(200)
+        .with_body("[]")
+        .expect(1)
+        .create();
+    let post_up_2 = server
+        .mock("POST", "/api/v1/entities")
+        .with_status(201)
+        .with_body(r#"{"id":"ent-r2","name":"Dryer","quantity":1,"attachments":[]}"#)
+        .expect(1)
+        .create();
+    let post_att_r2 = server
+        .mock("POST", "/api/v1/entities/ent-r2/attachments")
+        .match_body(Matcher::Regex("filename=\"LG_Manual\\.pdf\"".to_string()))
+        .with_status(201)
+        .with_body(r#"{"id":"att-r2","title":"LG_Manual.pdf","mimeType":"application/pdf"}"#)
+        .expect(1)
+        .create();
+
+    let upsert_out = hbctl(&server.url())
+        .args([
+            "--json",
+            "item",
+            "upsert",
+            "--name",
+            "Dryer",
+            "--attach",
+            &rename_spec,
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let upsert_val: Value = serde_json::from_slice(&upsert_out).unwrap();
+    assert_eq!(upsert_val["action"], "created");
+    assert_eq!(upsert_val["attachments"][0]["title"], "LG_Manual.pdf");
+    list_up_2.assert();
+    post_up_2.assert();
+    post_att_r2.assert();
+
+    // 3. attachment upload --attach-url follows 302 redirect, omits Homebox Authorization, derives filename
+    let ext_redirect = ext_server
+        .mock("GET", "/redirect-manual")
+        .match_request(|req| !req.has_header("authorization"))
+        .with_status(302)
+        .with_header(
+            "location",
+            &format!("{}/files/Redirected_Manual.pdf", ext_server.url()),
+        )
+        .expect(1)
+        .create();
+    let ext_target = ext_server
+        .mock("GET", "/files/Redirected_Manual.pdf")
+        .match_request(|req| !req.has_header("authorization"))
+        .with_status(200)
+        .with_header("content-type", "application/pdf")
+        .with_body(b"%PDF-1.4\nredirected payload\n")
+        .expect(1)
+        .create();
+    let get_ent_3 = server
+        .mock("GET", "/api/v1/entities/ent-1")
+        .with_status(200)
+        .with_body(r#"{"id":"ent-1","name":"Appliance","quantity":1,"attachments":[]}"#)
+        .expect(4)
+        .create();
+    let post_att_redir = server
+        .mock("POST", "/api/v1/entities/ent-1/attachments")
+        .match_body(Matcher::AllOf(vec![
+            Matcher::Regex("filename=\"Redirected_Manual\\.pdf\"".to_string()),
+            Matcher::Regex("redirected payload".to_string()),
+        ]))
+        .with_status(201)
+        .with_body(
+            r#"{"id":"att-redir","title":"Redirected_Manual.pdf","mimeType":"application/pdf"}"#,
+        )
+        .expect(1)
+        .create();
+
+    let redir_url = format!("{}/redirect-manual", ext_server.url());
+    let redir_out = hbctl(&server.url())
+        .args([
+            "--json",
+            "attachment",
+            "upload",
+            "ent-1",
+            "--attach-url",
+            &redir_url,
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let redir_val: Value = serde_json::from_slice(&redir_out).unwrap();
+    assert_eq!(redir_val[0]["file"], "Redirected_Manual.pdf");
+    assert_eq!(redir_val[0]["status"], "uploaded");
+    ext_redirect.assert();
+    ext_target.assert();
+    post_att_redir.assert();
+
+    // 4. attachment upload --attach-url <url>=Custom_Doc.pdf uses explicit remote name
+    let ext_custom = ext_server
+        .mock("GET", "/raw-blob")
+        .match_request(|req| !req.has_header("authorization"))
+        .with_status(200)
+        .with_header("content-type", "application/pdf")
+        .with_body(b"%PDF-1.4\ncustom doc\n")
+        .expect(1)
+        .create();
+    let post_att_custom = server
+        .mock("POST", "/api/v1/entities/ent-1/attachments")
+        .match_body(Matcher::Regex("filename=\"Custom_Doc\\.pdf\"".to_string()))
+        .with_status(201)
+        .with_body(r#"{"id":"att-cust","title":"Custom_Doc.pdf","mimeType":"application/pdf"}"#)
+        .expect(1)
+        .create();
+
+    let custom_url_spec = format!("{}/raw-blob=Custom_Doc.pdf", ext_server.url());
+    let custom_out = hbctl(&server.url())
+        .args([
+            "--json",
+            "attachment",
+            "upload",
+            "ent-1",
+            "--attach-url",
+            &custom_url_spec,
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let custom_val: Value = serde_json::from_slice(&custom_out).unwrap();
+    assert_eq!(custom_val[0]["file"], "Custom_Doc.pdf");
+    ext_custom.assert();
+    post_att_custom.assert();
+
+    // 5. --attach-url with oversized image (>500KB): fails without --optimize/--force, succeeds with --optimize
+    let big_img_bytes = make_oversized_image(950, 750, image::ImageFormat::Jpeg, false);
+    assert!(big_img_bytes.len() > 500 * 1024);
+    let ext_big_img = ext_server
+        .mock("GET", "/big-photo.jpg")
+        .with_status(200)
+        .with_header("content-type", "image/jpeg")
+        .with_body(big_img_bytes)
+        .expect(2)
+        .create();
+    let post_att_opt = server
+        .mock("POST", "/api/v1/entities/ent-1/attachments")
+        .match_request(|req| {
+            req.body()
+                .map(|b| {
+                    b.len() <= 500 * 1024 + 1024
+                        && String::from_utf8_lossy(b).contains("filename=\"big-photo.jpg\"")
+                })
+                .unwrap_or(false)
+        })
+        .with_status(201)
+        .with_body(r#"{"id":"att-url-opt","title":"big-photo.jpg","mimeType":"image/jpeg"}"#)
+        .expect(1)
+        .create();
+
+    let big_img_url = format!("{}/big-photo.jpg", ext_server.url());
+    hbctl(&server.url())
+        .args([
+            "attachment",
+            "upload",
+            "ent-1",
+            "--attach-url",
+            &big_img_url,
+        ])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("exceeds"));
+
+    hbctl(&server.url())
+        .args([
+            "--json",
+            "attachment",
+            "upload",
+            "ent-1",
+            "--attach-url",
+            &big_img_url,
+            "--optimize",
+        ])
+        .assert()
+        .success()
+        .stderr(predicate::str::contains("optimized image"));
+
+    ext_big_img.assert();
+    get_ent_3.assert();
+    post_att_opt.assert();
+
+    // 6. --attach-url with --dry-run works offline on attachment upload and item create
+    let dry_url_upload = hbctl("http://127.0.0.1:1")
+        .args([
+            "--json",
+            "attachment",
+            "upload",
+            "ent-1",
+            "--attach-url",
+            "https://offline.example.test/files/Guide.pdf",
+            "--dry-run",
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let dry_url_up_val: Value = serde_json::from_slice(&dry_url_upload).unwrap();
+    assert_eq!(dry_url_up_val[0]["body"]["name"], "Guide.pdf");
+    assert_eq!(
+        dry_url_up_val[0]["body"]["file"],
+        "https://offline.example.test/files/Guide.pdf"
+    );
+
+    let dry_url_create = hbctl("http://127.0.0.1:1")
+        .args([
+            "--json",
+            "item",
+            "create",
+            "--name",
+            "Offline Item",
+            "--attach-url",
+            "https://offline.example.test/files/Guide.pdf=Renamed_Guide.pdf",
+            "--dry-run",
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let dry_url_cr_val: Value = serde_json::from_slice(&dry_url_create).unwrap();
+    assert_eq!(dry_url_cr_val[1]["body"]["name"], "Renamed_Guide.pdf");
+
+    // 7. item create --attach <missing.pdf> --attach <good.pdf> --attach-best-effort
+    let post_create_be = server
+        .mock("POST", "/api/v1/entities")
+        .with_status(201)
+        .with_body(r#"{"id":"ent-be-1","name":"BestEffortCreate","quantity":1,"attachments":[]}"#)
+        .expect(1)
+        .create();
+    let post_att_good = server
+        .mock("POST", "/api/v1/entities/ent-be-1/attachments")
+        .match_body(Matcher::Regex("filename=\"good\\.pdf\"".to_string()))
+        .with_status(201)
+        .with_body(r#"{"id":"att-good","title":"good.pdf","mimeType":"application/pdf"}"#)
+        .expect(1)
+        .create();
+
+    let be_create_out = hbctl(&server.url())
+        .args([
+            "--json",
+            "item",
+            "create",
+            "--name",
+            "BestEffortCreate",
+            "--attach",
+            missing_pdf.to_str().unwrap(),
+            "--attach",
+            good_pdf.to_str().unwrap(),
+            "--attach-best-effort",
+        ])
+        .assert()
+        .success()
+        .stderr(predicate::str::contains("warning: failed to attach"))
+        .get_output()
+        .stdout
+        .clone();
+    let be_create_val: Value = serde_json::from_slice(&be_create_out).unwrap();
+    assert_eq!(be_create_val["id"], "ent-be-1");
+    assert_eq!(be_create_val["attachments"][0]["id"], "att-good");
+    assert_eq!(
+        be_create_val["attachmentErrors"].as_array().unwrap().len(),
+        1
+    );
+    assert_eq!(
+        be_create_val["attachmentErrors"][0]["source"],
+        missing_pdf.display().to_string()
+    );
+    post_create_be.assert();
+    post_att_good.assert();
+
+    // 8. item upsert --attach-url <404-url> --attach-best-effort
+    let ext_404 = ext_server
+        .mock("GET", "/missing-image.png")
+        .with_status(404)
+        .with_body("not found")
+        .expect(1)
+        .create();
+    let list_up_be = server
+        .mock("GET", "/api/v1/entities")
+        .match_query(Matcher::Any)
+        .with_status(200)
+        .with_body("[]")
+        .expect(1)
+        .create();
+    let post_up_be = server
+        .mock("POST", "/api/v1/entities")
+        .with_status(201)
+        .with_body(r#"{"id":"ent-be-2","name":"BestEffortUpsert","quantity":1,"attachments":[]}"#)
+        .expect(1)
+        .create();
+
+    let url_404 = format!("{}/missing-image.png", ext_server.url());
+    let be_upsert_out = hbctl(&server.url())
+        .args([
+            "--json",
+            "item",
+            "upsert",
+            "--name",
+            "BestEffortUpsert",
+            "--attach-url",
+            &url_404,
+            "--attach-best-effort",
+        ])
+        .assert()
+        .success()
+        .stderr(predicate::str::contains("warning: failed to attach"))
+        .get_output()
+        .stdout
+        .clone();
+    let be_upsert_val: Value = serde_json::from_slice(&be_upsert_out).unwrap();
+    assert_eq!(be_upsert_val["id"], "ent-be-2");
+    assert_eq!(be_upsert_val["action"], "created");
+    assert_eq!(
+        be_upsert_val["attachmentErrors"].as_array().unwrap().len(),
+        1
+    );
+    assert_eq!(be_upsert_val["attachmentErrors"][0]["source"], url_404);
+    ext_404.assert();
+    list_up_be.assert();
+    post_up_be.assert();
+}
+
+#[test]
+fn test_search_any_or_filter_and_unit_tolerant_number_fields() {
+    if !can_execute_binary() {
+        return;
+    }
+    let mut server = Server::new();
+
+    let summary = json!([
+        { "id": "ent-a1", "name": "Schlage Deadbolt", "quantity": 1 },
+        { "id": "ent-a2", "name": "Power Adapter", "quantity": 1 },
+        { "id": "ent-a3", "name": "Fluke 87V", "quantity": 1 },
+        { "id": "ent-a4", "name": "Both Match", "quantity": 1 }
+    ]);
+
+    let det_a1 = json!({
+        "id": "ent-a1",
+        "name": "Schlage Deadbolt",
+        "quantity": 1,
+        "fields": [
+            { "id": "f1", "name": "Model Number", "type": "text", "value": "ABC-900", "textValue": "ABC-900" },
+            { "id": "f2", "name": "Notes", "type": "text", "value": "Front door", "textValue": "Front door" }
+        ]
+    });
+    let det_a2 = json!({
+        "id": "ent-a2",
+        "name": "Power Adapter",
+        "quantity": 1,
+        "fields": [
+            { "id": "f3", "name": "Model Number", "type": "text", "value": "PSU-5V", "textValue": "PSU-5V" },
+            { "id": "f4", "name": "Notes", "type": "text", "value": "Amazon ASIN B001", "textValue": "Amazon ASIN B001" }
+        ]
+    });
+    let det_a3 = json!({
+        "id": "ent-a3",
+        "name": "Fluke 87V",
+        "quantity": 1,
+        "fields": [
+            { "id": "f5", "name": "Model Number", "type": "text", "value": "87V", "textValue": "87V" }
+        ]
+    });
+    let det_a4 = json!({
+        "id": "ent-a4",
+        "name": "Both Match",
+        "quantity": 1,
+        "fields": [
+            { "id": "f6", "name": "Model Number", "type": "text", "value": "ABC-100", "textValue": "ABC-100" },
+            { "id": "f7", "name": "Notes", "type": "text", "value": "ASIN B001", "textValue": "ASIN B001" }
+        ]
+    });
+
+    // 1. search --any --model ABC --field Notes=B001 (single hydrated pass, matches ent-a1, ent-a2, ent-a4)
+    // 2. search "Fluke" --any --field Notes=B001 (omits ?q=, matches ent-a2, ent-a3, ent-a4)
+    // 3. default search --model ABC --field Notes=B001 (AND mode, matches only ent-a4)
+    let list_search = server
+        .mock("GET", "/api/v1/entities")
+        .match_query(Matcher::Any)
+        .match_request(|req| !req.path_and_query().contains("q="))
+        .with_status(200)
+        .with_body(summary.to_string())
+        .expect(3)
+        .create();
+    let get_a1 = server
+        .mock("GET", "/api/v1/entities/ent-a1")
+        .with_status(200)
+        .with_body(det_a1.to_string())
+        .expect(3)
+        .create();
+    let get_a2 = server
+        .mock("GET", "/api/v1/entities/ent-a2")
+        .with_status(200)
+        .with_body(det_a2.to_string())
+        .expect(3)
+        .create();
+    let get_a3 = server
+        .mock("GET", "/api/v1/entities/ent-a3")
+        .with_status(200)
+        .with_body(det_a3.to_string())
+        .expect(3)
+        .create();
+    let get_a4 = server
+        .mock("GET", "/api/v1/entities/ent-a4")
+        .with_status(200)
+        .with_body(det_a4.to_string())
+        .expect(3)
+        .create();
+
+    let any_struct_out = hbctl(&server.url())
+        .args([
+            "--json",
+            "search",
+            "--any",
+            "--model",
+            "ABC",
+            "--field",
+            "Notes=B001",
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let any_struct: Vec<Value> = serde_json::from_slice(&any_struct_out).unwrap();
+    let any_ids: Vec<&str> = any_struct
+        .iter()
+        .map(|v| v["id"].as_str().unwrap())
+        .collect();
+    assert_eq!(any_ids, vec!["ent-a1", "ent-a2", "ent-a4"]);
+
+    let any_query_out = hbctl(&server.url())
+        .args([
+            "--json",
+            "search",
+            "Fluke",
+            "--any",
+            "--field",
+            "Notes=B001",
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let any_query: Vec<Value> = serde_json::from_slice(&any_query_out).unwrap();
+    let any_q_ids: Vec<&str> = any_query
+        .iter()
+        .map(|v| v["id"].as_str().unwrap())
+        .collect();
+    assert_eq!(any_q_ids, vec!["ent-a2", "ent-a3", "ent-a4"]);
+
+    let and_out = hbctl(&server.url())
+        .args([
+            "--json",
+            "search",
+            "--model",
+            "ABC",
+            "--field",
+            "Notes=B001",
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let and_items: Vec<Value> = serde_json::from_slice(&and_out).unwrap();
+    let and_ids: Vec<&str> = and_items
+        .iter()
+        .map(|v| v["id"].as_str().unwrap())
+        .collect();
+    assert_eq!(and_ids, vec!["ent-a4"]);
+
+    list_search.assert();
+    get_a1.assert();
+    get_a2.assert();
+    get_a3.assert();
+    get_a4.assert();
+
+    // 4. item create --field "Tare Weight (g)=250g" --field-type number -> "numberValue":250
+    let post_jar = server
+        .mock("POST", "/api/v1/entities")
+        .with_status(201)
+        .with_body(r#"{"id":"ent-jar","name":"Mason Jar","quantity":1,"fields":[]}"#)
+        .expect(1)
+        .create();
+    let put_jar = server
+        .mock("PUT", "/api/v1/entities/ent-jar")
+        .match_body(Matcher::Regex(r#""numberValue":250[,}]"#.to_string()))
+        .with_status(200)
+        .with_body(
+            json!({
+                "id": "ent-jar",
+                "name": "Mason Jar",
+                "quantity": 1,
+                "fields": [
+                    { "id": "fj1", "name": "Tare Weight (g)", "type": "number", "value": "250", "textValue": "250", "numberValue": 250 }
+                ]
+            })
+            .to_string(),
+        )
+        .expect(1)
+        .create();
+
+    hbctl(&server.url())
+        .args([
+            "--json",
+            "item",
+            "create",
+            "--name",
+            "Mason Jar",
+            "--field",
+            "Tare Weight (g)=250g",
+            "--field-type",
+            "number",
+        ])
+        .assert()
+        .success();
+    post_jar.assert();
+    put_jar.assert();
+
+    // 5. field set ent-1 Price $19.99 --type number -> "numberValue":19.99
+    let get_ent1 = server
+        .mock("GET", "/api/v1/entities/ent-1")
+        .with_status(200)
+        .with_body(r#"{"id":"ent-1","name":"Jar","quantity":1,"fields":[]}"#)
+        .expect(1)
+        .create();
+    let put_ent1 = server
+        .mock("PUT", "/api/v1/entities/ent-1")
+        .match_body(Matcher::Regex(r#""numberValue":19\.99[,}]"#.to_string()))
+        .with_status(200)
+        .with_body(
+            json!({
+                "id": "ent-1",
+                "name": "Jar",
+                "quantity": 1,
+                "fields": [
+                    { "id": "fp1", "name": "Price", "type": "number", "value": "19.99", "textValue": "19.99", "numberValue": 19.99 }
+                ]
+            })
+            .to_string(),
+        )
+        .expect(1)
+        .create();
+
+    hbctl(&server.url())
+        .args([
+            "--json", "field", "set", "ent-1", "Price", "$19.99", "--type", "number",
+        ])
+        .assert()
+        .success();
+    get_ent1.assert();
+    put_ent1.assert();
+
+    // 6. Negative physical units and invalid strings fail cleanly with "invalid number"
+    for bad in ["Tare Weight (g)=-250g", "Tare Weight (g)=250xyz"] {
+        hbctl(&server.url())
+            .args([
+                "item",
+                "create",
+                "--name",
+                "Bad",
+                "--field",
+                bad,
+                "--field-type",
+                "number",
+            ])
+            .assert()
+            .failure()
+            .stderr(predicate::str::contains("invalid number"));
+    }
+}

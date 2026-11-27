@@ -10,7 +10,7 @@ use std::thread;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use reqwest::blocking::{multipart, Client, RequestBuilder, Response};
-use reqwest::header::{AUTHORIZATION, CONTENT_TYPE, RETRY_AFTER};
+use reqwest::header::{AUTHORIZATION, CONTENT_DISPOSITION, CONTENT_TYPE, RETRY_AFTER};
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 use serde_json::{json, Value};
@@ -219,6 +219,15 @@ pub struct ListEntitiesQuery {
     pub entity_type_id: Option<String>,
     pub page: Option<u32>,
     pub page_size: Option<u32>,
+}
+
+/// Response payload and metadata from fetching a remote attachment URL.
+#[derive(Debug, Clone)]
+pub struct FetchedRemoteFile {
+    pub bytes: Vec<u8>,
+    pub final_url: String,
+    pub content_type: Option<String>,
+    pub content_disposition: Option<String>,
 }
 
 /// Blocking REST client for Homebox v0.26+.
@@ -873,6 +882,43 @@ impl HomeboxClient {
         let mut file = File::create(dest_path)?;
         let written = io::copy(&mut resp, &mut file)?;
         Ok(written)
+    }
+
+    /// Download a remote file over HTTP(S) without forwarding Homebox credentials.
+    pub fn fetch_remote_url(&self, url: &str) -> Result<FetchedRemoteFile> {
+        let resp =
+            self.send_with_retry(RetryMode::Idempotent, || Ok(self.download_http.get(url)))?;
+        let status = resp.status();
+        let final_url = resp.url().as_str().to_string();
+        let content_type = resp
+            .headers()
+            .get(CONTENT_TYPE)
+            .and_then(|v| v.to_str().ok())
+            .and_then(|s| s.split(';').next())
+            .map(|s| s.trim().to_ascii_lowercase())
+            .filter(|s| !s.is_empty());
+        let content_disposition = resp
+            .headers()
+            .get(CONTENT_DISPOSITION)
+            .and_then(|v| v.to_str().ok())
+            .map(ToOwned::to_owned);
+
+        if !status.is_success() {
+            let text = resp.text().unwrap_or_default();
+            let safe_msg = redact_secret(&text, &self.raw_secret);
+            return Err(HbctlError::Http {
+                status: status.as_u16(),
+                message: safe_msg,
+            });
+        }
+
+        let bytes = resp.bytes()?.to_vec();
+        Ok(FetchedRemoteFile {
+            bytes,
+            final_url,
+            content_type,
+            content_disposition,
+        })
     }
 
     pub fn delete_attachment(&self, entity_id: &str, attachment_id: &str) -> Result<()> {
