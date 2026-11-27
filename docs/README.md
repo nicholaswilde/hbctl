@@ -33,6 +33,8 @@ scoop install nicholaswilde/hbctl
 cargo install --git https://github.com/nicholaswilde/hbctl
 ```
 
+Debian/Ubuntu `.deb` packages are also published via [`nicholaswilde/apt`](https://nicholaswilde.io/apt) — see [Installation](https://nicholaswilde.io/hbctl/installation/).
+
 ### :gear:&nbsp; Usage
 
 ```bash
@@ -99,7 +101,25 @@ echo "$STAGING_KEY" | hbctl --profile staging auth login --url https://homebox-s
 HBCTL_PROFILE=staging hbctl item list
 ```
 
-See [`assets/config.example.toml`](../assets/config.example.toml).
+See [`assets/config.example.toml`](../assets/config.example.toml) and [Configuration](https://nicholaswilde.io/hbctl/configuration/).
+
+---
+
+## :book:&nbsp; Documentation
+
+Documentation can be found on the [hbctl documentation site](https://nicholaswilde.io/hbctl).
+
+---
+
+## :star:&nbsp; Contributing
+
+See [Contributing](https://nicholaswilde.io/hbctl/CONTRIBUTING/).
+
+---
+
+## :sparkles:&nbsp; Code of Conduct
+
+See [Code of Conduct](https://nicholaswilde.io/hbctl/CODE_OF_CONDUCT/).
 
 ---
 

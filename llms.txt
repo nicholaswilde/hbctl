@@ -5,7 +5,14 @@
 ## Docs
 
 - [README](docs/README.md): Overview, installation, usage, configuration
+- [Docs Home](docs/index.md): Documentation site homepage
+- [About](docs/about.md): Feature highlights and security/reliability architecture
+- [Installation](docs/installation.md): Homebrew, APT, Scoop, GitHub Releases, Cargo, completions, and man page
+- [Usage](docs/usage.md): Global options, commands, upsert, import, dedup, attachments, search, export
+- [Configuration](docs/configuration.md): Layered precedence, multi-instance profiles, image optimization, env vars
+- [Authentication & Security](docs/security.md): OS keyring + 0600 file fallback, token lifecycle, Bearer redaction
 - [Config Example](assets/config.example.toml): Annotated TOML configuration options
+- [Zensical Config](zensical.toml): Static documentation site configuration and navigation
 - [AGENTS](AGENTS.md): Architecture, module map, and quality gates
 
 ## Source
@@ -15,3 +22,10 @@
 - [src/client/mod.rs](src/client/mod.rs): Homebox v0.26+ REST client
 - [src/dedup.rs](src/dedup.rs): Two-pass deduplication engine
 - [src/output.rs](src/output.rs): Table, compact JSON, plain, CSV, Markdown renderers
+
+## Optional
+
+- [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md): Development workflow, quality gates, and DCO guidelines
+- [docs/CODE_OF_CONDUCT.md](docs/CODE_OF_CONDUCT.md): Contributor Covenant code of conduct
+- [pyproject.toml](pyproject.toml): Python environment (`zensical` >=0.0.45) via `uv`
+- [.github/workflows/docs.yml](.github/workflows/docs.yml): GitHub Pages deployment workflow for Zensical site
